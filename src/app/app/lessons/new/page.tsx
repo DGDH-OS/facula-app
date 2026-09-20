@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { LessonInput, GeneratedLesson, Vak, Niveau } from "@/lib/types";
 import { genereerLes } from "@/lib/lesson-generator";
+import { downloadLesPptx } from "@/lib/pptx-export";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -20,10 +21,24 @@ export default function NewLessonPage() {
     aantalLessen: 2,
   });
   const [resultaat, setResultaat] = useState<GeneratedLesson | null>(null);
+  const [exporteren, setExporteren] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setResultaat(genereerLes(input));
+  }
+
+  async function handleExport() {
+    if (!resultaat) return;
+    setExporteren(true);
+    try {
+      await downloadLesPptx(resultaat);
+    } catch (err) {
+      console.error("PowerPoint-export mislukt", err);
+      alert("Er ging iets mis bij het genereren van de PowerPoint. Probeer het opnieuw.");
+    } finally {
+      setExporteren(false);
+    }
   }
 
   function laadVoorbeeld() {
@@ -205,11 +220,11 @@ export default function NewLessonPage() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  disabled
-                  title="Demo-omgeving: export is een mockup, geen echt bestand"
-                  className="cursor-not-allowed rounded-full border border-[var(--color-marine)]/30 px-5 py-2.5 text-sm font-medium text-[var(--color-marine)]/60"
+                  onClick={handleExport}
+                  disabled={exporteren}
+                  className="rounded-full border border-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-marine)] hover:text-[var(--color-ivoor)] disabled:cursor-wait disabled:opacity-60"
                 >
-                  Exporteer naar PowerPoint (demo)
+                  {exporteren ? "Bezig met genereren…" : "Exporteer naar PowerPoint"}
                 </button>
                 <a
                   href="/app/tests/new"

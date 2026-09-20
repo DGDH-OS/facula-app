@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { TestInput, GeneratedTest, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
+import { downloadToetsDocx } from "@/lib/docx-export";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -22,10 +23,24 @@ export default function NewTestPage() {
     aantalVragen: 8,
   });
   const [resultaat, setResultaat] = useState<GeneratedTest | null>(null);
+  const [exporteren, setExporteren] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setResultaat(genereerToets(input));
+  }
+
+  async function handleExport() {
+    if (!resultaat) return;
+    setExporteren(true);
+    try {
+      await downloadToetsDocx(resultaat);
+    } catch (err) {
+      console.error("Word-export mislukt", err);
+      alert("Er ging iets mis bij het genereren van het Word-document. Probeer het opnieuw.");
+    } finally {
+      setExporteren(false);
+    }
   }
 
   function laadVoorbeeld() {
@@ -209,11 +224,11 @@ export default function NewTestPage() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  disabled
-                  title="Demo-omgeving: export is een mockup, geen echt bestand"
-                  className="cursor-not-allowed rounded-full border border-[var(--color-marine)]/30 px-5 py-2.5 text-sm font-medium text-[var(--color-marine)]/60"
+                  onClick={handleExport}
+                  disabled={exporteren}
+                  className="rounded-full border border-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-marine)] hover:text-[var(--color-ivoor)] disabled:cursor-wait disabled:opacity-60"
                 >
-                  Exporteer naar Word/PDF (demo)
+                  {exporteren ? "Bezig met genereren…" : "Exporteer naar Word"}
                 </button>
               </div>
             </article>
