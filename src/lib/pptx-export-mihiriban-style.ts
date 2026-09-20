@@ -1,7 +1,8 @@
 import path from "path";
 import { Automizer, modify } from "pptx-automizer";
-import type { GeneratedLesson, LessonSection } from "./types";
+import type { GeneratedLesson, LessonPart, LessonSection } from "./types";
 import { slugify } from "./pptx-export";
+import { afdwingenSlideRegels } from "./slide-content-rules";
 
 /**
  * Bouwt een PowerPoint in Mihiriban's eigen sjabloon-stijl (oranje/terracotta,
@@ -20,8 +21,10 @@ import { slugify } from "./pptx-export";
  *
  * De generator (genereerLes) levert per lesdeel 6 secties op: die worden
  * hieronder gemapt naar de 8 content-slides (2 t/m 9) van het sjabloon. Bij
- * meerdere lessen in de reeks wordt alleen de eerste les in dit sjabloon
- * gezet (het sjabloon is per ontwerp één vaste lesopbouw van 9 slides).
+ * meerdere lessen (aantalLessen > 1) wordt dit 9-slides-blok herhaald per
+ * lesdeel — elk blok krijgt in de titelslide een "Les N van M"-aanduiding,
+ * zodat alle lessen in de output terechtkomen (bug: voorheen alleen
+ * onderdelen[0]).
  */
 
 const TEMPLATE_FILE = "mihiriban-template.pptx";
@@ -36,7 +39,9 @@ function vindSectie(secties: LessonSection[], nummerPrefix: string): LessonSecti
 }
 
 function alsMultiText(regels: string[]) {
-  const gefilterd = regels.map((r) => r.trim()).filter(Boolean);
+  const gefilterd = afdwingenSlideRegels(regels)
+    .map((r) => r.trim())
+    .filter(Boolean);
   if (gefilterd.length === 0) {
     return [{ paragraph: {}, text: " " }];
   }
@@ -44,32 +49,11 @@ function alsMultiText(regels: string[]) {
 }
 
 export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buffer> {
-  const deel = les.onderdelen[0];
-  if (!deel) {
+  if (les.onderdelen.length === 0) {
     throw new Error("Les bevat geen onderdelen om te exporteren.");
   }
 
-  const leerdoelSectie = vindSectie(deel.secties, "1.");
-  const casusSectie = vindSectie(deel.secties, "2.");
-  const voorbeeldSectie = vindSectie(deel.secties, "3.");
-  const opdrachtSectie = vindSectie(deel.secties, "4.");
-  const besprekenSectie = vindSectie(deel.secties, "5.");
-  const huiswerkSectie = vindSectie(deel.secties, "6.");
-
-  const kernbegrippenRegels =
-    (leerdoelSectie?.inhoud ?? []).length > 1
-      ? (leerdoelSectie?.inhoud ?? []).slice(1)
-      : les.kernbegrippen;
-
-  const introRegels = [
-    `Leerdoel van deze les: ${les.input.leerdoel}`,
-    les.kernbegrippen.length > 0
-      ? `Vandaag komen deze kernbegrippen aan bod: ${les.kernbegrippen.join(", ")}.`
-      : "",
-  ];
-
-  const ondertitelKort =
-    les.kernbegrippen.slice(0, 3).join(", ") || les.titel;
+  const aantalLessen = les.onderdelen.length;
 
   // Let op: cleanup:true laat pptx-automizer "ongebruikte" media weghalen op
   // basis van slide-relaties — image1.jpeg wordt echter alleen door
@@ -86,59 +70,86 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
     .loadRoot(TEMPLATE_FILE)
     .load(TEMPLATE_FILE, "tpl");
 
-  // Slide 1 — titel
-  pres.addSlide("tpl", 1, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText(`${les.input.vak} ${les.input.niveau} ${les.input.leerjaar}`));
-    slide.modifyElement(ONDERTITEL_SHAPE, modify.setText(`Les 1 · ${ondertitelKort}`));
-  });
+  const voegLesBlokToe = (deel: LessonPart, idx: number) => {
+    const leerdoelSectie = vindSectie(deel.secties, "1.");
+    const casusSectie = vindSectie(deel.secties, "2.");
+    const voorbeeldSectie = vindSectie(deel.secties, "3.");
+    const opdrachtSectie = vindSectie(deel.secties, "4.");
+    const besprekenSectie = vindSectie(deel.secties, "5.");
+    const huiswerkSectie = vindSectie(deel.secties, "6.");
 
-  // Slide 2 — introductie
-  pres.addSlide("tpl", 2, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText("Introductie"));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(introRegels)));
-  });
+    const kernbegrippenRegels =
+      (leerdoelSectie?.inhoud ?? []).length > 1
+        ? (leerdoelSectie?.inhoud ?? []).slice(1)
+        : les.kernbegrippen;
 
-  // Slide 3 — leerdoelen
-  pres.addSlide("tpl", 3, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText("Leerdoelen"));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText([les.input.leerdoel])));
-  });
+    const introRegels = [
+      `Leerdoel: ${les.input.leerdoel}`,
+      les.kernbegrippen.length > 0
+        ? `Kernbegrippen vandaag: ${les.kernbegrippen.slice(0, 4).join(", ")}`
+        : "",
+    ];
 
-  // Slide 4 — kernbegrippen
-  pres.addSlide("tpl", 4, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText("Kernbegrippen"));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(kernbegrippenRegels)));
-  });
+    const ondertitelKort =
+      les.kernbegrippen.slice(0, 3).join(", ") || les.titel;
+    const lesLabel = aantalLessen > 1 ? `Les ${idx + 1} van ${aantalLessen}` : "Les 1";
 
-  // Slide 5 — casus
-  pres.addSlide("tpl", 5, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText(`Casus: ${les.input.vak.toLowerCase()}`));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(casusSectie?.inhoud ?? [])));
-  });
+    // Slide — titel (per lesdeel, met "Les N van M"-aanduiding bij meerdere lessen)
+    pres.addSlide("tpl", 1, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText(`${les.input.vak} ${les.input.niveau} ${les.input.leerjaar}`));
+      slide.modifyElement(ONDERTITEL_SHAPE, modify.setText(`${lesLabel} · ${ondertitelKort}`));
+    });
 
-  // Slide 6 — voorbeeld uitgewerkt
-  pres.addSlide("tpl", 6, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText("Voorbeeld uitgewerkt"));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(voorbeeldSectie?.inhoud ?? [])));
-  });
+    // Slide — introductie
+    pres.addSlide("tpl", 2, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Introductie"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(introRegels)));
+    });
 
-  // Slide 7 — opdracht in tweetallen
-  pres.addSlide("tpl", 7, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText("Opdracht in tweetallen"));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(opdrachtSectie?.inhoud ?? [])));
-  });
+    // Slide — leerdoelen
+    pres.addSlide("tpl", 3, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Leerdoelen"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText([les.input.leerdoel])));
+    });
 
-  // Slide 8 — bespreken
-  pres.addSlide("tpl", 8, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText("Bespreken"));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(besprekenSectie?.inhoud ?? [])));
-  });
+    // Slide — kernbegrippen
+    pres.addSlide("tpl", 4, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Kernbegrippen"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(kernbegrippenRegels)));
+    });
 
-  // Slide 9 — huiswerk
-  pres.addSlide("tpl", 9, (slide) => {
-    slide.modifyElement(TITEL_SHAPE, modify.setText("Huiswerk"));
-    slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(huiswerkSectie?.inhoud ?? [])));
-  });
+    // Slide — casus
+    pres.addSlide("tpl", 5, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText(`Casus: ${les.input.vak.toLowerCase()}`));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(casusSectie?.inhoud ?? [])));
+    });
+
+    // Slide — voorbeeld uitgewerkt
+    pres.addSlide("tpl", 6, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Voorbeeld uitgewerkt"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(voorbeeldSectie?.inhoud ?? [])));
+    });
+
+    // Slide — opdracht in tweetallen
+    pres.addSlide("tpl", 7, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Opdracht in tweetallen"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(opdrachtSectie?.inhoud ?? [])));
+    });
+
+    // Slide — bespreken
+    pres.addSlide("tpl", 8, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Bespreken"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(besprekenSectie?.inhoud ?? [])));
+    });
+
+    // Slide — huiswerk
+    pres.addSlide("tpl", 9, (slide) => {
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Huiswerk"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(huiswerkSectie?.inhoud ?? [])));
+    });
+  };
+
+  les.onderdelen.forEach((deel, idx) => voegLesBlokToe(deel, idx));
 
   const zip = await pres.getJSZip();
   const buffer = await zip.generateAsync({ type: "nodebuffer" });

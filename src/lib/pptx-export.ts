@@ -1,5 +1,6 @@
 import PptxGenJS from "pptxgenjs";
 import type { GeneratedLesson } from "./types";
+import { afdwingenSlideRegels, trimTitel } from "./slide-content-rules";
 
 // Facula kleurpalet (zie src/app/globals.css) — zonder '#' voor pptxgenjs
 const COLORS = {
@@ -118,8 +119,8 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
         }
       );
 
-      // sectietitel
-      slide.addText(sectie.titel, {
+      // sectietitel (assertion-zin, afgedwongen woordlimiet)
+      slide.addText(trimTitel(sectie.titel), {
         x: 0.5,
         y: 0.75,
         w: 9,
@@ -139,10 +140,12 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
         line: { color: COLORS.lijn, width: 1 },
       });
 
-      // bullets
-      if (sectie.inhoud.length > 0) {
+      // bullets — nogmaals door de content-regels gehaald zodat deze route
+      // consistent kort blijft, ongeacht wat de generator aanleverde.
+      const inhoudBeperkt = afdwingenSlideRegels(sectie.inhoud);
+      if (inhoudBeperkt.length > 0) {
         slide.addText(
-          sectie.inhoud.map((regel) => ({
+          inhoudBeperkt.map((regel) => ({
             text: regel,
             options: {
               bullet: { code: "2014", indent: 20 },

@@ -6,6 +6,11 @@ import type {
   LessonPart,
   LessonSection,
 } from "./types";
+import {
+  afdwingenSlideRegels,
+  afdwingenDefinitie,
+  trimTitel,
+} from "./slide-content-rules";
 
 /* ------------------------------------------------------------------ */
 /* Begrippen-extractie                                                 */
@@ -45,21 +50,17 @@ export function extraheerBegrippen(leerdoel: string): string[] {
 
 /* ------------------------------------------------------------------ */
 /* Begrippendefinities — bekende termen per vak, plus generieke fallback */
+/* Elke definitie is 1 losse, korte kernzin (zie PRESENTATIE-METHODIEK.md: */
+/* DEFINITIONS_AS_SINGLE_SENTENCE) — geen lijst van volzinnen.            */
 /* ------------------------------------------------------------------ */
 
 const DEFINITIES: Record<string, string> = {
-  referentiekader:
-    "het geheel van waarden, normen, ervaringen en kennis waarmee iemand de werkelijkheid interpreteert en beoordeelt.",
-  "selectieve waarneming":
-    "het onbewust vooral opmerken van informatie die past bij wat je al denkt of verwacht, en het negeren van informatie die daarmee in strijd is.",
-  desinformatie:
-    "informatie die doelbewust onjuist of misleidend is, met als doel mensen op het verkeerde been te zetten.",
-  manipulatie:
-    "het bewust beïnvloeden van iemands mening of gedrag door oneerlijke of misleidende middelen, zonder dat diegene dat doorheeft.",
-  polarisatie:
-    "het proces waarbij standpunten van groepen steeds verder uit elkaar gaan liggen, waardoor het 'wij' en 'zij'-denken toeneemt.",
-  framing:
-    "de manier waarop een boodschap wordt ingekleed of gepresenteerd, waardoor het publiek een bepaalde interpretatie krijgt aangereikt.",
+  referentiekader: "eigen waarden en ervaringen kleuren je interpretatie",
+  "selectieve waarneming": "onbewust vooral zien wat je al verwacht",
+  desinformatie: "bewust onjuiste, misleidende informatie",
+  manipulatie: "oneerlijk beïnvloeden van mening of gedrag",
+  polarisatie: "standpunten groeien steeds verder uit elkaar",
+  framing: "boodschap ingekleed voor gewenste interpretatie",
 };
 
 const GENERIEKE_VAKTERMEN: Record<Vak, string[]> = {
@@ -96,53 +97,53 @@ const GENERIEKE_VAKTERMEN: Record<Vak, string[]> = {
 
 function definieer(begrip: string, vak: Vak): string {
   const key = begrip.toLowerCase().trim();
-  if (DEFINITIES[key]) return DEFINITIES[key];
-  return `een kernbegrip binnen ${vak.toLowerCase()} dat leerlingen nodig hebben om de casus in deze les goed te kunnen duiden — leg dit begrip in eigen woorden uit en illustreer met een actueel voorbeeld.`;
+  if (DEFINITIES[key]) return afdwingenDefinitie(DEFINITIES[key]);
+  return afdwingenDefinitie(`kernbegrip binnen ${vak.toLowerCase()}, leg uit met voorbeeld`);
 }
 
 /* ------------------------------------------------------------------ */
 /* Casus met concrete cijfers — per vak, generiek herbruikbaar          */
+/* Fragmenten/labels, geen volzinnen — docent vult mondeling aan.       */
 /* ------------------------------------------------------------------ */
 
 function bouwCasus(vak: Vak, begrippen: string[], niveau: Niveau): string[] {
-  const eerste = begrippen[0] ?? "het kernbegrip";
-  const tweede = begrippen[1] ?? begrippen[0] ?? "een ander kernbegrip";
+  const eerste = begrippen[0] ?? "kernbegrip";
+  const tweede = begrippen[1] ?? begrippen[0] ?? "ander begrip";
 
   const casusMap: Record<Vak, string[]> = {
     Maatschappijleer: [
-      `Uit onderzoek van het CBS (2024) blijkt dat 68% van de 16- tot 24-jarigen dagelijks nieuws via social media tot zich neemt, tegenover 31% via een traditionele nieuwswebsite of krant.`,
-      `Op een fictief social-media-platform bereikt een bericht met een emotionele, gepolariseerde titel gemiddeld 4,2 keer zoveel weergaven als een neutraal geformuleerd bericht over hetzelfde onderwerp.`,
-      `In een klassikale peiling (n=180 leerlingen, 6 klassen) gaf 55% aan minstens één keer een nieuwsbericht te hebben gedeeld zonder de bron te controleren.`,
-      `Laat leerlingen in tweetallen bepalen: welke rol spelen ${eerste} en ${tweede} in dit soort cijfers, en wat betekent dat voor hoe betrouwbaar informatie op social media is?`,
+      "68% jongeren: nieuws via social media",
+      "Emotionele titel: 4,2x meer weergaven",
+      "55% deelt nieuws zonder bron te checken",
+      `Vraag: rol van ${eerste} en ${tweede}?`,
     ],
     Geschiedenis: [
-      `Tussen 1870 en 1914 groeide de Europese bevolking van circa 290 naar 460 miljoen mensen — een stijging van bijna 60% in nog geen halve eeuw.`,
-      `In dezelfde periode nam het aantal koloniale bezittingen van de grote Europese mogendheden in Afrika toe van ongeveer 10% van het continent (1870) naar meer dan 90% (1914).`,
-      `Historici gebruiken bronnen uit deze periode (kranten, redevoeringen, kaarten) om te reconstrueren hoe tijdgenoten deze ontwikkeling beoordeelden.`,
-      `Laat leerlingen in tweetallen bepalen: hoe helpen ${eerste} en ${tweede} bij het analyseren van deze bronnen en cijfers?`,
+      "Europese bevolking: 290 → 460 miljoen (1870-1914)",
+      "Koloniaal bezit Afrika: 10% → 90%",
+      "Bronnen: kranten, redevoeringen, kaarten",
+      `Vraag: hoe helpen ${eerste} en ${tweede}?`,
     ],
     Economie: [
-      `De inflatie in Nederland bedroeg in 2023 gemiddeld 4,1%, terwijl de gemiddelde cao-loonstijging uitkwam op 6,2%.`,
-      `Een supermarktketen verhoogt de prijs van een basisproduct met 8%; de gevraagde hoeveelheid daalt vervolgens met 3%.`,
-      `In dezelfde periode steeg de rente van de ECB van 0% naar 4,5%, wat direct doorwerkte in hypotheeklasten van huishoudens.`,
-      `Laat leerlingen in tweetallen bepalen: wat verklaren ${eerste} en ${tweede} over het gedrag van consumenten en producenten in dit voorbeeld?`,
+      "Inflatie 4,1% vs. cao-stijging 6,2% (2023)",
+      "Prijs +8% → gevraagde hoeveelheid -3%",
+      "ECB-rente: 0% → 4,5%",
+      `Vraag: wat verklaren ${eerste} en ${tweede}?`,
     ],
     Aardrijkskunde: [
-      `Tussen 2000 en 2023 groeide de wereldbevolking in steden van 2,9 miljard naar 4,4 miljard mensen — een toename van 52%.`,
-      `In een fictieve middelgrote stad wordt een woonwijk gepland voor 3.500 nieuwe woningen, terwijl de bestaande infrastructuur berekend is op 15% minder verkeersbewegingen.`,
-      `Een enquête onder bewoners laat zien dat 42% voorstander is van het plan, 38% tegen en 20% neutraal.`,
-      `Laat leerlingen in tweetallen bepalen: welke rol spelen ${eerste} en ${tweede} bij het afwegen van dit soort ruimtelijke keuzes?`,
+      "Wereldbevolking steden: 2,9 → 4,4 miljard",
+      "Nieuwe wijk: 3.500 woningen, infra -15%",
+      "Enquête: 42% voor, 38% tegen, 20% neutraal",
+      `Vraag: rol van ${eerste} en ${tweede}?`,
     ],
   };
 
-  const niveauNoot =
-    niveau === "vwo"
-      ? "Vraag vwo-leerlingen expliciet om de causaliteit kritisch te bevragen: correlatie is niet automatisch oorzaak-gevolg."
-      : niveau === "havo"
-        ? "Laat havo-leerlingen de cijfers eerst in eigen woorden samenvatten voordat ze de vervolgvraag beantwoorden."
-        : "Ondersteun met een visuele weergave van de cijfers (staafdiagram) voordat de vervolgvraag wordt gesteld.";
+  const niveauLabel: Record<Niveau, string> = {
+    vwo: "Extra: correlatie ≠ oorzaak-gevolg",
+    havo: "Eerst kort samenvatten in eigen woorden",
+    "vmbo-t": "Ondersteun met staafdiagram",
+  };
 
-  return [...casusMap[vak], niveauNoot];
+  return afdwingenSlideRegels([...casusMap[vak].slice(0, 3), niveauLabel[niveau]]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -150,14 +151,13 @@ function bouwCasus(vak: Vak, begrippen: string[], niveau: Niveau): string[] {
 /* ------------------------------------------------------------------ */
 
 function bouwUitgewerktVoorbeeld(vak: Vak, begrippen: string[]): string[] {
-  const term = begrippen[0] ?? "het kernbegrip";
-  return [
-    `Model hardop denkend voor: bekijk samen met de klas één concreet voorbeeld (bijvoorbeeld een nieuwsbericht, historische bron, prijsverandering of ruimtelijk plan) en laat zien hoe je ${term} hierin herkent.`,
-    `Stap 1 — benoem wat je waarneemt (de feiten/cijfers).`,
-    `Stap 2 — benoem welk kernbegrip hierop van toepassing is en waarom.`,
-    `Stap 3 — leg de link naar het bredere maatschappelijke vraagstuk uit deze les.`,
-    `Gebruik dit voorbeeld als hardop-denkmodel voordat leerlingen zelfstandig aan de slag gaan — dit voorkomt dat de opdracht te abstract blijft.`,
-  ];
+  const term = begrippen[0] ?? "kernbegrip";
+  return afdwingenSlideRegels([
+    "Kies voorbeeld: nieuwsbericht, bron of plan",
+    "Stap 1: benoem de feiten/cijfers",
+    `Stap 2: herken ${term} hierin`,
+    "Stap 3: leg link naar vraagstuk",
+  ]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -165,31 +165,31 @@ function bouwUitgewerktVoorbeeld(vak: Vak, begrippen: string[]): string[] {
 /* ------------------------------------------------------------------ */
 
 function bouwOpdracht(begrippen: string[]): string[] {
-  const lijst = begrippen.slice(0, 4);
-  return [
-    `Werk in tweetallen. Kies met je duo twee van de volgende kernbegrippen: ${lijst.join(", ")}.`,
-    `Zoek of bedenk samen een eigen, actueel voorbeeld waarin deze begrippen zichtbaar zijn (uit het nieuws, social media, of je eigen omgeving).`,
-    `Beschrijf in 4-6 zinnen: wat gebeurt er, welk begrip herken je, en wat is het maatschappelijke gevolg?`,
-    `Tijd: circa 12-15 minuten. Loop als docent rond en stel verdiepingsvragen ("hoe weet je dat dit ${lijst[0] ?? "dit begrip"} is en niet iets anders?").`,
-  ];
+  const lijst = begrippen.slice(0, 2);
+  return afdwingenSlideRegels([
+    `Kies twee begrippen: ${lijst.join(", ")}`,
+    "Zoek eigen actueel voorbeeld",
+    "Beschrijf kort: wat, begrip, gevolg",
+    "Tijd: 12-15 minuten",
+  ]);
 }
 
 function bouwBespreken(): string[] {
-  return [
-    "Laat 2-3 tweetallen hun voorbeeld kort (max. 1 minuut per duo) plenair delen.",
-    "Vraag de klas steeds: zijn jullie het eens met deze toepassing van het begrip? Waarom wel/niet?",
-    "Vat aan het bord samen welke begrippen zijn langsgekomen en leg de onderlinge samenhang uit (bijvoorbeeld: hoe kan framing bijdragen aan polarisatie).",
-    "Sluit af met de kernvraag van de les: wat heeft dit te maken met een groter maatschappelijk probleem?",
-  ];
+  return afdwingenSlideRegels([
+    "2-3 duo's delen voorbeeld (max 1 min)",
+    "Vraag: eens met deze toepassing?",
+    "Docent vat begrippen en samenhang samen",
+    "Terug naar kernvraag van de les",
+  ]);
 }
 
 function bouwHuiswerk(vak: Vak, begrippen: string[]): string[] {
-  const term = begrippen[0] ?? "een kernbegrip uit deze les";
-  return [
-    `Zoek zelfstandig één bericht, artikel of bron die past bij het vak ${vak.toLowerCase()} en waarin je ${term} herkent.`,
-    `Schrijf 5-8 zinnen: wat is de bron, welk begrip zie je terug, en welk maatschappelijk vraagstuk raakt dit?`,
-    `Neem je bron mee (link, foto of print) naar de volgende les — deze wordt gebruikt als opwarmer.`,
-  ];
+  const term = begrippen[0] ?? "kernbegrip";
+  return afdwingenSlideRegels([
+    `Zoek bron (${vak.toLowerCase()}) met ${term}`,
+    "Schrijf kort: bron, begrip, vraagstuk",
+    "Neem bron mee naar volgende les",
+  ]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,10 +197,12 @@ function bouwHuiswerk(vak: Vak, begrippen: string[]): string[] {
 /* ------------------------------------------------------------------ */
 
 function titelVoorLes(input: LessonInput): string {
-  return `${input.vak} — ${input.niveau.toUpperCase()} ${input.leerjaar}: les over ${input.leerdoel
-    .split(" ")
-    .slice(0, 6)
-    .join(" ")}...`;
+  return trimTitel(
+    `${input.vak} — ${input.niveau.toUpperCase()} ${input.leerjaar}: les over ${input.leerdoel
+      .split(" ")
+      .slice(0, 6)
+      .join(" ")}...`
+  );
 }
 
 export function genereerLes(input: LessonInput): GeneratedLesson {
@@ -221,43 +223,44 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
     const isLaatsteLes = idx === aantalLessen - 1;
     const secties: LessonSection[] = [
       {
-        titel: "1. Leerdoel & kernbegrippen",
+        titel: trimTitel("1. Leerdoel & kernbegrippen"),
         duur: 8,
-        inhoud: [
-          idx === 0
-            ? `Introduceer het leerdoel van deze lessenreeks: "${input.leerdoel}"`
-            : `Herhaal kort het leerdoel uit de vorige les en introduceer de nieuwe kernbegrippen van vandaag.`,
-          ...groep.map((b) => `${b[0].toUpperCase()}${b.slice(1)}: ${definieer(b, input.vak)}`),
-        ],
+        inhoud: afdwingenSlideRegels(
+          [
+            idx === 0 ? "Leerdoel van deze les(senreeks)" : "Herhaling + nieuwe kernbegrippen",
+            ...groep.map((b) => `${b[0].toUpperCase()}${b.slice(1)}: ${definieer(b, input.vak)}`),
+          ],
+          { maxBullets: groep.length + 1 }
+        ),
       },
       {
-        titel: "2. Casus met concrete cijfers",
+        titel: trimTitel("2. Casus met concrete cijfers"),
         duur: 12,
         inhoud: bouwCasus(input.vak, groep, input.niveau),
       },
       {
-        titel: "3. Uitgewerkt voorbeeld (klassikaal, docent modelt)",
+        titel: trimTitel("3. Uitgewerkt voorbeeld (klassikaal, docent modelt)"),
         duur: 8,
         inhoud: bouwUitgewerktVoorbeeld(input.vak, groep),
       },
       {
-        titel: "4. Opdracht in tweetallen",
+        titel: trimTitel("4. Opdracht in tweetallen"),
         duur: 15,
         inhoud: bouwOpdracht(groep),
       },
       {
-        titel: "5. Bespreken (plenair)",
+        titel: trimTitel("5. Bespreken (plenair)"),
         duur: 7,
         inhoud: bouwBespreken(),
       },
       {
-        titel: isLaatsteLes ? "6. Huiswerk & vooruitblik toets" : "6. Huiswerk",
+        titel: trimTitel(isLaatsteLes ? "6. Huiswerk & vooruitblik toets" : "6. Huiswerk"),
         duur: 0,
         inhoud: isLaatsteLes
-          ? [
+          ? afdwingenSlideRegels([
               ...bouwHuiswerk(input.vak, groep),
-              "Vooruitblik: deze lessenreeks kan direct worden afgesloten met een toets die op dezelfde leerdoelen en kernbegrippen aansluit (zie toetsgenerator).",
-            ]
+              "Vooruitblik: toets sluit aan op leerdoelen",
+            ])
           : bouwHuiswerk(input.vak, groep),
       },
     ];
