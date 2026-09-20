@@ -129,11 +129,15 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
         ? (leerdoelSectie?.inhoud ?? []).slice(1)
         : les.kernbegrippen;
 
+    // Let op: het volledige leerdoel gaat NIET door alsMultiText (7-woorden-
+    // trim) — dat kapte hem eerder af tot "je kunt opnoemen en uitleggen wat"
+    // (bug 2, ook hier aanwezig naast de Leerdoelen-slide). Introductie krijgt
+    // daarom alleen een korte kernwoorden-regel, het volledige leerdoel staat
+    // al ongeknipt op de volgende (Leerdoelen-)slide.
     const introRegels = [
-      `Leerdoel: ${les.input.leerdoel}`,
       les.kernbegrippen.length > 0
         ? `Kernbegrippen vandaag: ${les.kernbegrippen.slice(0, 4).join(", ")}`
-        : "",
+        : "Zie leerdoel op volgende slide",
     ];
 
     const ondertitelKort =
