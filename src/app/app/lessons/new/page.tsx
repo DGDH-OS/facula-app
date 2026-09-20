@@ -1,242 +1,203 @@
 "use client";
 
 import { useState } from "react";
-import type { LessonInput, GeneratedLesson, Vak, Niveau } from "@/lib/types";
-import { genereerLes } from "@/lib/lesson-generator";
-import { downloadLesPptx } from "@/lib/pptx-export";
+import type { LessonInput, Vak, Niveau } from "@/lib/types";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
 
-const DEMO_LEERDOEL =
-  "Je kunt opnoemen en uitleggen wat de begrippen referentiekader, selectieve waarneming, desinformatie, manipulatie, polarisatie, framing betekenen, en je kunt uitleggen wat deze begrippen te maken hebben met maatschappelijke problemen.";
+const DEFAULT_INPUT: LessonInput = {
+  vak: "Maatschappijleer",
+  niveau: "havo",
+  leerjaar: 4,
+  leerdoel: "",
+  lesduur: 50,
+  aantalLessen: 1,
+};
 
+/**
+ * Sterk vereenvoudigde flow: alleen het leerdoel vraagt verplicht aandacht.
+ * Vak/niveau/leerjaar/lesduur/aantal lessen staan achter een inklapbaar
+ * "instellingen"-blok met verstandige defaults. Bij klikken op de primaire
+ * knop wordt de les gegenereerd én de PowerPoint in Mihiriban's eigen
+ * sjabloon-stijl direct gedownload — in één vloeiende actie.
+ */
 export default function NewLessonPage() {
-  const [input, setInput] = useState<LessonInput>({
-    vak: "Maatschappijleer",
-    niveau: "havo",
-    leerjaar: 4,
-    leerdoel: DEMO_LEERDOEL,
-    lesduur: 50,
-    aantalLessen: 2,
-  });
-  const [resultaat, setResultaat] = useState<GeneratedLesson | null>(null);
-  const [exporteren, setExporteren] = useState(false);
+  const [input, setInput] = useState<LessonInput>(DEFAULT_INPUT);
+  const [instellingenOpen, setInstellingenOpen] = useState(false);
+  const [bezig, setBezig] = useState(false);
+  const [fout, setFout] = useState<string | null>(null);
+  const [klaar, setKlaar] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setResultaat(genereerLes(input));
-  }
+    if (!input.leerdoel.trim()) return;
 
-  async function handleExport() {
-    if (!resultaat) return;
-    setExporteren(true);
+    setBezig(true);
+    setFout(null);
+    setKlaar(false);
+
     try {
-      await downloadLesPptx(resultaat);
+      const response = await fetch("/api/lessons/mihiriban-pptx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error ?? "Genereren mislukt.");
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition") ?? "";
+      const match = contentDisposition.match(/filename="([^"]+)"/);
+      const bestandsnaam = match?.[1] ?? "les.pptx";
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = bestandsnaam;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setKlaar(true);
     } catch (err) {
       console.error("PowerPoint-export mislukt", err);
-      alert("Er ging iets mis bij het genereren van de PowerPoint. Probeer het opnieuw.");
+      setFout(
+        err instanceof Error
+          ? err.message
+          : "Er ging iets mis bij het genereren van de PowerPoint. Probeer het opnieuw."
+      );
     } finally {
-      setExporteren(false);
+      setBezig(false);
     }
   }
 
-  function laadVoorbeeld() {
-    setInput({
-      vak: "Maatschappijleer",
-      niveau: "havo",
-      leerjaar: 4,
-      leerdoel: DEMO_LEERDOEL,
-      lesduur: 50,
-      aantalLessen: 2,
-    });
-  }
-
   return (
-    <div>
-      <h1 className="font-display text-3xl text-[var(--color-marine)]">Nieuwe les genereren</h1>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--color-inkt)]/70">
-        Vul het leerdoel in — Facula vult automatisch kernbegrippen, casus,
-        uitgewerkt voorbeeld, opdracht, bespreking en huiswerk in volgens het
-        vaste lesformat.
+    <div className="mx-auto max-w-2xl">
+      <h1 className="font-display text-3xl text-[var(--color-marine)]">
+        Nieuwe les genereren
+      </h1>
+      <p className="mt-1 text-sm text-[var(--color-inkt)]/70">
+        Typ je leerdoel en klik op &quot;Maak mijn PowerPoint&quot; — Facula
+        genereert de hele les en levert meteen een kant-en-klare PowerPoint
+        in jouw eigen sjabloonstijl.
       </p>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[420px_1fr]">
-        <form
-          onSubmit={handleSubmit}
-          className="h-fit space-y-5 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6"
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-marine)]">Vak</label>
-              <select
-                value={input.vak}
-                onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
-                className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-              >
-                {VAKKEN.map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-marine)]">Niveau</label>
-              <select
-                value={input.niveau}
-                onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
-                className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-              >
-                {NIVEAUS.map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-marine)]">Leerjaar</label>
-              <input
-                type="number"
-                min={1}
-                max={6}
-                value={input.leerjaar}
-                onChange={(e) => setInput({ ...input, leerjaar: Number(e.target.value) })}
-                className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-marine)]">Lesduur (min)</label>
-              <input
-                type="number"
-                min={20}
-                max={120}
-                step={5}
-                value={input.lesduur}
-                onChange={(e) => setInput({ ...input, lesduur: Number(e.target.value) })}
-                className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">Aantal lessen</label>
-            <input
-              type="number"
-              min={1}
-              max={6}
-              value={input.aantalLessen}
-              onChange={(e) => setInput({ ...input, aantalLessen: Number(e.target.value) })}
-              className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-            />
-            <p className="mt-1 text-xs text-[var(--color-inkt)]/50">
-              De kernbegrippen uit het leerdoel worden verdeeld over dit aantal lessen.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">Leerdoel</label>
-            <textarea
-              required
-              rows={5}
-              value={input.leerdoel}
-              onChange={(e) => setInput({ ...input, leerdoel: e.target.value })}
-              className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              className="rounded-full bg-[var(--color-marine)] px-6 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
-            >
-              Genereer les
-            </button>
-            <button
-              type="button"
-              onClick={laadVoorbeeld}
-              className="text-xs text-[var(--color-inkt)]/60 underline underline-offset-4 hover:text-[var(--color-marine)]"
-            >
-              Laad Mihiriban-voorbeeld
-            </button>
-          </div>
-        </form>
-
+      <form
+        onSubmit={handleSubmit}
+        className="mt-8 space-y-6 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6"
+      >
         <div>
-          {!resultaat && (
-            <div className="flex h-full min-h-[300px] items-center justify-center rounded-2xl border border-dashed border-[var(--color-lijn)] text-sm text-[var(--color-inkt)]/50">
-              Vul het formulier in en klik op &quot;Genereer les&quot; om de output hier te zien.
-            </div>
-          )}
-          {resultaat && (
-            <article className="space-y-10">
-              <header className="rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-marine)] p-8 text-[var(--color-ivoor)]">
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-goud)]">
-                  {resultaat.input.vak} · {resultaat.input.niveau} {resultaat.input.leerjaar} ·{" "}
-                  {resultaat.input.aantalLessen}× {resultaat.input.lesduur} min
-                </p>
-                <h2 className="mt-3 font-display text-2xl">{resultaat.titel}</h2>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {resultaat.kernbegrippen.map((b) => (
-                    <span
-                      key={b}
-                      className="rounded-full bg-[var(--color-ivoor)]/10 px-3 py-1 text-xs"
-                    >
-                      {b}
-                    </span>
+          <label className="block text-base font-semibold text-[var(--color-marine)]">
+            Wat is het leerdoel van deze les?
+          </label>
+          <textarea
+            required
+            autoFocus
+            rows={7}
+            value={input.leerdoel}
+            onChange={(e) => setInput({ ...input, leerdoel: e.target.value })}
+            placeholder="Bijv. Je kunt uitleggen wat de begrippen referentiekader, selectieve waarneming en framing betekenen, en hoe ze samenhangen met maatschappelijke problemen."
+            className="mt-2 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-3 text-base leading-relaxed outline-none focus:border-[var(--color-marine)]"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={bezig || !input.leerdoel.trim()}
+          className="w-full rounded-full bg-[var(--color-marine)] px-6 py-3.5 text-base font-semibold text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:cursor-wait disabled:opacity-60"
+        >
+          {bezig ? "Bezig met genereren…" : "Maak mijn PowerPoint"}
+        </button>
+
+        {fout && (
+          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            {fout}
+          </p>
+        )}
+        {klaar && !fout && (
+          <p className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+            Je PowerPoint is gedownload — check je downloadmap.
+          </p>
+        )}
+
+        <div className="border-t border-[var(--color-lijn)] pt-4">
+          <button
+            type="button"
+            onClick={() => setInstellingenOpen((v) => !v)}
+            className="text-xs font-medium text-[var(--color-inkt)]/60 underline underline-offset-4 hover:text-[var(--color-marine)]"
+          >
+            {instellingenOpen ? "Instellingen verbergen" : "Instellingen aanpassen (optioneel)"}
+          </button>
+
+          {instellingenOpen && (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-marine)]">Vak</label>
+                <select
+                  value={input.vak}
+                  onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+                >
+                  {VAKKEN.map((v) => (
+                    <option key={v} value={v}>{v}</option>
                   ))}
-                </div>
-              </header>
-
-              {resultaat.onderdelen.map((deel) => (
-                <div key={deel.nummer} className="rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor)] p-8">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="font-display text-xl text-[var(--color-marine)]">{deel.titel}</h3>
-                    <span className="text-xs text-[var(--color-inkt)]/50">{deel.duur} minuten</span>
-                  </div>
-                  <div className="mt-6 space-y-6">
-                    {deel.secties.map((sectie) => (
-                      <div key={sectie.titel}>
-                        <div className="flex items-baseline justify-between">
-                          <h4 className="text-sm font-semibold text-[var(--color-groen)]">{sectie.titel}</h4>
-                          {sectie.duur ? (
-                            <span className="text-xs text-[var(--color-inkt)]/40">{sectie.duur} min</span>
-                          ) : null}
-                        </div>
-                        <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-[var(--color-inkt)]/80">
-                          {sectie.inhoud.map((regel, i) => (
-                            <li key={i} className="flex gap-2">
-                              <span className="text-[var(--color-goud)]">—</span>
-                              <span>{regel}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  disabled={exporteren}
-                  className="rounded-full border border-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-marine)] hover:text-[var(--color-ivoor)] disabled:cursor-wait disabled:opacity-60"
-                >
-                  {exporteren ? "Bezig met genereren…" : "Exporteer naar PowerPoint"}
-                </button>
-                <a
-                  href="/app/tests/new"
-                  className="rounded-full bg-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
-                >
-                  Genereer bijpassende toets →
-                </a>
+                </select>
               </div>
-            </article>
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-marine)]">Niveau</label>
+                <select
+                  value={input.niveau}
+                  onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+                >
+                  {NIVEAUS.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-marine)]">Leerjaar</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={input.leerjaar}
+                  onChange={(e) => setInput({ ...input, leerjaar: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-marine)]">Lesduur (min)</label>
+                <input
+                  type="number"
+                  min={20}
+                  max={120}
+                  step={5}
+                  value={input.lesduur}
+                  onChange={(e) => setInput({ ...input, lesduur: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-marine)]">Aantal lessen</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={input.aantalLessen}
+                  onChange={(e) => setInput({ ...input, aantalLessen: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+                />
+              </div>
+            </div>
           )}
         </div>
-      </div>
+      </form>
     </div>
   );
 }
