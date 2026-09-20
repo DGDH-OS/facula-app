@@ -10,6 +10,7 @@ import {
   afdwingenSlideRegels,
   afdwingenDefinitie,
   trimTitel,
+  MAX_WOORDEN_PER_DEFINITIE_BULLET,
 } from "./slide-content-rules";
 
 /* ------------------------------------------------------------------ */
@@ -17,14 +18,46 @@ import {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Stopwoorden voor de fallback-extractie: veelgebruikte Nederlandse
+ * onderwijs-werkwoorden en functiewoorden uit typische leerdoel-formuleringen
+ * ("je kunt uitleggen/opnoemen/benoemen wat de begrippen ... betekenen/
+ * inhouden en hoe deze de ... beïnvloeden"). Dit is een veiligheidsnet: als
+ * de primaire regex-match faalt, mag de fallback NOOIT een van deze woorden
+ * als kernbegrip aanzien, ook al is het > 6 letters.
+ */
+const STOPWOORDEN_FALLBACK = new Set(
+  [
+    "opnoemen", "uitleggen", "benoemen", "beschrijven", "toelichten",
+    "verklaren", "analyseren", "beoordelen", "onderbouwen", "toepassen",
+    "herkennen", "vergelijken", "samenvatten", "formuleren", "motiveren",
+    "onderzoeken", "beargumenteren", "illustreren", "definiëren", "duiden",
+    "begrippen", "begrip", "leerdoel", "leerdoelen", "kunnen", "kunt",
+    "kan", "moet", "moeten", "leerling", "leerlingen", "student",
+    "studenten", "maatschappelijke", "maatschappijleer", "problemen",
+    "probleem", "vraagstuk", "vraagstukken", "betekenen", "betekent",
+    "inhouden", "inhoudt", "voorstellen", "omvatten", "invloed",
+    "beïnvloeden", "beinvloeden", "hoofdstuk", "paragraaf", "onderwerp",
+    "onderwerpen", "context", "situatie", "voorbeeld", "voorbeelden",
+    "verband", "verbanden", "gevolgen", "oorzaken", "aanleiding",
+  ].map((w) => w.toLowerCase())
+);
+
+/**
  * Probeert kernbegrippen uit een vrij ingevoerd leerdoel te halen, bv.
  * "...wat de begrippen referentiekader, selectieve waarneming en framing
  * betekenen..." -> ["referentiekader", "selectieve waarneming", "framing"]
+ *
+ * Ondersteunt meerdere veelgebruikte werkwoordsvormen naast
+ * betekent/betekenen (inhouden/inhoudt, zijn, voorstellen, omvatten),
+ * omdat docenten leerdoelen op verschillende manieren formuleren, bv.
+ * "wat de begrippen X, Y en Z inhouden" of "...wat X, Y en Z zijn".
  */
 export function extraheerBegrippen(leerdoel: string): string[] {
   const tekst = leerdoel.trim();
-  const match = tekst.match(/begrippen?\s+(.+?)\s+betekent|begrippen?\s+(.+?)\s+betekenen/i);
-  const ruw = match ? (match[1] ?? match[2]) : null;
+  const werkwoorden = "betekenen|betekent|inhouden|inhoudt|zijn|voorstellen|omvatten";
+  const patroon = new RegExp(`begrippen?\\s+(.+?)\\s+(?:${werkwoorden})\\b`, "i");
+  const match = tekst.match(patroon);
+  const ruw = match ? match[1] : null;
 
   let lijst: string[] = [];
   if (ruw) {
@@ -35,12 +68,19 @@ export function extraheerBegrippen(leerdoel: string): string[] {
   }
 
   if (lijst.length < 2) {
-    // fallback: pak zelfstandige naamwoorden-achtige woorden > 5 letters als gok
+    // veiligheidsnet: pak zelfstandige-naamwoord-achtige woorden > 6 letters
+    // als gok, maar sluit bekende werkwoorden/functiewoorden expliciet uit
+    // zodat de fallback nooit een werkwoord als kernbegrip aanziet.
     lijst = Array.from(
       new Set(
         tekst
           .split(/[\s,]+/)
-          .filter((w) => w.length > 6 && /^[a-zA-ZÀ-ÿ]+$/.test(w))
+          .filter(
+            (w) =>
+              w.length > 6 &&
+              /^[a-zA-ZÀ-ÿ]+$/.test(w) &&
+              !STOPWOORDEN_FALLBACK.has(w.toLowerCase())
+          )
       )
     ).slice(0, 6);
   }
@@ -230,7 +270,16 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
             idx === 0 ? "Leerdoel van deze les(senreeks)" : "Herhaling + nieuwe kernbegrippen",
             ...groep.map((b) => `${b[0].toUpperCase()}${b.slice(1)}: ${definieer(b, input.vak)}`),
           ],
-          { maxBullets: groep.length + 1 }
+          {
+            maxBullets: groep.length + 1,
+            // "Label: definitie"-bullets zijn geen losse actie-bullets — een
+            // definitie mag tot MAX_DEFINITIE_WOORDEN woorden zijn, dus het
+            // label + definitie samen hebben een eigen, hogere limiet nodig.
+            // Anders knipt de generieke 7-woorden-regel de definitie af
+            // vóórdat hij een complete gedachte vormt (bug 3).
+            maxWoordenPerBullet: MAX_WOORDEN_PER_DEFINITIE_BULLET,
+            maxTotaalWoorden: (groep.length + 1) * MAX_WOORDEN_PER_DEFINITIE_BULLET,
+          }
         ),
       },
       {

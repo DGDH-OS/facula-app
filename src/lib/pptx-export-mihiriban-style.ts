@@ -2,7 +2,11 @@ import path from "path";
 import { Automizer, modify } from "pptx-automizer";
 import type { GeneratedLesson, LessonPart, LessonSection } from "./types";
 import { slugify } from "./pptx-export";
-import { afdwingenSlideRegels } from "./slide-content-rules";
+import {
+  afdwingenSlideRegels,
+  afdwingenVolledigeZin,
+  MAX_WOORDEN_PER_DEFINITIE_BULLET,
+} from "./slide-content-rules";
 
 /**
  * Bouwt een PowerPoint in Mihiriban's eigen sjabloon-stijl (oranje/terracotta,
@@ -38,8 +42,50 @@ function vindSectie(secties: LessonSection[], nummerPrefix: string): LessonSecti
   return secties.find((s) => s.titel.startsWith(nummerPrefix));
 }
 
+/**
+ * Voor actie-bullets (casus/opdracht/bespreken/huiswerk/introductie): mogen
+ * kort en fragmentarisch blijven, generieke 7-woorden-bullet-regel van
+ * toepassing.
+ */
 function alsMultiText(regels: string[]) {
   const gefilterd = afdwingenSlideRegels(regels)
+    .map((r) => r.trim())
+    .filter(Boolean);
+  if (gefilterd.length === 0) {
+    return [{ paragraph: {}, text: " " }];
+  }
+  return gefilterd.map((text) => ({ paragraph: {}, text }));
+}
+
+/**
+ * Voor content die grammaticaal COMPLEET moet blijven: het volledige leerdoel
+ * op de Leerdoelen-slide. Gebruikt afdwingenVolledigeZin i.p.v. de generieke
+ * bullet-trim, zodat de zin nooit midden-in wordt afgekapt (bug 2).
+ */
+function alsMultiTextVolledigeZin(regels: string[]) {
+  const gefilterd = regels
+    .map((r) => afdwingenVolledigeZin(r))
+    .map((r) => r.trim())
+    .filter(Boolean);
+  if (gefilterd.length === 0) {
+    return [{ paragraph: {}, text: " " }];
+  }
+  return gefilterd.map((text) => ({ paragraph: {}, text }));
+}
+
+/**
+ * Voor de "Label: definitie"-bullets in de kernbegrippen-sectie: deze zijn al
+ * grammaticaal compleet opgebouwd door lesson-generator.ts (met
+ * MAX_WOORDEN_PER_DEFINITIE_BULLET). Hier NIET nogmaals door de generieke
+ * 7-woorden-bullet-trim halen — dat zou de definitie alsnog midden-in
+ * afknippen (bug 3). Wel de maxBullets-limiet en filtering op lege regels
+ * behouden, maar met dezelfde ruimere per-bullet/totaal-limiet.
+ */
+function alsMultiTextDefinities(regels: string[]) {
+  const gefilterd = afdwingenSlideRegels(regels, {
+    maxWoordenPerBullet: MAX_WOORDEN_PER_DEFINITIE_BULLET,
+    maxTotaalWoorden: regels.length * MAX_WOORDEN_PER_DEFINITIE_BULLET,
+  })
     .map((r) => r.trim())
     .filter(Boolean);
   if (gefilterd.length === 0) {
@@ -109,13 +155,19 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
     // Slide — leerdoelen
     pres.addSlide("tpl", 3, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Leerdoelen"));
-      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText([les.input.leerdoel])));
+      slide.modifyElement(
+        INHOUD_SHAPE,
+        modify.setMultiText(alsMultiTextVolledigeZin([les.input.leerdoel]))
+      );
     });
 
     // Slide — kernbegrippen
     pres.addSlide("tpl", 4, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Kernbegrippen"));
-      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(kernbegrippenRegels)));
+      slide.modifyElement(
+        INHOUD_SHAPE,
+        modify.setMultiText(alsMultiTextDefinities(kernbegrippenRegels))
+      );
     });
 
     // Slide — casus

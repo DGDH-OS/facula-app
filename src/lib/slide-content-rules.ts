@@ -18,6 +18,27 @@ export const MAX_WORDS_PER_BULLET = 7;
 export const MAX_BODY_WORDS_TOTAL = 30;
 export const MAX_DEFINITIE_WOORDEN = 12;
 
+/**
+ * Woordlimiet voor een "Label: definitie"-bullet (kernbegrippen-sectie).
+ * Dit is HOGER dan MAX_WORDS_PER_BULLET (dat is voor losse actie-bullets in
+ * casus/opdracht/bespreken/huiswerk) omdat een label + een complete definitie
+ * (tot MAX_DEFINITIE_WOORDEN woorden) samen bijna altijd > 7 woorden zijn.
+ * Zonder deze eigen, ruimere limiet knipt de generieke bullet-trim de
+ * definitie middenin de zin af (bug: "Opnoemen: kernbegrip binnen
+ * maatschappijleer, leg uit met" zonder vervolg).
+ */
+export const MAX_WOORDEN_PER_DEFINITIE_BULLET = 20;
+
+/**
+ * Woordlimiet voor content die grammaticaal COMPLEET moet blijven ook al is
+ * die langer dan een actie-bullet — met name het volledige leerdoel op de
+ * Leerdoelen-slide. Dit is de categorie "definitie/uitspraak die leerlingen
+ * zelf lezen" uit PRESENTATIE-METHODIEK.md: een langere losse volzin is hier
+ * toegestaan en gewenst (Assertion-Evidence / Mayer's redundancy principle),
+ * in tegenstelling tot actie-bullets die de docent mondeling toelicht.
+ */
+export const MAX_WOORDEN_VOLLEDIGE_ZIN = 50;
+
 function woorden(tekst: string): string[] {
   return tekst.trim().split(/\s+/).filter(Boolean);
 }
@@ -96,4 +117,42 @@ export function afdwingenDefinitie(definitie: string, maxWoorden: number = MAX_D
   const w = woorden(schoon);
   if (w.length <= maxWoorden) return schoon;
   return w.slice(0, maxWoorden).join(" ");
+}
+
+/**
+ * Voor content die grammaticaal COMPLEET moet blijven, ook als die langer is
+ * dan een actie-bullet (het volledige leerdoel op de Leerdoelen-slide, een
+ * volledige definitie). In tegenstelling tot trimBullet/afdwingenDefinitie
+ * knipt dit NOOIT blind op woordaantal midden in een zinsdeel af:
+ * - past de tekst binnen maxWoorden? geef 'm volledig terug, ongewijzigd.
+ * - te lang? knip dan alleen af op de laatste zin-/komma-grens vóór de
+ *   limiet, zodat het resultaat altijd een complete gedachte blijft.
+ * - is er geen bruikbare grens gevonden, voeg een "…" toe zodat het duidelijk
+ *   een bewuste inkorting is, nooit een onopgemerkt afgekapt zinsdeel.
+ */
+export function afdwingenVolledigeZin(
+  tekst: string,
+  maxWoorden: number = MAX_WOORDEN_VOLLEDIGE_ZIN
+): string {
+  const schoon = tekst.trim().replace(/\s+/g, " ");
+  const w = woorden(schoon);
+  if (w.length <= maxWoorden) return schoon;
+
+  const kandidaat = w.slice(0, maxWoorden).join(" ");
+  const laatstePunt = Math.max(
+    kandidaat.lastIndexOf("."),
+    kandidaat.lastIndexOf(";"),
+    kandidaat.lastIndexOf("!"),
+    kandidaat.lastIndexOf("?")
+  );
+  if (laatstePunt > kandidaat.length * 0.4) {
+    return kandidaat.slice(0, laatstePunt + 1).trim();
+  }
+
+  const laatsteKomma = kandidaat.lastIndexOf(",");
+  if (laatsteKomma > kandidaat.length * 0.4) {
+    return `${kandidaat.slice(0, laatsteKomma).trim()}…`;
+  }
+
+  return `${kandidaat.trim()}…`;
 }
