@@ -146,7 +146,7 @@ function definieer(begrip: string, vak: Vak): string {
 /* Fragmenten/labels, geen volzinnen — docent vult mondeling aan.       */
 /* ------------------------------------------------------------------ */
 
-function bouwCasus(vak: Vak, begrippen: string[], niveau: Niveau): string[] {
+export function bouwCasus(vak: Vak, begrippen: string[], niveau: Niveau): string[] {
   const eerste = begrippen[0] ?? "kernbegrip";
   const tweede = begrippen[1] ?? begrippen[0] ?? "ander begrip";
 
@@ -190,7 +190,7 @@ function bouwCasus(vak: Vak, begrippen: string[], niveau: Niveau): string[] {
 /* Uitgewerkt voorbeeld                                                 */
 /* ------------------------------------------------------------------ */
 
-function bouwUitgewerktVoorbeeld(vak: Vak, begrippen: string[]): string[] {
+export function bouwUitgewerktVoorbeeld(vak: Vak, begrippen: string[]): string[] {
   const term = begrippen[0] ?? "kernbegrip";
   return afdwingenSlideRegels([
     "Kies voorbeeld: nieuwsbericht, bron of plan",
@@ -206,7 +206,7 @@ function bouwUitgewerktVoorbeeld(vak: Vak, begrippen: string[]): string[] {
 /* waar mogelijk — kort en concreet, geen open discussie.               */
 /* ------------------------------------------------------------------ */
 
-function bouwTerugblik(vak: Vak, begrippen: string[], isEersteLes: boolean): string[] {
+export function bouwTerugblik(vak: Vak, begrippen: string[], isEersteLes: boolean): string[] {
   const eerste = begrippen[0] ?? "kernbegrip";
 
   const terugblikMap: Record<Vak, string[]> = {
@@ -246,7 +246,7 @@ function bouwTerugblik(vak: Vak, begrippen: string[], isEersteLes: boolean): str
 /* discussie (bv. quizvraag of duim-omhoog/omlaag-check).               */
 /* ------------------------------------------------------------------ */
 
-function bouwBegeleideInoefening(vak: Vak, begrippen: string[]): string[] {
+export function bouwBegeleideInoefening(vak: Vak, begrippen: string[]): string[] {
   const eerste = begrippen[0] ?? "kernbegrip";
   const tweede = begrippen[1] ?? begrippen[0] ?? "ander begrip";
 
@@ -259,10 +259,39 @@ function bouwBegeleideInoefening(vak: Vak, begrippen: string[]): string[] {
 }
 
 /* ------------------------------------------------------------------ */
+/* Leerdoel & kernbegrippen (sectie 2) — nieuwe export, ONGEWIJZIGDE   */
+/* logica t.o.v. wat voorheen inline in genereerLes() stond, zodat     */
+/* sectie-regeneratie exact dezelfde content-regels doorloopt.         */
+/* ------------------------------------------------------------------ */
+
+export function bouwLeerdoelKernbegrippen(
+  vak: Vak,
+  begrippen: string[],
+  isEersteLes: boolean
+): string[] {
+  return afdwingenSlideRegels(
+    [
+      isEersteLes ? "Leerdoel van deze les(senreeks)" : "Herhaling + nieuwe kernbegrippen",
+      ...begrippen.map((b) => `${b[0].toUpperCase()}${b.slice(1)}: ${definieer(b, vak)}`),
+    ],
+    {
+      maxBullets: begrippen.length + 1,
+      // "Label: definitie"-bullets zijn geen losse actie-bullets — een
+      // definitie mag tot MAX_DEFINITIE_WOORDEN woorden zijn, dus het
+      // label + definitie samen hebben een eigen, hogere limiet nodig.
+      // Anders knipt de generieke 7-woorden-regel de definitie af
+      // vóórdat hij een complete gedachte vormt (bug 3).
+      maxWoordenPerBullet: MAX_WOORDEN_PER_DEFINITIE_BULLET,
+      maxTotaalWoorden: (begrippen.length + 1) * MAX_WOORDEN_PER_DEFINITIE_BULLET,
+    }
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Opdracht, bespreken, huiswerk                                        */
 /* ------------------------------------------------------------------ */
 
-function bouwOpdracht(begrippen: string[]): string[] {
+export function bouwOpdracht(begrippen: string[]): string[] {
   const lijst = begrippen.slice(0, 2);
   return afdwingenSlideRegels([
     `Kies twee begrippen: ${lijst.join(", ")}`,
@@ -272,7 +301,7 @@ function bouwOpdracht(begrippen: string[]): string[] {
   ]);
 }
 
-function bouwBespreken(): string[] {
+export function bouwBespreken(): string[] {
   return afdwingenSlideRegels([
     "2-3 duo's delen voorbeeld (max 1 min)",
     "Vraag: eens met deze toepassing?",
@@ -281,7 +310,7 @@ function bouwBespreken(): string[] {
   ]);
 }
 
-function bouwHuiswerk(vak: Vak, begrippen: string[]): string[] {
+export function bouwHuiswerk(vak: Vak, begrippen: string[]): string[] {
   const term = begrippen[0] ?? "kernbegrip";
   return afdwingenSlideRegels([
     `Zoek bron (${vak.toLowerCase()}) met ${term}`,
@@ -328,22 +357,7 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
       {
         titel: trimTitel("2. Leerdoel & kernbegrippen"),
         duur: 8,
-        inhoud: afdwingenSlideRegels(
-          [
-            idx === 0 ? "Leerdoel van deze les(senreeks)" : "Herhaling + nieuwe kernbegrippen",
-            ...groep.map((b) => `${b[0].toUpperCase()}${b.slice(1)}: ${definieer(b, input.vak)}`),
-          ],
-          {
-            maxBullets: groep.length + 1,
-            // "Label: definitie"-bullets zijn geen losse actie-bullets — een
-            // definitie mag tot MAX_DEFINITIE_WOORDEN woorden zijn, dus het
-            // label + definitie samen hebben een eigen, hogere limiet nodig.
-            // Anders knipt de generieke 7-woorden-regel de definitie af
-            // vóórdat hij een complete gedachte vormt (bug 3).
-            maxWoordenPerBullet: MAX_WOORDEN_PER_DEFINITIE_BULLET,
-            maxTotaalWoorden: (groep.length + 1) * MAX_WOORDEN_PER_DEFINITIE_BULLET,
-          }
-        ),
+        inhoud: bouwLeerdoelKernbegrippen(input.vak, groep, idx === 0),
       },
       {
         titel: trimTitel("3. Casus met concrete cijfers"),

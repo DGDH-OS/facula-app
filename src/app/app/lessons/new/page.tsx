@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { LessonInput, Vak, Niveau } from "@/lib/types";
 import { FormCard } from "@/components/ui/FormCard";
 import { MoreOptions } from "@/components/ui/MoreOptions";
@@ -21,14 +22,15 @@ const DEFAULT_INPUT: LessonInput = {
  * Sterk vereenvoudigde flow: alleen het leerdoel vraagt verplicht aandacht.
  * Vak/niveau/leerjaar/lesduur/aantal lessen staan achter een inklapbaar
  * "Meer opties"-blok met verstandige defaults. Bij klikken op de primaire
- * knop wordt de les gegenereerd én de PowerPoint in Mihiriban's eigen
- * sjabloon-stijl direct gedownload — in één vloeiende actie.
+ * knop wordt de les gegenereerd en opgeslagen, waarna er direct doorgestuurd
+ * wordt naar de les-detailpagina — export en sectie-regeneratie gebeuren
+ * daar, niet in deze generatie-flow.
  */
 export default function NewLessonPage() {
+  const router = useRouter();
   const [input, setInput] = useState<LessonInput>(DEFAULT_INPUT);
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
-  const [klaar, setKlaar] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,11 +38,8 @@ export default function NewLessonPage() {
 
     setBezig(true);
     setFout(null);
-    setKlaar(false);
 
     try {
-      // Stap 1: genereer de les server-side en sla hem op (gekoppeld aan de
-      // ingelogde gebruiker) via /api/lessons.
       const genResponse = await fetch("/api/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,40 +52,14 @@ export default function NewLessonPage() {
       }
 
       const { id } = await genResponse.json();
-
-      // Stap 2: haal de PowerPoint op basis van de zojuist OPGESLAGEN les op
-      // (bewijst dat export op opgeslagen data werkt, niet alleen op de
-      // verse generatie in het geheugen).
-      const response = await fetch(`/api/lessons/${id}/pptx`);
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error ?? "PowerPoint genereren mislukt.");
-      }
-
-      const blob = await response.blob();
-      const contentDisposition = response.headers.get("Content-Disposition") ?? "";
-      const match = contentDisposition.match(/filename="([^"]+)"/);
-      const bestandsnaam = match?.[1] ?? "les.pptx";
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = bestandsnaam;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
-      setKlaar(true);
+      router.push("/app/lessons/" + id);
     } catch (err) {
-      console.error("PowerPoint-export mislukt", err);
+      console.error("Les genereren mislukt", err);
       setFout(
         err instanceof Error
           ? err.message
           : "Er ging iets mis. Probeer het opnieuw."
       );
-    } finally {
       setBezig(false);
     }
   }
@@ -116,16 +89,11 @@ export default function NewLessonPage() {
           disabled={bezig || !input.leerdoel.trim()}
           className="w-full rounded-full bg-[var(--color-marine)] px-6 py-3.5 text-base font-semibold text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:cursor-wait disabled:opacity-60"
         >
-          {bezig ? "Bezig…" : "Maak mijn PowerPoint"}
+          {bezig ? "Bezig…" : "Maak mijn les"}
         </button>
 
         {fout && (
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
-        )}
-        {klaar && !fout && (
-          <p className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-            Gedownload — check je downloadmap.
-          </p>
         )}
 
         <MoreOptions>
