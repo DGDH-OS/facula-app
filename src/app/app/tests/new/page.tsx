@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { TestInput, GeneratedTest, Vak, Niveau } from "@/lib/types";
-import { genereerToets } from "@/lib/test-generator";
 import { downloadToetsDocx } from "@/lib/docx-export";
 import { FormCard, PreviewPlaceholder } from "@/components/ui/FormCard";
 import { MoreOptions } from "@/components/ui/MoreOptions";
@@ -28,10 +27,31 @@ export default function NewTestPage() {
   const [input, setInput] = useState<TestInput>(DEFAULT_INPUT);
   const [resultaat, setResultaat] = useState<GeneratedTest | null>(null);
   const [exporteren, setExporteren] = useState(false);
+  const [bezig, setBezig] = useState(false);
+  const [fout, setFout] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setResultaat(genereerToets(input));
+    setBezig(true);
+    setFout(null);
+    try {
+      const response = await fetch("/api/tests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error ?? "Genereren mislukt.");
+      }
+      const { test } = await response.json();
+      setResultaat(test);
+    } catch (err) {
+      console.error("Toets genereren mislukt", err);
+      setFout(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
+    } finally {
+      setBezig(false);
+    }
   }
 
   async function handleExport() {
@@ -77,10 +97,15 @@ export default function NewTestPage() {
 
           <button
             type="submit"
-            className="w-full rounded-full bg-[var(--color-marine)] px-6 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
+            disabled={bezig}
+            className="w-full rounded-full bg-[var(--color-marine)] px-6 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:opacity-60"
           >
-            Genereer toets
+            {bezig ? "Bezig…" : "Genereer toets"}
           </button>
+
+          {fout && (
+            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
+          )}
 
           <MoreOptions>
             <div>

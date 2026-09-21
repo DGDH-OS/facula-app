@@ -39,15 +39,29 @@ export default function NewLessonPage() {
     setKlaar(false);
 
     try {
-      const response = await fetch("/api/lessons/mihiriban-pptx", {
+      // Stap 1: genereer de les server-side en sla hem op (gekoppeld aan de
+      // ingelogde gebruiker) via /api/lessons.
+      const genResponse = await fetch("/api/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
 
+      if (!genResponse.ok) {
+        const data = await genResponse.json().catch(() => null);
+        throw new Error(data?.error ?? "Genereren mislukt.");
+      }
+
+      const { id } = await genResponse.json();
+
+      // Stap 2: haal de PowerPoint op basis van de zojuist OPGESLAGEN les op
+      // (bewijst dat export op opgeslagen data werkt, niet alleen op de
+      // verse generatie in het geheugen).
+      const response = await fetch(`/api/lessons/${id}/pptx`);
+
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error ?? "Genereren mislukt.");
+        throw new Error(data?.error ?? "PowerPoint genereren mislukt.");
       }
 
       const blob = await response.blob();

@@ -3,20 +3,45 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { setMockUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [naam, setNaam] = useState("Mihiriban Burgaz");
   const [email, setEmail] = useState("");
   const [wachtwoord, setWachtwoord] = useState("");
   const [bezig, setBezig] = useState(false);
+  const [fout, setFout] = useState<string | null>(null);
+  const [bevestigVereist, setBevestigVereist] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBezig(true);
-    setMockUser({ naam: naam || "Docent", email: email || "docent@school.nl" });
-    router.push("/app");
+    setFout(null);
+    setBevestigVereist(false);
+
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: wachtwoord,
+    });
+
+    if (error) {
+      setFout(error.message);
+      setBezig(false);
+      return;
+    }
+
+    // Bij e-mailconfirmatie AAN geeft signUp een user terug zonder actieve
+    // sessie totdat de link in de mail bevestigd is. Bij bevestiging UIT
+    // (of al bevestigd) is er direct een sessie en kan meteen door naar /app.
+    if (data.session) {
+      router.push("/app");
+      router.refresh();
+      return;
+    }
+
+    setBevestigVereist(true);
+    setBezig(false);
   }
 
   return (
@@ -33,59 +58,54 @@ export default function SignupPage() {
           minuten. Geen betaalgegevens nodig.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">
-              Naam
-            </label>
-            <input
-              type="text"
-              required
-              value={naam}
-              onChange={(e) => setNaam(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-marine)]"
-              placeholder="Voor- en achternaam"
-            />
+        {bevestigVereist ? (
+          <div className="mt-8 rounded-lg bg-green-50 px-4 py-4 text-sm text-green-700">
+            Check je inbox — we hebben een bevestigingslink gestuurd naar{" "}
+            <strong>{email}</strong>. Klik erop om je account te activeren en
+            in te loggen.
           </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">
-              E-mailadres
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-marine)]"
-              placeholder="jij@school.nl"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">
-              Wachtwoord
-            </label>
-            <input
-              type="password"
-              required
-              value={wachtwoord}
-              onChange={(e) => setWachtwoord(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-marine)]"
-              placeholder="Kies een wachtwoord"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={bezig}
-            className="w-full rounded-full bg-[var(--color-marine)] px-6 py-3 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:opacity-60"
-          >
-            Account aanmaken
-          </button>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-marine)]">
+                E-mailadres
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-marine)]"
+                placeholder="jij@school.nl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-marine)]">
+                Wachtwoord
+              </label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={wachtwoord}
+                onChange={(e) => setWachtwoord(e.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-marine)]"
+                placeholder="Kies een wachtwoord (min. 6 tekens)"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={bezig}
+              className="w-full rounded-full bg-[var(--color-marine)] px-6 py-3 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:opacity-60"
+            >
+              {bezig ? "Bezig…" : "Account aanmaken"}
+            </button>
 
-        <p className="mt-4 text-xs text-[var(--color-inkt)]/50">
-          Demo-omgeving: er wordt niets extern opgeslagen. Je gegevens blijven
-          lokaal in je browser.
-        </p>
+            {fout && (
+              <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
+            )}
+          </form>
+        )}
 
         <p className="mt-8 text-sm text-[var(--color-inkt)]/70">
           Al een account?{" "}

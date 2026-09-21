@@ -8,7 +8,6 @@ import type {
   RapportOutputType,
   RapportToon,
 } from "@/lib/types";
-import { genereerRapportTekst } from "@/lib/report-generator";
 import { FormCard, PreviewPlaceholder } from "@/components/ui/FormCard";
 import { MoreOptions } from "@/components/ui/MoreOptions";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -36,12 +35,33 @@ export default function NewReportPage() {
   const [input, setInput] = useState<ReportInput>(DEFAULT_INPUT);
   const [resultaat, setResultaat] = useState<GeneratedReport | null>(null);
   const [gekopieerd, setGekopieerd] = useState(false);
+  const [bezig, setBezig] = useState(false);
+  const [fout, setFout] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!input.leerlingLabel.trim() || !input.aantekeningen.trim()) return;
     setGekopieerd(false);
-    setResultaat(genereerRapportTekst(input));
+    setBezig(true);
+    setFout(null);
+    try {
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error ?? "Genereren mislukt.");
+      }
+      const { report } = await response.json();
+      setResultaat(report);
+    } catch (err) {
+      console.error("Rapport genereren mislukt", err);
+      setFout(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
+    } finally {
+      setBezig(false);
+    }
   }
 
   async function handleCopy() {
@@ -96,11 +116,15 @@ export default function NewReportPage() {
 
           <button
             type="submit"
-            disabled={!input.leerlingLabel.trim() || !input.aantekeningen.trim()}
+            disabled={!input.leerlingLabel.trim() || !input.aantekeningen.trim() || bezig}
             className="w-full rounded-full bg-[var(--color-marine)] px-6 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Genereer tekst
+            {bezig ? "Bezig…" : "Genereer tekst"}
           </button>
+
+          {fout && (
+            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
+          )}
 
           <MoreOptions>
             <div>

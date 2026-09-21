@@ -3,24 +3,38 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { setMockUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("mihiriban@voorbeeldschool.nl");
+  const [email, setEmail] = useState("");
   const [wachtwoord, setWachtwoord] = useState("");
   const [bezig, setBezig] = useState(false);
+  const [fout, setFout] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBezig(true);
-    // Mock-auth: geen echte backend, alleen lokale state.
-    const naam = email.split("@")[0];
-    setMockUser({
-      naam: naam.charAt(0).toUpperCase() + naam.slice(1),
+    setFout(null);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
       email,
+      password: wachtwoord,
     });
+
+    if (error) {
+      setFout(
+        error.message === "Invalid login credentials"
+          ? "E-mailadres of wachtwoord onjuist."
+          : error.message
+      );
+      setBezig(false);
+      return;
+    }
+
     router.push("/app");
+    router.refresh();
   }
 
   return (
@@ -68,14 +82,13 @@ export default function LoginPage() {
             disabled={bezig}
             className="w-full rounded-full bg-[var(--color-marine)] px-6 py-3 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:opacity-60"
           >
-            Inloggen
+            {bezig ? "Bezig…" : "Inloggen"}
           </button>
-        </form>
 
-        <p className="mt-4 text-xs text-[var(--color-inkt)]/50">
-          Demo-omgeving: elk e-mailadres en wachtwoord werkt. Er wordt niets
-          extern opgeslagen of geverifieerd.
-        </p>
+          {fout && (
+            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
+          )}
+        </form>
 
         <p className="mt-8 text-sm text-[var(--color-inkt)]/70">
           Nog geen account?{" "}

@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { LessonInput, Vak, Niveau } from "@/lib/types";
+import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
 import { genereerLes } from "@/lib/lesson-generator";
-import {
-  bouwMihiribanPptxBuffer,
-  mihiribanBestandsnaam,
-} from "@/lib/pptx-export-mihiriban-style";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -18,12 +15,22 @@ function isNiveau(v: unknown): v is Niveau {
 }
 
 /**
- * POST /api/lessons/mihiriban-pptx
- * Genereert een les via genereerLes() en retourneert direct de bijbehorende
- * PowerPoint in Mihiriban's eigen sjabloon-stijl als download — één actie,
- * geen tussenstap.
+ * POST /api/lessons
+ * Genereert een les via de ongewijzigde genereerLes()-functie en slaat het
+ * resultaat op in facula.lessons, gekoppeld aan de ingelogde gebruiker.
+ * De user_id komt ALTIJD uit de server-side sessie, nooit uit de request-
+ * body — een client kan dus nooit voor iemand anders opslaan.
  */
 export async function POST(request: NextRequest) {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
+  }
+
   let body: Partial<LessonInput>;
   try {
     body = await request.json();
@@ -47,22 +54,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const les = genereerLes(input);
-    const buffer = await bouwMihiribanPptxBuffer(les);
-    const bestandsnaam = mihiribanBestandsnaam(les);
+    const output: Omit<GeneratedLesson, "input"> = {
+      id: les.id,
+      createdAt: les.createdAt,
+      titel: les.titel,
+      kernbegrippen: les.kernbegrippen,
+      onderdelen: les.onderdelen,
+    };
 
-    return new NextResponse(new Uint8Array(buffer), {
-      status: 200,
-      headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "Content-Disposition": `attachment; filename="${bestandsnaam}"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    const { data: rij, error } = await supabase
+      .schema("facula")
+      .from("lessons")
+      .insert({ user_id: user.id, input, output })
+      .select("id, created_at")
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ id: rij.id, createdAt: rij.created_at, lesson: les });
   } catch (err) {
-    console.error("Mihiriban PowerPoint-export mislukt", err);
+    console.error("Les genereren/opslaan mislukt", err);
     return NextResponse.json(
-      { error: "Er ging iets mis bij het genereren van de PowerPoint." },
+      { error: "Er ging iets mis bij het genereren van de les." },
       { status: 500 }
     );
   }
