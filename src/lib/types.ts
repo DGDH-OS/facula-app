@@ -45,6 +45,20 @@ export interface MeerkeuzeOptie {
   correct: boolean;
 }
 
+/**
+ * Resultaat van de constructive-alignment-check (zie
+ * src/lib/constructive-alignment.ts) tussen het leerdoel van de les en deze
+ * specifieke toetsvraag. Optioneel omdat oudere/handmatig gebouwde
+ * ToetsVraag-objecten dit veld niet hoeven te hebben; een latere sessie kan
+ * dit in de UI zichtbaar maken.
+ */
+export interface AfstemmingResultaat {
+  afgestemd: boolean;
+  leerdoelNiveau: string;
+  toetsvraagNiveau: string;
+  waarschuwing?: string;
+}
+
 export interface ToetsVraag {
   nummer: number;
   type: VraagType;
@@ -52,6 +66,8 @@ export interface ToetsVraag {
   punten: number;
   opties?: MeerkeuzeOptie[];
   antwoordsleutel: string;
+  /** Constructive-alignment-check t.o.v. het leerdoel (zie hierboven). */
+  alignment?: AfstemmingResultaat;
 }
 
 export interface TestInput {

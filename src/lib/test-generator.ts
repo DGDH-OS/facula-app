@@ -6,6 +6,7 @@ import type {
   MeerkeuzeOptie,
 } from "./types";
 import { extraheerBegrippen } from "./lesson-generator";
+import { controleerAfstemming } from "./constructive-alignment";
 
 const DEFINITIES: Record<string, string> = {
   referentiekader:
@@ -161,6 +162,13 @@ export function genereerToets(input: TestInput): GeneratedTest {
     antwoordsleutel:
       "Volledig antwoord (4 pt): beide begrippen correct uitgelegd + een logisch onderbouwd verband met een concreet maatschappelijk probleem. Gedeeltelijk (2-3 pt): begrippen correct maar verband zwak onderbouwd. 0-1 pt: begrippen onjuist of geen verband gelegd.",
   } as ToetsVraag);
+
+  // Constructive-alignment-check: elke vraag t.o.v. het leerdoel (zelfde
+  // guardrail-patroon als avg-guardrails.ts). Resultaat wordt opgeslagen op
+  // de vraag zodat het later in de UI getoond kan worden.
+  for (const vraag of vragen) {
+    vraag.alignment = controleerAfstemming(input.leerdoel, vraag.vraag);
+  }
 
   const totaalPunten = vragen.reduce((sum, v) => sum + v.punten, 0);
 

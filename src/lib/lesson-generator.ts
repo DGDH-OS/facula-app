@@ -201,6 +201,64 @@ function bouwUitgewerktVoorbeeld(vak: Vak, begrippen: string[]): string[] {
 }
 
 /* ------------------------------------------------------------------ */
+/* Terugblik / activering voorkennis (EDI-fase 1, NIEUW)                */
+/* Korte herinneringsvraag/aanknopingspunt bij voorkennis, vak-specifiek */
+/* waar mogelijk — kort en concreet, geen open discussie.               */
+/* ------------------------------------------------------------------ */
+
+function bouwTerugblik(vak: Vak, begrippen: string[], isEersteLes: boolean): string[] {
+  const eerste = begrippen[0] ?? "kernbegrip";
+
+  const terugblikMap: Record<Vak, string[]> = {
+    Maatschappijleer: [
+      "Denk terug: laatste nieuwsbericht dat je las",
+      "Wie bepaalde wat jij zag/las?",
+      `Herinner je nog iets over ${eerste}?`,
+    ],
+    Geschiedenis: [
+      "Denk terug aan vorige les: welk jaartal/gebeurtenis?",
+      "Wat veranderde toen in de samenleving?",
+      `Herinner je nog iets over ${eerste}?`,
+    ],
+    Economie: [
+      "Denk terug: laatste keer dat je iets kocht",
+      "Wat bepaalde de prijs die je betaalde?",
+      `Herinner je nog iets over ${eerste}?`,
+    ],
+    Aardrijkskunde: [
+      "Denk terug: een plek die drastisch veranderde",
+      "Wat was de oorzaak van die verandering?",
+      `Herinner je nog iets over ${eerste}?`,
+    ],
+  };
+
+  const openingsRegel = isEersteLes
+    ? "Korte activeringsvraag klassikaal (2 min)"
+    : "Terugblik op vorige les (2 min)";
+
+  return afdwingenSlideRegels([openingsRegel, ...terugblikMap[vak]]);
+}
+
+/* ------------------------------------------------------------------ */
+/* Begeleide inoefening + check-for-understanding (EDI-fase 4, NIEUW)   */
+/* Korte, snelle controlevraag die de docent klassikaal stelt vóórdat  */
+/* leerlingen zelfstandig aan de slag gaan — kort/concreet, geen open  */
+/* discussie (bv. quizvraag of duim-omhoog/omlaag-check).               */
+/* ------------------------------------------------------------------ */
+
+function bouwBegeleideInoefening(vak: Vak, begrippen: string[]): string[] {
+  const eerste = begrippen[0] ?? "kernbegrip";
+  const tweede = begrippen[1] ?? begrippen[0] ?? "ander begrip";
+
+  return afdwingenSlideRegels([
+    "Samen kort oefenen (5 min, docent begeleidt)",
+    `Check: herken je ${eerste} in dit voorbeeld?`,
+    "Duim omhoog/omlaag: snap je het?",
+    `Snelle vraag: noem één kenmerk van ${tweede}`,
+  ]);
+}
+
+/* ------------------------------------------------------------------ */
 /* Opdracht, bespreken, huiswerk                                        */
 /* ------------------------------------------------------------------ */
 
@@ -263,7 +321,12 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
     const isLaatsteLes = idx === aantalLessen - 1;
     const secties: LessonSection[] = [
       {
-        titel: trimTitel("1. Leerdoel & kernbegrippen"),
+        titel: trimTitel("1. Terugblik & activering"),
+        duur: 3,
+        inhoud: bouwTerugblik(input.vak, groep, idx === 0),
+      },
+      {
+        titel: trimTitel("2. Leerdoel & kernbegrippen"),
         duur: 8,
         inhoud: afdwingenSlideRegels(
           [
@@ -283,27 +346,32 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
         ),
       },
       {
-        titel: trimTitel("2. Casus met concrete cijfers"),
+        titel: trimTitel("3. Casus met concrete cijfers"),
         duur: 12,
         inhoud: bouwCasus(input.vak, groep, input.niveau),
       },
       {
-        titel: trimTitel("3. Uitgewerkt voorbeeld (klassikaal, docent modelt)"),
+        titel: trimTitel("4. Uitgewerkt voorbeeld (klassikaal, docent modelt)"),
         duur: 8,
         inhoud: bouwUitgewerktVoorbeeld(input.vak, groep),
       },
       {
-        titel: trimTitel("4. Opdracht in tweetallen"),
+        titel: trimTitel("5. Begeleide inoefening & check-for-understanding"),
+        duur: 5,
+        inhoud: bouwBegeleideInoefening(input.vak, groep),
+      },
+      {
+        titel: trimTitel("6. Opdracht in tweetallen"),
         duur: 15,
         inhoud: bouwOpdracht(groep),
       },
       {
-        titel: trimTitel("5. Bespreken (plenair)"),
+        titel: trimTitel("7. Bespreken (plenair)"),
         duur: 7,
         inhoud: bouwBespreken(),
       },
       {
-        titel: trimTitel(isLaatsteLes ? "6. Huiswerk & vooruitblik toets" : "6. Huiswerk"),
+        titel: trimTitel(isLaatsteLes ? "8. Huiswerk & vooruitblik toets" : "8. Huiswerk"),
         duur: 0,
         inhoud: isLaatsteLes
           ? afdwingenSlideRegels([

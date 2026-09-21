@@ -23,9 +23,17 @@ import {
  *   1 titel · 2 introductie · 3 leerdoelen · 4 kernbegrippen · 5 casus ·
  *   6 voorbeeld uitgewerkt · 7 opdracht in tweetallen · 8 bespreken · 9 huiswerk
  *
- * De generator (genereerLes) levert per lesdeel 6 secties op: die worden
- * hieronder gemapt naar de 8 content-slides (2 t/m 9) van het sjabloon. Bij
- * meerdere lessen (aantalLessen > 1) wordt dit 9-slides-blok herhaald per
+ * De generator (genereerLes) levert per lesdeel INMIDDELS 8 secties op (EDI-
+ * uitbreiding: 1. terugblik & activering, 2. leerdoel & kernbegrippen,
+ * 3. casus, 4. voorbeeld, 5. begeleide inoefening & check-for-understanding,
+ * 6. opdracht, 7. bespreken, 8. huiswerk) — het sjabloon heeft een VAST
+ * aantal van 9 slides en kan niet zomaar 2 extra content-slides krijgen.
+ * Oplossing: de twee nieuwe secties worden gecombineerd op een bestaande
+ * sjabloonslide i.p.v. een eigen slide te krijgen (zie combineerRegels
+ * hierboven), zodat het sjabloon-gebaseerde exportsysteem niet crasht:
+ *   - terugblik (1.) → samengevoegd op slide 2 "introductie"
+ *   - begeleide inoefening (5.) → samengevoegd op slide 6 "voorbeeld uitgewerkt"
+ * Bij meerdere lessen (aantalLessen > 1) wordt dit 9-slides-blok herhaald per
  * lesdeel — elk blok krijgt in de titelslide een "Les N van M"-aanduiding,
  * zodat alle lessen in de output terechtkomen (bug: voorheen alleen
  * onderdelen[0]).
@@ -37,6 +45,23 @@ const TEMPLATE_DIR = path.join(process.cwd(), "src", "templates");
 const TITEL_SHAPE = "Titel 1";
 const INHOUD_SHAPE = "Tijdelijke aanduiding voor inhoud 2";
 const ONDERTITEL_SHAPE = "Ondertitel 2";
+
+/**
+ * Voegt twee bullet-lijsten samen tot één slide-body die nog steeds aan de
+ * content-guardrails voldoet (max 4 bullets, max 30 woorden totaal) — nodig
+ * omdat het vaste 9-slides-sjabloon geen eigen slide heeft voor de twee
+ * nieuwe EDI-secties (terugblik, begeleide inoefening) en deze daarom
+ * gecombineerd worden op een bestaande content-slide. Pakt eerst de
+ * belangrijkste regel(s) van `primair`, vult aan met `secundair` tot de
+ * bullet-limiet, en laat afdwingenSlideRegels de rest (woordlimieten)
+ * garanderen zodat dit nooit een slide met te veel tekst oplevert.
+ */
+function combineerRegels(primair: string[], secundair: string[], maxBullets = 4): string[] {
+  const primaireSlice = primair.slice(0, Math.max(1, maxBullets - 1));
+  const ruimte = maxBullets - primaireSlice.length;
+  const secundaireSlice = ruimte > 0 ? secundair.slice(0, ruimte) : [];
+  return afdwingenSlideRegels([...primaireSlice, ...secundaireSlice], { maxBullets });
+}
 
 function vindSectie(secties: LessonSection[], nummerPrefix: string): LessonSection | undefined {
   return secties.find((s) => s.titel.startsWith(nummerPrefix));
@@ -117,12 +142,14 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
     .load(TEMPLATE_FILE, "tpl");
 
   const voegLesBlokToe = (deel: LessonPart, idx: number) => {
-    const leerdoelSectie = vindSectie(deel.secties, "1.");
-    const casusSectie = vindSectie(deel.secties, "2.");
-    const voorbeeldSectie = vindSectie(deel.secties, "3.");
-    const opdrachtSectie = vindSectie(deel.secties, "4.");
-    const besprekenSectie = vindSectie(deel.secties, "5.");
-    const huiswerkSectie = vindSectie(deel.secties, "6.");
+    const terugblikSectie = vindSectie(deel.secties, "1.");
+    const leerdoelSectie = vindSectie(deel.secties, "2.");
+    const casusSectie = vindSectie(deel.secties, "3.");
+    const voorbeeldSectie = vindSectie(deel.secties, "4.");
+    const inoefeningSectie = vindSectie(deel.secties, "5.");
+    const opdrachtSectie = vindSectie(deel.secties, "6.");
+    const besprekenSectie = vindSectie(deel.secties, "7.");
+    const huiswerkSectie = vindSectie(deel.secties, "8.");
 
     const kernbegrippenRegels =
       (leerdoelSectie?.inhoud ?? []).length > 1
@@ -134,11 +161,25 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
     // (bug 2, ook hier aanwezig naast de Leerdoelen-slide). Introductie krijgt
     // daarom alleen een korte kernwoorden-regel, het volledige leerdoel staat
     // al ongeknipt op de volgende (Leerdoelen-)slide.
-    const introRegels = [
+    //
+    // De nieuwe terugblik-sectie (EDI-fase 1) heeft geen eigen slide in het
+    // vaste 9-slides-sjabloon — hij wordt daarom SAMENGEVOEGD met de
+    // introductieslide (combineerRegels), zodat de activeringsvraag zichtbaar
+    // blijft zonder een extra slide nodig te hebben.
+    const introBasis = [
       les.kernbegrippen.length > 0
         ? `Kernbegrippen vandaag: ${les.kernbegrippen.slice(0, 4).join(", ")}`
         : "Zie leerdoel op volgende slide",
     ];
+    const introRegels = combineerRegels(introBasis, terugblikSectie?.inhoud ?? []);
+
+    // De nieuwe begeleide-inoefening-sectie (EDI-fase 4, check-for-
+    // understanding) heeft evenmin een eigen sjabloonslide — samengevoegd met
+    // de "voorbeeld uitgewerkt"-slide, direct ervoor in de EDI-volgorde.
+    const voorbeeldMetInoefening = combineerRegels(
+      voorbeeldSectie?.inhoud ?? [],
+      inoefeningSectie?.inhoud ?? []
+    );
 
     const ondertitelKort =
       les.kernbegrippen.slice(0, 3).join(", ") || les.titel;
@@ -150,7 +191,7 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
       slide.modifyElement(ONDERTITEL_SHAPE, modify.setText(`${lesLabel} · ${ondertitelKort}`));
     });
 
-    // Slide — introductie
+    // Slide — introductie (incl. terugblik/activering)
     pres.addSlide("tpl", 2, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Introductie"));
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(introRegels)));
@@ -180,10 +221,10 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(casusSectie?.inhoud ?? [])));
     });
 
-    // Slide — voorbeeld uitgewerkt
+    // Slide — voorbeeld uitgewerkt (incl. begeleide inoefening/check)
     pres.addSlide("tpl", 6, (slide) => {
-      slide.modifyElement(TITEL_SHAPE, modify.setText("Voorbeeld uitgewerkt"));
-      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(voorbeeldSectie?.inhoud ?? [])));
+      slide.modifyElement(TITEL_SHAPE, modify.setText("Voorbeeld & check"));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(voorbeeldMetInoefening)));
     });
 
     // Slide — opdracht in tweetallen
