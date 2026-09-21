@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
 import { genereerLes } from "@/lib/lesson-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -53,6 +54,17 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    const paid = await isPaidSubscriber(supabase, user.id);
+    if (!paid) {
+      const usage = await checkAndIncrementUsage(supabase, user.id, "lessons");
+      if (!usage.allowed) {
+        return NextResponse.json(
+          { error: quotaLimitBoodschap("lessons") },
+          { status: 402 }
+        );
+      }
+    }
+
     const les = genereerLes(input);
     const output: Omit<GeneratedLesson, "input"> = {
       id: les.id,

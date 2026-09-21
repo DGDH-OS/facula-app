@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -52,6 +53,17 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    const paid = await isPaidSubscriber(supabase, user.id);
+    if (!paid) {
+      const usage = await checkAndIncrementUsage(supabase, user.id, "tests");
+      if (!usage.allowed) {
+        return NextResponse.json(
+          { error: quotaLimitBoodschap("tests") },
+          { status: 402 }
+        );
+      }
+    }
+
     const toets = genereerToets(input);
     const output = {
       id: toets.id,

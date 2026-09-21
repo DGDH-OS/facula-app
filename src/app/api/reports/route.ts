@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ReportInput, RapportOutputType, RapportToon } from "@/lib/types";
 import { genereerRapportTekst } from "@/lib/report-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
 
 const OUTPUT_TYPES: RapportOutputType[] = ["rapporttekst", "oudergesprek", "oudermail"];
 const TONEN: RapportToon[] = ["formeel", "vriendelijk-direct", "warm"];
@@ -57,6 +58,17 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    const paid = await isPaidSubscriber(supabase, user.id);
+    if (!paid) {
+      const usage = await checkAndIncrementUsage(supabase, user.id, "reports");
+      if (!usage.allowed) {
+        return NextResponse.json(
+          { error: quotaLimitBoodschap("reports") },
+          { status: 402 }
+        );
+      }
+    }
+
     const rapport = genereerRapportTekst(input);
     const output = {
       id: rapport.id,

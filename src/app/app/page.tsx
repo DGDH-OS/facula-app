@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { UpgradeButton } from "@/components/ui/UpgradeButton";
+import { getCurrentUsage, isPaidSubscriber, FREE_QUOTA_PER_MONTH } from "@/lib/quota";
 import type { GeneratedLesson, GeneratedTest, GeneratedReport } from "@/lib/types";
 
 function tijdGeleden(iso: string): string {
@@ -45,6 +47,9 @@ export default async function AppDashboard() {
   const toetsen = toetsenRes.data ?? [];
   const rapporten = rapportenRes.data ?? [];
 
+  const paid = user ? await isPaidSubscriber(supabase, user.id) : false;
+  const usage = user ? await getCurrentUsage(supabase, user.id) : { lessons: 0, tests: 0, reports: 0 };
+
   return (
     <div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -52,6 +57,33 @@ export default async function AppDashboard() {
           Welkom{user?.email ? `, ${user.email.split("@")[0]}` : ""}
         </h1>
       </div>
+
+      <section className="mt-6 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-lg text-[var(--color-marine)]">Gebruik deze maand</h2>
+              {paid ? (
+                <StatusBadge label="Abonnee" tone="success" title="Onbeperkt gebruik als betalend abonnee" />
+              ) : (
+                <StatusBadge label="Gratis" tone="neutral" title={`Gratis quotum: ${FREE_QUOTA_PER_MONTH} per categorie per maand`} />
+              )}
+            </div>
+            {paid ? (
+              <p className="mt-2 text-sm text-[var(--color-inkt)]/60">
+                Je hebt een actief abonnement — geen maandelijkse limiet.
+              </p>
+            ) : (
+              <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--color-inkt)]/70">
+                <li>{usage.lessons} van {FREE_QUOTA_PER_MONTH} lessen deze maand</li>
+                <li>{usage.tests} van {FREE_QUOTA_PER_MONTH} toetsen deze maand</li>
+                <li>{usage.reports} van {FREE_QUOTA_PER_MONTH} rapporten deze maand</li>
+              </ul>
+            )}
+          </div>
+          {!paid && <UpgradeButton />}
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Link
