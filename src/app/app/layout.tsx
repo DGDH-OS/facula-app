@@ -55,6 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {navItem("/app", "Overzicht")}
           {navItem("/app/lessons/new", "Nieuwe les")}
           {navItem("/app/tests/new", "Nieuwe toets")}
+          {navItem("/app/reports/new", "Rapport & communicatie")}
         </nav>
         <div className="mt-auto" />
         <div className="mt-14 border-t border-[var(--color-lijn)] pt-6">
@@ -81,6 +82,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {navItem("/app", "Overzicht")}
             {navItem("/app/lessons/new", "Les")}
             {navItem("/app/tests/new", "Toets")}
+            {navItem("/app/reports/new", "Rapport")}
           </nav>
         </div>
         <div className="px-6 py-10 md:px-10">{children}</div>

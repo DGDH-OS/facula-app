@@ -37,6 +37,12 @@ export default function AppDashboard() {
           >
             + Nieuwe toets
           </Link>
+          <Link
+            href="/app/reports/new"
+            className="rounded-full border border-[var(--color-goud)]/50 px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-goud)]/10"
+          >
+            + Rapport/oudercommunicatie
+          </Link>
         </div>
       </div>
 
@@ -122,6 +128,43 @@ export default function AppDashboard() {
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+      <section className="mt-12">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display text-xl text-[var(--color-marine)]">
+            Rapport &amp; communicatie
+          </h2>
+          <span className="rounded-full bg-[var(--color-goud)]/15 px-2.5 py-1 text-xs font-medium text-[var(--color-goud)]">
+            Bevat mogelijk leerlinggegevens — AVG-let-op
+          </span>
+        </div>
+        <p className="mt-2 max-w-2xl text-sm text-[var(--color-inkt)]/70">
+          Een apart onderdeel van de suite, met een andere risicocategorie
+          dan lessen en toetsen hierboven: hier typ je aantekeningen over een
+          leerling in om een rapporttekst, oudergesprek-verslag of
+          oudermail te laten opstellen.
+        </p>
+        <div className="mt-4 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-[var(--color-inkt)]/75">
+              Nog geen rapportteksten gegenereerd in dit overzicht.
+            </p>
+            <div className="flex gap-3">
+              <Link
+                href="/app/reports/new"
+                className="rounded-full bg-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
+              >
+                Nieuwe rapporttekst
+              </Link>
+              <Link
+                href="/privacy/rapport-module"
+                className="rounded-full border border-[var(--color-marine)]/30 px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-marine)]/5"
+              >
+                Privacy-uitleg
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     </div>

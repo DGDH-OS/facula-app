@@ -72,3 +72,35 @@ export interface GeneratedTest {
   totaalPunten: number;
   tijdsduur: number;
 }
+
+/* ------------------------------------------------------------------ */
+/* Module 1 — Rapport & oudercommunicatie                              */
+/* LET OP: dit is een andere risicocategorie dan les/toets hierboven — */
+/* deze module verwerkt mogelijk leerlinggerelateerde tekst. Zie       */
+/* src/lib/avg-guardrails.ts en /privacy/rapport-module.                */
+/* ------------------------------------------------------------------ */
+
+export type RapportOutputType = "rapporttekst" | "oudergesprek" | "oudermail";
+
+export type RapportToon = "formeel" | "vriendelijk-direct" | "warm";
+
+export interface ReportInput {
+  /** Bij voorkeur gepseudonimiseerd, bijv. "L.J." i.p.v. een volledige naam. */
+  leerlingLabel: string;
+  aantekeningen: string;
+  outputType: RapportOutputType;
+  toon: RapportToon;
+}
+
+export interface ReportGuardrailResultaat {
+  ok: boolean;
+  gevondenWoorden: string[];
+}
+
+export interface GeneratedReport {
+  id: string;
+  createdAt: string;
+  input: ReportInput;
+  tekst: string;
+  guardrail: ReportGuardrailResultaat;
+}
