@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { LessonInput, Vak, Niveau } from "@/lib/types";
+import { FormCard } from "@/components/ui/FormCard";
+import { MoreOptions } from "@/components/ui/MoreOptions";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -18,13 +20,12 @@ const DEFAULT_INPUT: LessonInput = {
 /**
  * Sterk vereenvoudigde flow: alleen het leerdoel vraagt verplicht aandacht.
  * Vak/niveau/leerjaar/lesduur/aantal lessen staan achter een inklapbaar
- * "instellingen"-blok met verstandige defaults. Bij klikken op de primaire
+ * "Meer opties"-blok met verstandige defaults. Bij klikken op de primaire
  * knop wordt de les gegenereerd én de PowerPoint in Mihiriban's eigen
  * sjabloon-stijl direct gedownload — in één vloeiende actie.
  */
 export default function NewLessonPage() {
   const [input, setInput] = useState<LessonInput>(DEFAULT_INPUT);
-  const [instellingenOpen, setInstellingenOpen] = useState(false);
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
   const [klaar, setKlaar] = useState(false);
@@ -69,7 +70,7 @@ export default function NewLessonPage() {
       setFout(
         err instanceof Error
           ? err.message
-          : "Er ging iets mis bij het genereren van de PowerPoint. Probeer het opnieuw."
+          : "Er ging iets mis. Probeer het opnieuw."
       );
     } finally {
       setBezig(false);
@@ -78,22 +79,12 @@ export default function NewLessonPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="font-display text-3xl text-[var(--color-marine)]">
-        Nieuwe les genereren
-      </h1>
-      <p className="mt-1 text-sm text-[var(--color-inkt)]/70">
-        Typ je leerdoel en klik op &quot;Maak mijn PowerPoint&quot; — Facula
-        genereert de hele les en levert meteen een kant-en-klare PowerPoint
-        in jouw eigen sjabloonstijl.
-      </p>
+      <h1 className="font-display text-3xl text-[var(--color-marine)]">Nieuwe les</h1>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-8 space-y-6 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6"
-      >
+      <FormCard onSubmit={handleSubmit} className="mt-8">
         <div>
           <label className="block text-base font-semibold text-[var(--color-marine)]">
-            Wat is het leerdoel van deze les?
+            Leerdoel
           </label>
           <textarea
             required
@@ -111,93 +102,79 @@ export default function NewLessonPage() {
           disabled={bezig || !input.leerdoel.trim()}
           className="w-full rounded-full bg-[var(--color-marine)] px-6 py-3.5 text-base font-semibold text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:cursor-wait disabled:opacity-60"
         >
-          {bezig ? "Bezig met genereren…" : "Maak mijn PowerPoint"}
+          {bezig ? "Bezig…" : "Maak mijn PowerPoint"}
         </button>
 
         {fout && (
-          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {fout}
-          </p>
+          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
         )}
         {klaar && !fout && (
           <p className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-            Je PowerPoint is gedownload — check je downloadmap.
+            Gedownload — check je downloadmap.
           </p>
         )}
 
-        <div className="border-t border-[var(--color-lijn)] pt-4">
-          <button
-            type="button"
-            onClick={() => setInstellingenOpen((v) => !v)}
-            className="text-xs font-medium text-[var(--color-inkt)]/60 underline underline-offset-4 hover:text-[var(--color-marine)]"
-          >
-            {instellingenOpen ? "Instellingen verbergen" : "Instellingen aanpassen (optioneel)"}
-          </button>
-
-          {instellingenOpen && (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-[var(--color-marine)]">Vak</label>
-                <select
-                  value={input.vak}
-                  onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-                >
-                  {VAKKEN.map((v) => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--color-marine)]">Niveau</label>
-                <select
-                  value={input.niveau}
-                  onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-                >
-                  {NIVEAUS.map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--color-marine)]">Leerjaar</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={6}
-                  value={input.leerjaar}
-                  onChange={(e) => setInput({ ...input, leerjaar: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--color-marine)]">Lesduur (min)</label>
-                <input
-                  type="number"
-                  min={20}
-                  max={120}
-                  step={5}
-                  value={input.lesduur}
-                  onChange={(e) => setInput({ ...input, lesduur: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--color-marine)]">Aantal lessen</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={6}
-                  value={input.aantalLessen}
-                  onChange={(e) => setInput({ ...input, aantalLessen: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </form>
+        <MoreOptions>
+          <div>
+            <label className="block text-xs font-medium text-[var(--color-marine)]">Vak</label>
+            <select
+              value={input.vak}
+              onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
+              className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+            >
+              {VAKKEN.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[var(--color-marine)]">Niveau</label>
+            <select
+              value={input.niveau}
+              onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
+              className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+            >
+              {NIVEAUS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[var(--color-marine)]">Leerjaar</label>
+            <input
+              type="number"
+              min={1}
+              max={6}
+              value={input.leerjaar}
+              onChange={(e) => setInput({ ...input, leerjaar: Number(e.target.value) })}
+              className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[var(--color-marine)]">Lesduur (min)</label>
+            <input
+              type="number"
+              min={20}
+              max={120}
+              step={5}
+              value={input.lesduur}
+              onChange={(e) => setInput({ ...input, lesduur: Number(e.target.value) })}
+              className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[var(--color-marine)]">Aantal lessen</label>
+            <input
+              type="number"
+              min={1}
+              max={6}
+              value={input.aantalLessen}
+              onChange={(e) => setInput({ ...input, aantalLessen: Number(e.target.value) })}
+              className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
+            />
+          </div>
+        </MoreOptions>
+      </FormCard>
     </div>
   );
 }

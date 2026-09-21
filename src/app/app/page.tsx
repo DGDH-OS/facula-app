@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getMockUser, type MockUser } from "@/lib/auth";
 import { MOCK_LESSEN, MOCK_TOETSEN } from "@/lib/mock-data";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 export default function AppDashboard() {
   const [user, setUser] = useState<MockUser | null>(null);
@@ -16,49 +17,40 @@ export default function AppDashboard() {
   return (
     <div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-3xl text-[var(--color-marine)]">
-            Welkom{user ? `, ${user.naam}` : ""}
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-inkt)]/70">
-            Je overzicht van lessen en toetsen.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href="/app/lessons/new"
-            className="rounded-full bg-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
-          >
-            + Nieuwe les
-          </Link>
-          <Link
-            href="/app/tests/new"
-            className="rounded-full border border-[var(--color-marine)]/30 px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-marine)]/5"
-          >
-            + Nieuwe toets
-          </Link>
-          <Link
-            href="/app/reports/new"
-            className="rounded-full border border-[var(--color-goud)]/50 px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-goud)]/10"
-          >
-            + Rapport/oudercommunicatie
-          </Link>
-        </div>
+        <h1 className="font-display text-3xl text-[var(--color-marine)]">
+          Welkom{user ? `, ${user.naam}` : ""}
+        </h1>
       </div>
 
-      <div className="mt-10 grid gap-6 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
-          <p className="text-xs uppercase tracking-wide text-[var(--color-inkt)]/50">Lessen</p>
-          <p className="mt-2 font-display text-3xl text-[var(--color-marine)]">{MOCK_LESSEN.length}</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
-          <p className="text-xs uppercase tracking-wide text-[var(--color-inkt)]/50">Toetsen</p>
-          <p className="mt-2 font-display text-3xl text-[var(--color-marine)]">{MOCK_TOETSEN.length}</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
-          <p className="text-xs uppercase tracking-wide text-[var(--color-inkt)]/50">Abonnement</p>
-          <p className="mt-2 font-display text-lg text-[var(--color-marine)]">Actief — proefperiode</p>
-        </div>
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <Link
+          href="/app/lessons/new"
+          className="group rounded-2xl bg-[var(--color-marine)] p-6 text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
+        >
+          <p className="font-display text-xl">Lessen maken</p>
+          <p className="mt-3 text-sm text-[var(--color-ivoor)]/70">
+            {MOCK_LESSEN.length} lessen
+          </p>
+        </Link>
+        <Link
+          href="/app/tests/new"
+          className="group rounded-2xl border-2 border-[var(--color-marine)]/30 p-6 transition hover:border-[var(--color-marine)]"
+        >
+          <p className="font-display text-xl text-[var(--color-marine)]">Toetsen maken</p>
+          <p className="mt-3 text-sm text-[var(--color-inkt)]/60">
+            {MOCK_TOETSEN.length} toetsen
+          </p>
+        </Link>
+        <Link
+          href="/app/reports/new"
+          className="group rounded-2xl border-2 border-[var(--color-goud)]/50 p-6 transition hover:border-[var(--color-goud)]"
+        >
+          <div className="flex items-center gap-2">
+            <p className="font-display text-xl text-[var(--color-marine)]">Rapporten schrijven</p>
+            <StatusBadge label="AVG" tone="warning" title="Bevat mogelijk leerlinggegevens — AVG-let-op" />
+          </div>
+          <p className="mt-3 text-sm text-[var(--color-inkt)]/60">Oudercommunicatie</p>
+        </Link>
       </div>
 
       <section className="mt-12">
@@ -83,15 +75,10 @@ export default function AppDashboard() {
                     {les.niveau} {les.leerjaar}
                   </td>
                   <td className="px-5 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs ${
-                        les.status === "klaar"
-                          ? "bg-[var(--color-groen)]/10 text-[var(--color-groen)]"
-                          : "bg-[var(--color-goud)]/15 text-[var(--color-goud)]"
-                      }`}
-                    >
-                      {les.status === "klaar" ? "Klaar" : "Concept"}
-                    </span>
+                    <StatusBadge
+                      label={les.status === "klaar" ? "Klaar" : "Concept"}
+                      tone={les.status === "klaar" ? "success" : "warning"}
+                    />
                   </td>
                   <td className="px-5 py-3 text-[var(--color-inkt)]/50">{les.bijgewerkt}</td>
                 </tr>
@@ -130,32 +117,21 @@ export default function AppDashboard() {
           </table>
         </div>
       </section>
+
       <section className="mt-12">
         <div className="flex items-center gap-2">
-          <h2 className="font-display text-xl text-[var(--color-marine)]">
-            Rapport &amp; communicatie
-          </h2>
-          <span className="rounded-full bg-[var(--color-goud)]/15 px-2.5 py-1 text-xs font-medium text-[var(--color-goud)]">
-            Bevat mogelijk leerlinggegevens — AVG-let-op
-          </span>
+          <h2 className="font-display text-xl text-[var(--color-marine)]">Rapport &amp; communicatie</h2>
+          <StatusBadge label="AVG" tone="warning" title="Bevat mogelijk leerlinggegevens — AVG-let-op" />
         </div>
-        <p className="mt-2 max-w-2xl text-sm text-[var(--color-inkt)]/70">
-          Een apart onderdeel van de suite, met een andere risicocategorie
-          dan lessen en toetsen hierboven: hier typ je aantekeningen over een
-          leerling in om een rapporttekst, oudergesprek-verslag of
-          oudermail te laten opstellen.
-        </p>
         <div className="mt-4 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-[var(--color-inkt)]/75">
-              Nog geen rapportteksten gegenereerd in dit overzicht.
-            </p>
+            <p className="text-sm text-[var(--color-inkt)]/75">Nog geen rapportteksten.</p>
             <div className="flex gap-3">
               <Link
                 href="/app/reports/new"
                 className="rounded-full bg-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
               >
-                Nieuwe rapporttekst
+                Nieuw rapport
               </Link>
               <Link
                 href="/privacy/rapport-module"
