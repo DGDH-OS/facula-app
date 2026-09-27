@@ -47,6 +47,7 @@ create policy "content_versions_select_own"
 
 grant usage on schema facula to authenticated;
 grant select on facula.content_versions to authenticated;
+grant all on facula.content_versions to service_role;
 
 create or replace function facula.save_version_and_update(
   p_content_type text,
