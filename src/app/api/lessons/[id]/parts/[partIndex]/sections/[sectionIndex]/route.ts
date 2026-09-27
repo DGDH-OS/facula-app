@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { GeneratedLesson } from "@/lib/types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { saveVersionSnapshot } from "@/lib/versioning";
 
 type LessonOutput = Omit<GeneratedLesson, "input">;
 
@@ -56,7 +57,7 @@ export async function PATCH(
   const { data: rij, error } = await supabase
     .schema("facula")
     .from("lessons")
-    .select("id, output")
+    .select("id, input, output")
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
@@ -65,12 +66,20 @@ export async function PATCH(
     return NextResponse.json({ error: "Les niet gevonden." }, { status: 404 });
   }
 
+  const input = rij.input;
   const output = rij.output as LessonOutput;
   const deel = output.onderdelen[partIndex];
   const sectie = deel?.secties[sectionIndex];
 
   if (!deel || !sectie) {
     return NextResponse.json({ error: "Sectie niet gevonden." }, { status: 404 });
+  }
+
+  try {
+    await saveVersionSnapshot(supabase, user.id, "lesson", id, input, output);
+  } catch (versionError) {
+    console.error("Versiesnapshot wegschrijven mislukt", versionError);
+    return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
   }
 
   output.onderdelen[partIndex].secties[sectionIndex] = { ...sectie, inhoud };

@@ -12,6 +12,7 @@ import {
 } from "@/lib/lesson-generator";
 import { afdwingenSlideRegels } from "@/lib/slide-content-rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { saveVersionSnapshot } from "@/lib/versioning";
 
 type LessonOutput = Omit<GeneratedLesson, "input">;
 
@@ -71,6 +72,13 @@ export async function POST(
 
   if (!deel || !sectie) {
     return NextResponse.json({ error: "Sectie niet gevonden." }, { status: 404 });
+  }
+
+  try {
+    await saveVersionSnapshot(supabase, user.id, "lesson", id, input, output);
+  } catch (versionError) {
+    console.error("Versiesnapshot wegschrijven mislukt", versionError);
+    return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
   }
 
   const groep = output.kernbegrippen.length > 0 ? output.kernbegrippen : ["kernbegrip"];

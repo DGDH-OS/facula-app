@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ExportPptxButton } from "@/components/lessons/ExportPptxButton";
 import { LessonSections } from "@/components/lessons/LessonSections";
+import { VersionHistory } from "@/components/lessons/VersionHistory";
 import type { GeneratedLesson } from "@/lib/types";
 
 export default async function LessonDetailPage({
@@ -62,6 +63,8 @@ export default async function LessonDetailPage({
       </div>
 
       <LessonSections lessonId={rij.id} onderdelen={output.onderdelen} />
+
+      <VersionHistory lessonId={rij.id} />
     </div>
   );
 }
