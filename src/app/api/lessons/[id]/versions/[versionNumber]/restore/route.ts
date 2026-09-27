@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { GeneratedLesson } from "@/lib/types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getVersion, saveVersionSnapshot } from "@/lib/versioning";
+import { getVersion, saveVersionAndUpdate } from "@/lib/versioning";
 
 /**
  * POST /api/lessons/[id]/versions/[versionNumber]/restore
@@ -54,32 +54,18 @@ export async function POST(
   }
 
   try {
-    await saveVersionSnapshot(
+    await saveVersionAndUpdate(
       supabase,
-      user.id,
       "lesson",
       id,
-      huidigeRij.input,
-      huidigeRij.output
+      teHerstellen.input,
+      teHerstellen.output
     );
-  } catch (versionError) {
-    console.error("Versiesnapshot vóór restore mislukt", versionError);
-    return NextResponse.json({ error: "Terugzetten mislukt." }, { status: 500 });
-  }
-
-  const { error: updateError } = await supabase
-    .schema("facula")
-    .from("lessons")
-    .update({
-      input: teHerstellen.input,
-      output: teHerstellen.output,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (updateError) {
-    console.error("Les terugzetten mislukt", updateError);
+  } catch (saveError) {
+    if ((saveError as { code?: string }).code === "P0002") {
+      return NextResponse.json({ error: "Les niet gevonden." }, { status: 404 });
+    }
+    console.error("Les terugzetten mislukt", saveError);
     return NextResponse.json({ error: "Terugzetten mislukt." }, { status: 500 });
   }
 

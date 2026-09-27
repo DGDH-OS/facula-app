@@ -19,47 +19,27 @@ export interface ContentVersionDetail<TInput = unknown, TOutput = unknown>
 }
 
 /**
- * Schrijft de OUDE staat (input+output) van een lesson/test/report weg als
- * nieuwe versie-rij. Moet aangeroepen worden VOORDAT de brontabel wordt
- * geüpdatet — de aanroeper geeft dus expliciet de staat mee zoals die vóór
- * de update was, niet de nieuwe staat.
+ * Slaat atomair de huidige staat op als versie en werkt daarna de bronrij bij
+ * met de nieuwe input/output. De databasefunctie bepaalt de eigenaar en het
+ * versienummer onder een row lock.
  */
-export async function saveVersionSnapshot(
+export async function saveVersionAndUpdate(
   supabase: SupabaseClient,
-  userId: string,
   contentType: VersionedContentType,
   contentId: string,
-  input: unknown,
-  output: unknown
-): Promise<void> {
-  const { data: laatste, error: leesError } = await supabase
+  newInput: unknown,
+  newOutput: unknown
+): Promise<number> {
+  const { data, error } = await supabase
     .schema("facula")
-    .from("content_versions")
-    .select("version_number")
-    .eq("content_type", contentType)
-    .eq("content_id", contentId)
-    .eq("user_id", userId)
-    .order("version_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (leesError) throw leesError;
-
-  const volgendVersienummer = (laatste?.version_number ?? 0) + 1;
-
-  const { error: schrijfError } = await supabase
-    .schema("facula")
-    .from("content_versions")
-    .insert({
-      content_type: contentType,
-      content_id: contentId,
-      user_id: userId,
-      version_number: volgendVersienummer,
-      input,
-      output,
+    .rpc("save_version_and_update", {
+      p_content_type: contentType,
+      p_content_id: contentId,
+      p_new_input: newInput,
+      p_new_output: newOutput,
     });
-
-  if (schrijfError) throw schrijfError;
+  if (error) throw error;
+  return data as number;
 }
 
 /** Lijst van eerdere versies (zonder input/output, licht voor een overzicht), nieuwste eerst. */

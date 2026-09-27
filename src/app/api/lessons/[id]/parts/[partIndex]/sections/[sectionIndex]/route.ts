@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { GeneratedLesson } from "@/lib/types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { saveVersionSnapshot } from "@/lib/versioning";
+import { saveVersionAndUpdate } from "@/lib/versioning";
 
 type LessonOutput = Omit<GeneratedLesson, "input">;
 
@@ -75,24 +75,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Sectie niet gevonden." }, { status: 404 });
   }
 
-  try {
-    await saveVersionSnapshot(supabase, user.id, "lesson", id, input, output);
-  } catch (versionError) {
-    console.error("Versiesnapshot wegschrijven mislukt", versionError);
-    return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
-  }
-
   output.onderdelen[partIndex].secties[sectionIndex] = { ...sectie, inhoud };
 
-  const { error: updateError } = await supabase
-    .schema("facula")
-    .from("lessons")
-    .update({ output, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (updateError) {
-    console.error("Sectie-edit opslaan mislukt", updateError);
+  try {
+    await saveVersionAndUpdate(supabase, "lesson", id, input, output);
+  } catch (saveError) {
+    if ((saveError as { code?: string }).code === "P0002") {
+      return NextResponse.json({ error: "Les niet gevonden." }, { status: 404 });
+    }
+    console.error("Sectie-edit opslaan mislukt", saveError);
     return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
   }
 

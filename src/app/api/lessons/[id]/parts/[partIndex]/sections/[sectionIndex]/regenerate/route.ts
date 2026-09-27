@@ -12,7 +12,7 @@ import {
 } from "@/lib/lesson-generator";
 import { afdwingenSlideRegels } from "@/lib/slide-content-rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { saveVersionSnapshot } from "@/lib/versioning";
+import { saveVersionAndUpdate } from "@/lib/versioning";
 
 type LessonOutput = Omit<GeneratedLesson, "input">;
 
@@ -74,13 +74,6 @@ export async function POST(
     return NextResponse.json({ error: "Sectie niet gevonden." }, { status: 404 });
   }
 
-  try {
-    await saveVersionSnapshot(supabase, user.id, "lesson", id, input, output);
-  } catch (versionError) {
-    console.error("Versiesnapshot wegschrijven mislukt", versionError);
-    return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
-  }
-
   const groep = output.kernbegrippen.length > 0 ? output.kernbegrippen : ["kernbegrip"];
   const isEersteLes = partIndex === 0;
   const isLaatsteLes = partIndex === output.onderdelen.length - 1;
@@ -125,15 +118,13 @@ export async function POST(
     inhoud: nieuweInhoud,
   };
 
-  const { error: updateError } = await supabase
-    .schema("facula")
-    .from("lessons")
-    .update({ output, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (updateError) {
-    console.error("Sectie-regeneratie opslaan mislukt", updateError);
+  try {
+    await saveVersionAndUpdate(supabase, "lesson", id, input, output);
+  } catch (saveError) {
+    if ((saveError as { code?: string }).code === "P0002") {
+      return NextResponse.json({ error: "Les niet gevonden." }, { status: 404 });
+    }
+    console.error("Sectie-regeneratie opslaan mislukt", saveError);
     return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
   }
 

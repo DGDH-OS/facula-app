@@ -28,6 +28,18 @@ export async function GET(
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
+  const { data: les, error: lesError } = await supabase
+    .schema("facula")
+    .from("lessons")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (lesError || !les) {
+    return NextResponse.json({ error: "Les niet gevonden." }, { status: 404 });
+  }
+
   try {
     const versie = await getVersion<GeneratedLesson["input"], Omit<GeneratedLesson, "input">>(
       supabase,
