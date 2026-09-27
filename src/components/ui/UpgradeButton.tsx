@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Upgrade-knop voor het dashboard. Post naar /api/stripe/checkout en
@@ -41,16 +42,15 @@ export function UpgradeButton() {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={bezig}
-        className="rounded-full bg-[var(--color-goud)] px-5 py-2.5 text-sm font-semibold text-[var(--color-marine)] transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
-      >
-        {bezig ? "Bezig…" : "Upgrade naar onbeperkt"}
-      </button>
-      {melding && <p className="text-xs text-[var(--color-inkt)]/60">{melding}</p>}
+    <div className="flex flex-col items-start gap-2">
+      <Button variant="secondary" onClick={handleClick} disabled={bezig}>
+        {bezig ? "Bezig..." : "Neem onbeperkt gebruik"}
+      </Button>
+      {melding && (
+        <p aria-live="polite" className="text-base text-tekst-zacht">
+          {melding}
+        </p>
+      )}
     </div>
   );
 }

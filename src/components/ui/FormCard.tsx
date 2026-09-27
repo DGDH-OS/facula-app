@@ -17,7 +17,7 @@ export function FormCard({
   return (
     <form
       onSubmit={onSubmit}
-      className={`space-y-5 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6 ${className}`}
+      className={`space-y-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6 ${className}`}
     >
       {children}
     </form>
@@ -27,7 +27,7 @@ export function FormCard({
 /** Lege-staat/voorbeeld-vak, consistent voor toets- en rapport-preview. */
 export function PreviewPlaceholder({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full min-h-[300px] items-center justify-center rounded-2xl border border-dashed border-[var(--color-lijn)] text-center text-sm text-[var(--color-inkt)]/50">
+    <div className="flex h-full min-h-75 items-center justify-center rounded-2xl border-2 border-dashed border-lijn p-6 text-center text-base text-tekst-zacht">
       {children}
     </div>
   );

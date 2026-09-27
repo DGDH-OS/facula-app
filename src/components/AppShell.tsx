@@ -57,10 +57,10 @@ export function AppShell({
         </nav>
         <div className="mt-auto" />
         <div className="mt-14 border-t border-[var(--color-lijn)] pt-6">
-          <p className="mt-0.5 text-xs text-[var(--color-inkt)]/50">{email}</p>
+          <p className="mt-0.5 text-base text-[var(--color-inkt)]/70">{email}</p>
           <button
             onClick={handleLogout}
-            className="mt-4 text-xs text-[var(--color-inkt)]/60 underline underline-offset-4 hover:text-[var(--color-marine)]"
+            className="mt-4 text-base text-[var(--color-inkt)]/80 underline underline-offset-4 hover:text-[var(--color-marine)]"
           >
             Uitloggen
           </button>
@@ -72,7 +72,7 @@ export function AppShell({
           <Link href="/" className="font-display text-lg text-[var(--color-marine)]">
             Facula
           </Link>
-          <nav className="flex gap-3 text-xs">
+          <nav className="flex gap-3 text-base">
             {navItem("/app", "Overzicht")}
             {navItem("/app/lessons/new", "Les")}
             {navItem("/app/tests/new", "Toets")}

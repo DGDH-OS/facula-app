@@ -51,7 +51,7 @@ export default async function LessonDetailPage({
               {output.kernbegrippen.map((begrip) => (
                 <span
                   key={begrip}
-                  className="rounded-full bg-[var(--color-goud)]/15 px-3 py-1 text-xs font-medium text-[var(--color-goud)]"
+                  className="rounded-full bg-[var(--color-goud)]/15 px-3 py-1 text-base font-semibold text-[var(--color-goud)]"
                 >
                   {begrip}
                 </span>

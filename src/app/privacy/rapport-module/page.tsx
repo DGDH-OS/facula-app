@@ -8,7 +8,7 @@ export default function RapportModulePrivacyPage() {
       <SiteHeader />
       <main className="flex-1 px-6 py-24">
         <div className="mx-auto max-w-3xl">
-          <span className="inline-block rounded-full bg-[var(--color-goud)]/15 px-3 py-1 text-xs font-medium text-[var(--color-goud)]">
+          <span className="inline-block rounded-full bg-[var(--color-goud)]/15 px-3 py-1 text-base font-semibold text-[var(--color-goud)]">
             Bevat mogelijk leerlinggegevens — AVG-let-op
           </span>
           <h1 className="mt-4 font-display text-4xl text-[var(--color-marine)]">

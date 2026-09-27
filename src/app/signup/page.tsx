@@ -105,7 +105,7 @@ export default function SignupPage() {
               <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
             )}
 
-            <p className="text-xs text-[var(--color-inkt)]/60">
+            <p className="text-base text-[var(--color-inkt)]/80">
               Door een account aan te maken ga je akkoord met de{" "}
               <Link href="/voorwaarden" className="underline underline-offset-4 hover:text-[var(--color-marine)]">
                 voorwaarden

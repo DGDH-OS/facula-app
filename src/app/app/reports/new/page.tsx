@@ -95,7 +95,7 @@ export default function NewReportPage() {
               className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
             />
             {/* AVG-vereiste, harde productregel — altijd zichtbaar, niet uitzetbaar. */}
-            <p className="mt-2 text-xs font-medium text-[var(--color-goud)]">
+            <p className="mt-2 text-base font-semibold text-[var(--color-goud)]">
               ⚠ Gebruik geen volledige naam — AVG.
             </p>
           </div>
@@ -128,7 +128,7 @@ export default function NewReportPage() {
 
           <MoreOptions>
             <div>
-              <label className="block text-xs font-medium text-[var(--color-marine)]">Output-type</label>
+              <label className="block text-base font-semibold text-[var(--color-marine)]">Output-type</label>
               <select
                 value={input.outputType}
                 onChange={(e) => setInput({ ...input, outputType: e.target.value as RapportOutputType })}
@@ -140,7 +140,7 @@ export default function NewReportPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--color-marine)]">Toon</label>
+              <label className="block text-base font-semibold text-[var(--color-marine)]">Toon</label>
               <select
                 value={input.toon}
                 onChange={(e) => setInput({ ...input, toon: e.target.value as RapportToon })}
@@ -153,7 +153,7 @@ export default function NewReportPage() {
             </div>
           </MoreOptions>
 
-          <p className="text-xs text-[var(--color-inkt)]/50">
+          <p className="text-base text-[var(--color-inkt)]/70">
             Geen automatische koppeling met Magister/Somtoday —{" "}
             <Link href="/privacy/rapport-module" className="underline underline-offset-4 hover:text-[var(--color-marine)]">
               privacy-uitleg

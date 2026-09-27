@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { GeneratedLesson } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
 
 type LessonOutput = Omit<GeneratedLesson, "input">;
 
@@ -24,25 +25,25 @@ function formatTimestamp(iso: string): string {
 
 function VersionPreview({ output }: { output: LessonOutput }) {
   return (
-    <div className="mt-3 space-y-4 rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-4">
+    <div className="mt-3 space-y-5 rounded-lg border-2 border-lijn bg-ivoor-deep p-5">
       <div>
-        <p className="font-display text-sm text-[var(--color-marine)]">{output.titel}</p>
+        <p className="font-display text-xl text-marine">{output.titel}</p>
         {output.kernbegrippen.length > 0 && (
-          <p className="mt-1 text-xs text-[var(--color-inkt)]/60">
+          <p className="mt-1 text-base text-tekst-zacht">
             {output.kernbegrippen.join(", ")}
           </p>
         )}
       </div>
       {output.onderdelen.map((deel) => (
         <div key={deel.nummer}>
-          <p className="text-xs font-semibold text-[var(--color-inkt)]/70">{deel.titel}</p>
-          <div className="mt-1 space-y-2">
+          <p className="text-base font-semibold text-marine">{deel.titel}</p>
+          <div className="mt-2 space-y-3">
             {deel.secties.map((sectie, i) => (
               <div key={i}>
-                <p className="text-xs font-medium text-[var(--color-inkt)]/60">
+                <p className="text-base font-medium text-tekst-zacht">
                   {sectie.titel}
                 </p>
-                <ul className="mt-0.5 space-y-0.5 text-xs text-[var(--color-inkt)]/80">
+                <ul className="mt-1 space-y-1 text-base text-tekst">
                   {sectie.inhoud.map((regel, j) => (
                     <li key={j}>• {regel}</li>
                   ))}
@@ -121,42 +122,47 @@ function VersionRow({
   }
 
   return (
-    <li className="rounded-xl border border-[var(--color-lijn)] p-4">
+    <li className="rounded-xl border-2 border-lijn p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-[var(--color-marine)]">
+          <p className="text-base font-semibold text-marine">
             Versie {version.versionNumber}
           </p>
-          <p className="text-xs text-[var(--color-inkt)]/60">
+          <p className="text-base text-tekst-zacht">
             {formatTimestamp(version.createdAt)}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="secondary"
             onClick={toggleBekijken}
-            className="rounded-full border border-[var(--color-lijn)] px-3 py-1.5 text-xs font-medium text-[var(--color-inkt)]/70 transition hover:border-[var(--color-marine)]"
+            aria-expanded={bekijken}
           >
-            {bekijken ? "Verbergen" : "Bekijken"}
-          </button>
-          <button
-            type="button"
-            onClick={terugzetten}
-            disabled={herstellen}
-            className="rounded-full bg-[var(--color-marine)] px-3 py-1.5 text-xs font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:cursor-wait disabled:opacity-60"
-          >
-            {herstellen ? "Bezig…" : "Terugzetten"}
-          </button>
+            {bekijken ? "Verberg deze versie" : "Bekijk deze versie"}
+          </Button>
+          <Button variant="secondary" onClick={terugzetten} disabled={herstellen}>
+            {herstellen ? "Bezig met terugzetten..." : "Zet deze versie terug"}
+          </Button>
         </div>
       </div>
 
-      {bekijken && (laden ? (
-        <p className="mt-3 text-xs text-[var(--color-inkt)]/60">Laden…</p>
-      ) : (
-        detail && <VersionPreview output={detail.output} />
-      ))}
+      <div aria-live="polite">
+        {bekijken &&
+          (laden ? (
+            <p className="mt-3 text-base text-tekst-zacht">Bezig met ophalen...</p>
+          ) : (
+            detail && <VersionPreview output={detail.output} />
+          ))}
+      </div>
 
-      {fout && <p className="mt-2 text-xs text-red-600">{fout}</p>}
+      {fout && (
+        <p
+          aria-live="polite"
+          className="mt-3 rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
+        >
+          {fout}
+        </p>
+      )}
     </li>
   );
 }
@@ -193,22 +199,29 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
   }
 
   return (
-    <div className="mt-10 border-t border-[var(--color-lijn)] pt-6">
+    <div className="mt-10 border-t-2 border-lijn pt-6">
       <button
         type="button"
         onClick={toggleOpen}
-        className="font-display text-lg text-[var(--color-marine)]"
+        aria-expanded={open}
+        className="inline-flex min-h-14 items-center gap-2 font-display text-xl text-marine underline underline-offset-4"
       >
-        Versiegeschiedenis {open ? "▾" : "▸"}
+        Eerdere versies
+        <span aria-hidden>{open ? "▾" : "▸"}</span>
       </button>
 
       {open && (
-        <div className="mt-4">
-          {laden && <p className="text-sm text-[var(--color-inkt)]/60">Laden…</p>}
-          {fout && <p className="text-sm text-red-600">{fout}</p>}
+        <div className="mt-4" aria-live="polite">
+          {laden && <p className="text-base text-tekst-zacht">Bezig met ophalen...</p>}
+          {fout && (
+            <p className="rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst">
+              {fout}
+            </p>
+          )}
           {versions && versions.length === 0 && (
-            <p className="text-sm text-[var(--color-inkt)]/60">
-              Nog geen eerdere versies — deze les is nog niet bewerkt of geregenereerd.
+            <p className="text-base text-tekst-zacht">
+              Nog geen eerdere versies. Deze les is nog niet aangepast of opnieuw
+              gemaakt.
             </p>
           )}
           {versions && versions.length > 0 && (

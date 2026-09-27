@@ -125,7 +125,7 @@ export default async function AppDashboard() {
         ) : (
           <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--color-lijn)]">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--color-ivoor-deep)] text-xs uppercase tracking-wide text-[var(--color-inkt)]/50">
+              <thead className="bg-[var(--color-ivoor-deep)] text-base font-semibold uppercase tracking-wide text-[var(--color-inkt)]/70">
                 <tr>
                   <th className="px-5 py-3 font-medium">Titel</th>
                   <th className="px-5 py-3 font-medium">Vak</th>
@@ -167,7 +167,7 @@ export default async function AppDashboard() {
         ) : (
           <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--color-lijn)]">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--color-ivoor-deep)] text-xs uppercase tracking-wide text-[var(--color-inkt)]/50">
+              <thead className="bg-[var(--color-ivoor-deep)] text-base font-semibold uppercase tracking-wide text-[var(--color-inkt)]/70">
                 <tr>
                   <th className="px-5 py-3 font-medium">Titel</th>
                   <th className="px-5 py-3 font-medium">Vak</th>

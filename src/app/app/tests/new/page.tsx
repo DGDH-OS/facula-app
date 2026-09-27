@@ -109,7 +109,7 @@ export default function NewTestPage() {
 
           <MoreOptions>
             <div>
-              <label className="block text-xs font-medium text-[var(--color-marine)]">Vak</label>
+              <label className="block text-base font-semibold text-[var(--color-marine)]">Vak</label>
               <select
                 value={input.vak}
                 onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
@@ -121,7 +121,7 @@ export default function NewTestPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--color-marine)]">Niveau</label>
+              <label className="block text-base font-semibold text-[var(--color-marine)]">Niveau</label>
               <select
                 value={input.niveau}
                 onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
@@ -133,7 +133,7 @@ export default function NewTestPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--color-marine)]">Leerjaar</label>
+              <label className="block text-base font-semibold text-[var(--color-marine)]">Leerjaar</label>
               <input
                 type="number"
                 min={1}
@@ -144,7 +144,7 @@ export default function NewTestPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--color-marine)]">Aantal vragen</label>
+              <label className="block text-base font-semibold text-[var(--color-marine)]">Aantal vragen</label>
               <input
                 type="number"
                 min={3}
@@ -162,7 +162,7 @@ export default function NewTestPage() {
           {resultaat && (
             <article className="space-y-8">
               <header className="rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-marine)] p-8 text-[var(--color-ivoor)]">
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-goud)]">
+                <p className="text-base font-semibold uppercase tracking-[0.2em] text-[var(--color-goud)]">
                   {resultaat.input.vak} · {resultaat.input.niveau} {resultaat.input.leerjaar}
                 </p>
                 <h2 className="mt-3 font-display text-2xl">{resultaat.titel}</h2>
@@ -181,7 +181,7 @@ export default function NewTestPage() {
                         <p className="text-sm font-medium text-[var(--color-inkt)]">
                           {v.nummer}. {v.vraag}
                         </p>
-                        <span className="shrink-0 text-xs text-[var(--color-inkt)]/40">
+                        <span className="shrink-0 text-base text-[var(--color-inkt)]/70">
                           {v.punten} {v.punten === 1 ? "punt" : "punten"} ·{" "}
                           {v.type === "meerkeuze" ? "meerkeuze" : v.type === "open" ? "open" : "invulvraag"}
                         </span>

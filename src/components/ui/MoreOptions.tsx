@@ -9,7 +9,7 @@ import { useState, type ReactNode } from "react";
  */
 export function MoreOptions({
   children,
-  label = "Meer opties",
+  label = "Instellingen aanpassen",
 }: {
   children: ReactNode;
   label?: string;
@@ -17,23 +17,23 @@ export function MoreOptions({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border-t border-[var(--color-lijn)] pt-4">
+    <div className="border-t-2 border-lijn pt-4">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-inkt)]/60 transition hover:text-[var(--color-marine)]"
+        className="flex min-h-14 items-center gap-2 text-base font-semibold text-marine underline underline-offset-4"
       >
         <span
-          className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}
+          className={`inline-block transition-transform duration-200 ${open ? "rotate-90" : ""}`}
           aria-hidden
         >
           ›
         </span>
-        {open ? "Verberg opties" : label}
+        {open ? "Verberg instellingen" : label}
       </button>
 
-      {open && <div className="mt-4 grid gap-4 sm:grid-cols-2">{children}</div>}
+      {open && <div className="mt-4 grid gap-5 sm:grid-cols-2">{children}</div>}
     </div>
   );
 }

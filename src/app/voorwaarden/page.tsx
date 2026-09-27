@@ -8,7 +8,7 @@ export default function VoorwaardenPage() {
       <SiteHeader />
       <main className="flex-1 px-6 py-24">
         <div className="mx-auto max-w-3xl">
-          <p className="text-xs uppercase tracking-wide text-[var(--color-inkt)]/50">
+          <p className="text-base font-semibold uppercase tracking-wide text-[var(--color-inkt)]/70">
             Versie 27 september 2026
           </p>
           <h1 className="mt-2 font-display text-4xl text-[var(--color-marine)]">

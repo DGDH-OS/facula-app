@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Verplaatst vanuit de generatie-flow (`/app/lessons/new`) naar de
@@ -44,16 +45,18 @@ export function ExportPptxButton({ lessonId }: { lessonId: string }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <button
-        type="button"
-        onClick={exporteer}
-        disabled={bezig}
-        className="rounded-full bg-[var(--color-marine)] px-5 py-2.5 text-sm font-semibold text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:cursor-wait disabled:opacity-60"
-      >
-        {bezig ? "Bezig…" : "Exporteer naar PowerPoint"}
-      </button>
-      {fout && <p className="text-xs text-red-600">{fout}</p>}
+    <div className="flex flex-col items-start gap-2">
+      <Button variant="primary" onClick={exporteer} disabled={bezig}>
+        {bezig ? "Bezig met maken..." : "Download als PowerPoint"}
+      </Button>
+      {fout && (
+        <p
+          aria-live="polite"
+          className="rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
+        >
+          {fout}
+        </p>
+      )}
     </div>
   );
 }

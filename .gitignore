@@ -20,6 +20,9 @@
 # production
 /build
 
+# lokaal bewijsmateriaal (screenshots, meetlogs), nooit committen
+/.artifacts/
+
 # misc
 .DS_Store
 *.pem

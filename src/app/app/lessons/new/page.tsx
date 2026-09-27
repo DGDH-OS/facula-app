@@ -98,7 +98,7 @@ export default function NewLessonPage() {
 
         <MoreOptions>
           <div>
-            <label className="block text-xs font-medium text-[var(--color-marine)]">Vak</label>
+            <label className="block text-base font-semibold text-[var(--color-marine)]">Vak</label>
             <select
               value={input.vak}
               onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
@@ -110,7 +110,7 @@ export default function NewLessonPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--color-marine)]">Niveau</label>
+            <label className="block text-base font-semibold text-[var(--color-marine)]">Niveau</label>
             <select
               value={input.niveau}
               onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
@@ -122,7 +122,7 @@ export default function NewLessonPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--color-marine)]">Leerjaar</label>
+            <label className="block text-base font-semibold text-[var(--color-marine)]">Leerjaar</label>
             <input
               type="number"
               min={1}
@@ -133,7 +133,7 @@ export default function NewLessonPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--color-marine)]">Lesduur (min)</label>
+            <label className="block text-base font-semibold text-[var(--color-marine)]">Lesduur (min)</label>
             <input
               type="number"
               min={20}
@@ -145,7 +145,7 @@ export default function NewLessonPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[var(--color-marine)]">Aantal lessen</label>
+            <label className="block text-base font-semibold text-[var(--color-marine)]">Aantal lessen</label>
             <input
               type="number"
               min={1}

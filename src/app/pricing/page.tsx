@@ -68,7 +68,7 @@ export default function PricingPage() {
                 }`}
               >
                 {tier.uitgelicht && (
-                  <span className="mb-4 inline-block w-fit rounded-full bg-[var(--color-goud)] px-3 py-1 text-xs font-medium text-[var(--color-marine-deep)]">
+                  <span className="mb-4 inline-block w-fit rounded-full bg-[var(--color-goud)] px-3 py-1 text-base font-semibold text-[var(--color-marine-deep)]">
                     Meest gekozen
                   </span>
                 )}
@@ -91,8 +91,8 @@ export default function PricingPage() {
                   </span>
                 </div>
                 <p
-                  className={`mt-1 text-xs ${
-                    tier.uitgelicht ? "text-[var(--color-ivoor)]/50" : "text-[var(--color-inkt)]/50"
+                  className={`mt-1 text-base ${
+                    tier.uitgelicht ? "text-[var(--color-ivoor)]/80" : "text-[var(--color-inkt)]/70"
                   }`}
                 >
                   of €{tier.prijs * 10} per jaar — 2 maanden gratis

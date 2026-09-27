@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import type { LessonPart, LessonSection } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
 
 function RefreshIcon({ spinning }: { spinning: boolean }) {
   return (
     <svg
       viewBox="0 0 16 16"
-      width="12"
-      height="12"
+      width="20"
+      height="20"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -94,12 +95,12 @@ function SectionCard({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--color-lijn)] bg-[var(--color-ivoor)] p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-display text-base text-[var(--color-marine)]">
+    <div className="rounded-xl border-2 border-lijn bg-ivoor p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-display text-xl text-marine">
           {section.titel}
           {section.duur ? (
-            <span className="ml-2 text-xs font-normal text-[var(--color-inkt)]/50">
+            <span className="ml-2 text-base font-normal text-tekst-zacht">
               {section.duur} min
             </span>
           ) : null}
@@ -108,56 +109,63 @@ function SectionCard({
           type="button"
           onClick={regenereer}
           disabled={regenerating}
-          className="flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--color-goud)] transition hover:text-[var(--color-marine)] disabled:opacity-50"
+          className="inline-flex min-h-14 shrink-0 items-center gap-2 text-base font-semibold text-marine underline underline-offset-4 disabled:opacity-70"
         >
           <RefreshIcon spinning={regenerating} />
-          {regenerating ? "Bezig…" : "Regenereer"}
+          {regenerating ? "Bezig met maken..." : "Maak dit onderdeel opnieuw"}
         </button>
       </div>
 
       {editing ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
           <textarea
             rows={Math.max(3, draft.split("\n").length)}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             autoFocus
-            className="w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[var(--color-marine)]"
+            aria-label={`Inhoud van ${section.titel}`}
+            className="min-h-14 w-full rounded-lg border-2 border-lijn bg-ivoor-deep px-4 py-3 text-base text-tekst focus:border-marine"
           />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={opslaan}
-              disabled={saving}
-              className="rounded-full bg-[var(--color-marine)] px-4 py-1.5 text-xs font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:opacity-60"
-            >
-              {saving ? "Opslaan…" : "Opslaan"}
-            </button>
-            <button
-              type="button"
+          <div className="flex flex-wrap gap-3">
+            <Button variant="primary" onClick={opslaan} disabled={saving}>
+              {saving ? "Bezig met opslaan..." : "Bewaar dit onderdeel"}
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => {
                 setEditing(false);
                 setDraft(section.inhoud.join("\n"));
               }}
-              className="rounded-full border border-[var(--color-lijn)] px-4 py-1.5 text-xs font-medium text-[var(--color-inkt)]/70 transition hover:border-[var(--color-marine)]"
             >
               Annuleren
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
-        <ul
-          onClick={() => setEditing(true)}
-          title="Klik om te bewerken"
-          className="mt-3 cursor-text space-y-1.5 text-sm text-[var(--color-inkt)]/80"
-        >
-          {section.inhoud.map((regel, i) => (
-            <li key={i}>• {regel}</li>
-          ))}
-        </ul>
+        <>
+          <ul className="mt-3 space-y-2 text-base text-tekst">
+            {section.inhoud.map((regel, i) => (
+              <li key={i}>• {regel}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="mt-2 inline-flex min-h-14 items-center text-base font-semibold text-marine underline underline-offset-4"
+          >
+            Pas dit onderdeel aan
+          </button>
+        </>
       )}
 
-      {fout && <p className="mt-2 text-xs text-red-600">{fout}</p>}
+      {fout && (
+        <p
+          aria-live="polite"
+          className="mt-3 rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
+        >
+          {fout}
+        </p>
+      )}
     </div>
   );
 }
@@ -190,9 +198,9 @@ export function LessonSections({
     <div className="mt-8 space-y-10">
       {onderdelen.map((deel, partIndex) => (
         <div key={deel.nummer}>
-          <h2 className="font-display text-xl text-[var(--color-marine)]">
+          <h2 className="font-display text-2xl text-marine">
             {deel.titel}
-            <span className="ml-2 text-sm font-normal text-[var(--color-inkt)]/50">
+            <span className="ml-2 text-base font-normal text-tekst-zacht">
               {deel.duur} min
             </span>
           </h2>

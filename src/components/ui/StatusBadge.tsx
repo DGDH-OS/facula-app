@@ -1,15 +1,27 @@
 type StatusTone = "success" | "warning" | "neutral";
 
+/**
+ * Elk vlak/tekst-paar haalt >= 7:1, gemeten en vastgelegd in globals.css.
+ * De oude varianten gebruikten goud en groen als tekstkleur op een 10-15%
+ * tint van zichzelf; goud haalde daar 2,65:1.
+ */
 const TONE_STYLES: Record<StatusTone, string> = {
-  success: "bg-[var(--color-groen)]/10 text-[var(--color-groen)]",
-  warning: "bg-[var(--color-goud)]/15 text-[var(--color-goud)]",
-  neutral: "bg-[var(--color-inkt)]/10 text-[var(--color-inkt)]/70",
+  success: "bg-succes-vlak text-succes-tekst",
+  warning: "bg-waarschuwing-vlak text-waarschuwing-tekst",
+  neutral: "bg-neutraal-vlak text-tekst",
+};
+
+/** Teken naast het label, zodat de betekenis niet alleen uit kleur komt. */
+const TONE_TEKENS: Record<StatusTone, string> = {
+  success: "✓",
+  warning: "⚠",
+  neutral: "•",
 };
 
 /**
- * Eén status-component voor de hele suite: kleur + stip i.p.v. een
- * tekstuele uitleg. `title` geeft de volledige uitleg als tooltip,
- * zodat het zichtbare label kort kan blijven.
+ * Eén status-component voor de hele suite. `title` geeft de volledige
+ * uitleg als tooltip; omdat een tooltip op touch niet bestaat, staat de
+ * uitleg altijd óók ergens als gewone tekst op de pagina.
  */
 export function StatusBadge({
   label,
@@ -23,9 +35,9 @@ export function StatusBadge({
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${TONE_STYLES[tone]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${TONE_STYLES[tone]}`}
     >
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden />
+      <span aria-hidden>{TONE_TEKENS[tone]}</span>
       {label}
     </span>
   );
