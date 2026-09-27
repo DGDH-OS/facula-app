@@ -8,7 +8,22 @@ import { createClient } from "@/lib/supabase/client";
  * Client-side navigatie/uitloggen-shell. De AUTH-GUARD zelf zit in
  * layout.tsx (server-side sessie-check) — dit component toont alleen de
  * al-geverifieerde gebruiker en regelt de uitlog-actie.
+ *
+ * Navigatie is bewust maximaal drie bestemmingen plus uitloggen (brief 4):
+ * "Mijn werk" wijst naar de lijst op het startscherm, want een eigen
+ * overzichtspagina bestaat nog niet. Uitloggen is visueel secundair en
+ * staat rechts (brief 10.10), zonder bevestigingsmodal.
+ *
+ * De balk is sticky. `scroll-padding-top` in globals.css zorgt dat een
+ * element dat via Tab of een anker focus krijgt niet onder deze balk
+ * verdwijnt (WCAG 2.4.11).
  */
+const NAV_ITEMS: { href: string; label: string }[] = [
+  { href: "/app", label: "Start" },
+  { href: "/app#werk", label: "Mijn werk" },
+  { href: "/app/account", label: "Account" },
+];
+
 export function AppShell({
   email,
   children,
@@ -19,22 +34,6 @@ export function AppShell({
   const router = useRouter();
   const pathname = usePathname();
 
-  const navItem = (href: string, label: string) => {
-    const actief = pathname === href || (href !== "/app" && pathname?.startsWith(href));
-    return (
-      <Link
-        href={href}
-        className={`block rounded-lg px-3 py-2 text-sm transition ${
-          actief
-            ? "bg-[var(--color-marine)] text-[var(--color-ivoor)]"
-            : "text-[var(--color-inkt)]/75 hover:bg-[var(--color-marine)]/5"
-        }`}
-      >
-        {label}
-      </Link>
-    );
-  };
-
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -43,45 +42,45 @@ export function AppShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--color-ivoor)]">
-      <aside className="hidden w-64 shrink-0 border-r border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6 md:block">
-        <Link href="/" className="font-display text-xl text-[var(--color-marine)]">
-          Facula
-        </Link>
-        <nav className="mt-10 space-y-1">
-          {navItem("/app", "Overzicht")}
-          {navItem("/app/lessons/new", "Nieuwe les")}
-          {navItem("/app/tests/new", "Nieuwe toets")}
-          {navItem("/app/reports/new", "Rapport & communicatie")}
-          {navItem("/app/account", "Account")}
-        </nav>
-        <div className="mt-auto" />
-        <div className="mt-14 border-t border-[var(--color-lijn)] pt-6">
-          <p className="mt-0.5 text-base text-[var(--color-inkt)]/70">{email}</p>
-          <button
-            onClick={handleLogout}
-            className="mt-4 text-base text-[var(--color-inkt)]/80 underline underline-offset-4 hover:text-[var(--color-marine)]"
-          >
-            Uitloggen
-          </button>
-        </div>
-      </aside>
-      <div className="flex-1">
-        {/* mobiele topbalk */}
-        <div className="flex items-center justify-between border-b border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] px-4 py-3 md:hidden">
-          <Link href="/" className="font-display text-lg text-[var(--color-marine)]">
+    <div className="min-h-screen bg-ivoor">
+      <header className="sticky top-0 z-20 border-b border-lijn bg-ivoor-deep">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+          <Link href="/" className="font-display text-xl text-marine">
             Facula
           </Link>
-          <nav className="flex gap-3 text-base">
-            {navItem("/app", "Overzicht")}
-            {navItem("/app/lessons/new", "Les")}
-            {navItem("/app/tests/new", "Toets")}
-            {navItem("/app/reports/new", "Rapport")}
-            {navItem("/app/account", "Account")}
+          <nav aria-label="Hoofdnavigatie" className="flex flex-wrap items-center gap-2">
+            {NAV_ITEMS.map(({ href, label }) => {
+              const doel = href.split("#")[0];
+              const actief =
+                pathname === doel || (doel !== "/app" && Boolean(pathname?.startsWith(doel)));
+              return (
+                <Link
+                  key={label}
+                  href={href}
+                  aria-current={actief ? "page" : undefined}
+                  className={`flex min-h-12 items-center rounded-lg px-4 text-base font-semibold transition-colors duration-200 ${
+                    actief
+                      ? "bg-marine text-op-donker"
+                      : "text-tekst hover:bg-neutraal-vlak"
+                  }`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
+          <div className="ms-auto flex items-center gap-4">
+            <span className="hidden text-sm text-tekst-zacht sm:inline">{email}</span>
+            <button
+              onClick={handleLogout}
+              className="flex min-h-12 items-center rounded-lg px-3 text-base text-tekst underline underline-offset-4 transition-colors duration-200 hover:bg-neutraal-vlak hover:no-underline"
+            >
+              Uitloggen
+            </button>
+          </div>
         </div>
-        <div className="px-6 py-10 md:px-10">{children}</div>
-      </div>
+      </header>
+      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">{children}</main>
     </div>
   );
 }

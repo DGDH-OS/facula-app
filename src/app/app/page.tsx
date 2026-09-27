@@ -2,8 +2,10 @@ import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { UpgradeButton } from "@/components/ui/UpgradeButton";
+import { Tile } from "@/components/ui/Tile";
+import { LesIcon, ToetsIcon, RapportIcon } from "@/components/ui/icons";
 import { getCurrentUsage, isPaidSubscriber, FREE_QUOTA_PER_MONTH } from "@/lib/quota";
-import type { GeneratedLesson, GeneratedTest, GeneratedReport } from "@/lib/types";
+import type { GeneratedLesson } from "@/lib/types";
 
 function tijdGeleden(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -50,205 +52,139 @@ export default async function AppDashboard() {
   const paid = user ? await isPaidSubscriber(supabase, user.id) : false;
   const usage = user ? await getCurrentUsage(supabase, user.id) : { lessons: 0, tests: 0, reports: 0 };
 
+  /*
+   * Maximaal vijf rijen, en alleen lessen: een les heeft een detailpagina
+   * (/app/lessons/[id]) en is dus echt te openen. Toetsen en rapporten
+   * hebben die pagina nog niet, dus die staan als leesbare regel onder de
+   * lijst in plaats van als rij die nergens heen gaat.
+   */
+  const laatsteLessen = lessen.slice(0, 5);
+  const andersGemaakt = [
+    toetsen.length > 0 ? `${toetsen.length} ${toetsen.length === 1 ? "toets" : "toetsen"}` : null,
+    rapporten.length > 0
+      ? `${rapporten.length} ${rapporten.length === 1 ? "rapport" : "rapporten"}`
+      : null,
+  ].filter((deel): deel is string => deel !== null);
+
   return (
     <div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="font-display text-3xl text-[var(--color-marine)]">
-          Welkom{user?.email ? `, ${user.email.split("@")[0]}` : ""}
-        </h1>
+      <h1 className="font-display text-3xl text-marine">
+        Welkom{user?.email ? `, ${user.email.split("@")[0]}` : ""}
+      </h1>
+      <p className="mt-3 max-w-[60ch] text-base text-tekst-zacht">
+        Kies hieronder wat je wilt maken. Je hoeft alleen je leerdoel in te vullen.
+      </p>
+
+      <h2 className="mt-10 font-display text-2xl text-marine">Wat wil je maken?</h2>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <Tile
+          href="/app/lessons/new"
+          icoon={<LesIcon />}
+          kop="Een les maken"
+          zin="Vul je leerdoel in en krijg een volledige les met opdrachten."
+        />
+        <Tile
+          href="/app/tests/new"
+          icoon={<ToetsIcon />}
+          kop="Een toets maken"
+          zin="Vragen en antwoordsleutel bij het leerdoel van je les."
+        />
+        <Tile
+          href="/app/reports/new"
+          icoon={<RapportIcon />}
+          kop="Een rapport schrijven"
+          zin="Een rapporttekst of oudermail in jouw woorden."
+          extra={
+            <StatusBadge
+              label="Let op leerlinggegevens"
+              tone="warning"
+              title="Gebruik geen volledige namen: dit valt onder de AVG"
+            />
+          }
+        />
       </div>
 
-      <section className="mt-6 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
+      <section id="werk" className="mt-14">
+        <h2 className="font-display text-2xl text-marine">Je laatste werk</h2>
+        {laatsteLessen.length === 0 ? (
+          <p className="mt-4 text-base text-tekst-zacht">
+            Je hebt nog niets gemaakt.{" "}
+            <Link href="/app/lessons/new" className="text-marine underline underline-offset-4">
+              Maak je eerste les
+            </Link>
+            .
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-lijn overflow-hidden rounded-2xl border-2 border-lijn">
+            {laatsteLessen.map((les) => {
+              const input = les.input as GeneratedLesson["input"];
+              const output = les.output as Pick<GeneratedLesson, "titel">;
+              return (
+                <li key={les.id}>
+                  <Link
+                    href={`/app/lessons/${les.id}`}
+                    className="flex min-h-20 flex-col justify-center gap-1 bg-ivoor px-5 py-4 transition-colors duration-200 hover:bg-ivoor-deep sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+                  >
+                    <span className="text-lg font-semibold text-marine">{output.titel}</span>
+                    <span className="text-base text-tekst-zacht">
+                      Les · {input.vak} · {input.niveau} {input.leerjaar} ·{" "}
+                      {tijdGeleden(les.created_at)}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {andersGemaakt.length > 0 && (
+          <p className="mt-4 text-base text-tekst-zacht">
+            Je maakte ook {andersGemaakt.join(" en ")}. Die kun je nu nog niet opnieuw openen, alleen
+            nieuw maken.
+          </p>
+        )}
+      </section>
+
+      <section className="mt-14 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-lg text-[var(--color-marine)]">Gebruik deze maand</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="font-display text-xl text-marine">Gebruik deze maand</h2>
               {paid ? (
-                <StatusBadge label="Abonnee" tone="success" title="Onbeperkt gebruik als betalend abonnee" />
+                <StatusBadge
+                  label="Abonnee"
+                  tone="success"
+                  title="Onbeperkt gebruik als betalend abonnee"
+                />
               ) : (
-                <StatusBadge label="Gratis" tone="neutral" title={`Gratis quotum: ${FREE_QUOTA_PER_MONTH} per categorie per maand`} />
+                <StatusBadge
+                  label="Gratis"
+                  tone="neutral"
+                  title={`Gratis: ${FREE_QUOTA_PER_MONTH} per soort per maand`}
+                />
               )}
             </div>
             {paid ? (
-              <p className="mt-2 text-sm text-[var(--color-inkt)]/60">
-                Je hebt een actief abonnement — geen maandelijkse limiet.
+              <p className="mt-3 text-base text-tekst-zacht">
+                Je hebt een abonnement. Er is geen maandlimiet.
               </p>
             ) : (
-              <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--color-inkt)]/70">
-                <li>{usage.lessons} van {FREE_QUOTA_PER_MONTH} lessen deze maand</li>
-                <li>{usage.tests} van {FREE_QUOTA_PER_MONTH} toetsen deze maand</li>
-                <li>{usage.reports} van {FREE_QUOTA_PER_MONTH} rapporten deze maand</li>
+              <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-base text-tekst-zacht">
+                <li>
+                  {usage.lessons} van {FREE_QUOTA_PER_MONTH} lessen
+                </li>
+                <li>
+                  {usage.tests} van {FREE_QUOTA_PER_MONTH} toetsen
+                </li>
+                <li>
+                  {usage.reports} van {FREE_QUOTA_PER_MONTH} rapporten
+                </li>
               </ul>
             )}
           </div>
           {!paid && <UpgradeButton />}
         </div>
       </section>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Link
-          href="/app/lessons/new"
-          className="group rounded-2xl bg-[var(--color-marine)] p-6 text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
-        >
-          <p className="font-display text-xl">Lessen maken</p>
-          <p className="mt-3 text-sm text-[var(--color-ivoor)]/70">
-            {lessen.length} {lessen.length === 1 ? "les" : "lessen"}
-          </p>
-        </Link>
-        <Link
-          href="/app/tests/new"
-          className="group rounded-2xl border-2 border-[var(--color-marine)]/30 p-6 transition hover:border-[var(--color-marine)]"
-        >
-          <p className="font-display text-xl text-[var(--color-marine)]">Toetsen maken</p>
-          <p className="mt-3 text-sm text-[var(--color-inkt)]/60">
-            {toetsen.length} {toetsen.length === 1 ? "toets" : "toetsen"}
-          </p>
-        </Link>
-        <Link
-          href="/app/reports/new"
-          className="group rounded-2xl border-2 border-[var(--color-goud)]/50 p-6 transition hover:border-[var(--color-goud)]"
-        >
-          <div className="flex items-center gap-2">
-            <p className="font-display text-xl text-[var(--color-marine)]">Rapporten schrijven</p>
-            <StatusBadge label="AVG" tone="warning" title="Bevat mogelijk leerlinggegevens — AVG-let-op" />
-          </div>
-          <p className="mt-3 text-sm text-[var(--color-inkt)]/60">Oudercommunicatie</p>
-        </Link>
-      </div>
-
-      <section className="mt-12">
-        <h2 className="font-display text-xl text-[var(--color-marine)]">Recente lessen</h2>
-        {lessen.length === 0 ? (
-          <p className="mt-4 text-sm text-[var(--color-inkt)]/60">
-            Nog geen lessen. <Link href="/app/lessons/new" className="underline underline-offset-4">Maak je eerste les</Link>.
-          </p>
-        ) : (
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--color-lijn)]">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--color-ivoor-deep)] text-base font-semibold uppercase tracking-wide text-[var(--color-inkt)]/70">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Titel</th>
-                  <th className="px-5 py-3 font-medium">Vak</th>
-                  <th className="px-5 py-3 font-medium">Niveau</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Bijgewerkt</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-lijn)]">
-                {lessen.map((les) => {
-                  const input = les.input as GeneratedLesson["input"];
-                  const output = les.output as Pick<GeneratedLesson, "titel">;
-                  return (
-                    <tr key={les.id} className="bg-[var(--color-ivoor)]">
-                      <td className="px-5 py-3 font-medium text-[var(--color-marine)]">{output.titel}</td>
-                      <td className="px-5 py-3 text-[var(--color-inkt)]/75">{input.vak}</td>
-                      <td className="px-5 py-3 text-[var(--color-inkt)]/75">
-                        {input.niveau} {input.leerjaar}
-                      </td>
-                      <td className="px-5 py-3">
-                        <StatusBadge label="Klaar" tone="success" />
-                      </td>
-                      <td className="px-5 py-3 text-[var(--color-inkt)]/50">{tijdGeleden(les.created_at)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="mt-12">
-        <h2 className="font-display text-xl text-[var(--color-marine)]">Recente toetsen</h2>
-        {toetsen.length === 0 ? (
-          <p className="mt-4 text-sm text-[var(--color-inkt)]/60">
-            Nog geen toetsen. <Link href="/app/tests/new" className="underline underline-offset-4">Maak je eerste toets</Link>.
-          </p>
-        ) : (
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--color-lijn)]">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--color-ivoor-deep)] text-base font-semibold uppercase tracking-wide text-[var(--color-inkt)]/70">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Titel</th>
-                  <th className="px-5 py-3 font-medium">Vak</th>
-                  <th className="px-5 py-3 font-medium">Niveau</th>
-                  <th className="px-5 py-3 font-medium">Vragen</th>
-                  <th className="px-5 py-3 font-medium">Bijgewerkt</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-lijn)]">
-                {toetsen.map((toets) => {
-                  const input = toets.input as GeneratedTest["input"];
-                  const output = toets.output as Pick<GeneratedTest, "titel" | "vragen">;
-                  return (
-                    <tr key={toets.id} className="bg-[var(--color-ivoor)]">
-                      <td className="px-5 py-3 font-medium text-[var(--color-marine)]">{output.titel}</td>
-                      <td className="px-5 py-3 text-[var(--color-inkt)]/75">{input.vak}</td>
-                      <td className="px-5 py-3 text-[var(--color-inkt)]/75">
-                        {input.niveau} {input.leerjaar}
-                      </td>
-                      <td className="px-5 py-3 text-[var(--color-inkt)]/75">{output.vragen.length}</td>
-                      <td className="px-5 py-3 text-[var(--color-inkt)]/50">{tijdGeleden(toets.created_at)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="mt-12">
-        <div className="flex items-center gap-2">
-          <h2 className="font-display text-xl text-[var(--color-marine)]">Rapport &amp; communicatie</h2>
-          <StatusBadge label="AVG" tone="warning" title="Bevat mogelijk leerlinggegevens — AVG-let-op" />
-        </div>
-        <div className="mt-4 rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-ivoor-deep)] p-6">
-          {rapporten.length === 0 ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-[var(--color-inkt)]/75">Nog geen rapportteksten.</p>
-              <div className="flex gap-3">
-                <Link
-                  href="/app/reports/new"
-                  className="rounded-full bg-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
-                >
-                  Nieuw rapport
-                </Link>
-                <Link
-                  href="/privacy/rapport-module"
-                  className="rounded-full border border-[var(--color-marine)]/30 px-5 py-2.5 text-sm font-medium text-[var(--color-marine)] transition hover:bg-[var(--color-marine)]/5"
-                >
-                  Privacy-uitleg
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <ul className="space-y-3">
-                {rapporten.map((rapport) => {
-                  const input = rapport.input as GeneratedReport["input"];
-                  return (
-                    <li key={rapport.id} className="flex items-center justify-between text-sm">
-                      <span className="text-[var(--color-inkt)]/80">
-                        {input.leerlingLabel} · {input.outputType}
-                      </span>
-                      <span className="text-[var(--color-inkt)]/50">{tijdGeleden(rapport.created_at)}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="mt-4 flex gap-3">
-                <Link
-                  href="/app/reports/new"
-                  className="rounded-full bg-[var(--color-marine)] px-5 py-2.5 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)]"
-                >
-                  Nieuw rapport
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
     </div>
   );
 }
+
