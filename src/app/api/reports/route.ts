@@ -3,6 +3,7 @@ import type { ReportInput, RapportOutputType, RapportToon } from "@/lib/types";
 import { genereerRapportTekst } from "@/lib/report-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
+import { limitString, readBodyWithLimit } from "@/lib/validation";
 
 const OUTPUT_TYPES: RapportOutputType[] = ["rapporttekst", "oudergesprek", "oudermail"];
 const TONEN: RapportToon[] = ["formeel", "vriendelijk-direct", "warm"];
@@ -31,21 +32,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
+  const bodyResult = await readBodyWithLimit(request);
+  if (!bodyResult.ok) {
+    return NextResponse.json({ error: "Aanvraag is te groot." }, { status: 413 });
+  }
+
   let body: Partial<ReportInput>;
   try {
-    body = await request.json();
+    body = JSON.parse(bodyResult.text);
   } catch {
     return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
   }
 
-  const leerlingLabel =
-    typeof body.leerlingLabel === "string" ? body.leerlingLabel.trim() : "";
-  const aantekeningen =
-    typeof body.aantekeningen === "string" ? body.aantekeningen.trim() : "";
+  const leerlingLabel = limitString(body.leerlingLabel, 2000);
+  const aantekeningen = limitString(body.aantekeningen, 2000);
 
   if (!leerlingLabel || !aantekeningen) {
     return NextResponse.json(
-      { error: "Leerling en aantekeningen zijn verplicht." },
+      { error: "Leerling en aantekeningen zijn verplicht en mogen maximaal 2000 tekens zijn." },
       { status: 400 }
     );
   }

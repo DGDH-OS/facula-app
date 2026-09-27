@@ -32,6 +32,7 @@ export async function GET(
     .from("lessons")
     .select("id, input, output, created_at")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
   if (error || !rij) {

@@ -3,6 +3,7 @@ import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
 import { genereerLes } from "@/lib/lesson-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
+import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -32,16 +33,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
+  const bodyResult = await readBodyWithLimit(request);
+  if (!bodyResult.ok) {
+    return NextResponse.json({ error: "Aanvraag is te groot." }, { status: 413 });
+  }
+
   let body: Partial<LessonInput>;
   try {
-    body = await request.json();
+    body = JSON.parse(bodyResult.text);
   } catch {
     return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
   }
 
-  const leerdoel = typeof body.leerdoel === "string" ? body.leerdoel.trim() : "";
+  const leerdoel = limitString(body.leerdoel, 2000);
   if (!leerdoel) {
-    return NextResponse.json({ error: "Leerdoel is verplicht." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Leerdoel is verplicht en mag maximaal 2000 tekens zijn." },
+      { status: 400 }
+    );
+  }
+
+  const lesduur =
+    body.lesduur === undefined ? 50 : clampInt(body.lesduur, 10, 240);
+  if (lesduur === null) {
+    return NextResponse.json(
+      { error: "Lesduur moet tussen 10 en 240 minuten liggen." },
+      { status: 400 }
+    );
+  }
+
+  const aantalLessen =
+    body.aantalLessen === undefined ? 1 : clampInt(body.aantalLessen, 1, 6);
+  if (aantalLessen === null) {
+    return NextResponse.json(
+      { error: "Aantal lessen moet tussen 1 en 6 liggen." },
+      { status: 400 }
+    );
   }
 
   const input: LessonInput = {
@@ -49,8 +76,8 @@ export async function POST(request: NextRequest) {
     niveau: isNiveau(body.niveau) ? body.niveau : "havo",
     leerjaar: Number.isFinite(body.leerjaar) ? Number(body.leerjaar) : 4,
     leerdoel,
-    lesduur: Number.isFinite(body.lesduur) ? Number(body.lesduur) : 50,
-    aantalLessen: Number.isFinite(body.aantalLessen) ? Number(body.aantalLessen) : 1,
+    lesduur,
+    aantalLessen,
   };
 
   try {

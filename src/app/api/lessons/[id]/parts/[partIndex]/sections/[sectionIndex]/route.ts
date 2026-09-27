@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { GeneratedLesson } from "@/lib/types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { saveVersionAndUpdate } from "@/lib/versioning";
+import { readBodyWithLimit } from "@/lib/validation";
 
 type LessonOutput = Omit<GeneratedLesson, "input">;
 
@@ -27,19 +28,37 @@ export async function PATCH(
     return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
   }
 
+  const bodyResult = await readBodyWithLimit(request);
+  if (!bodyResult.ok) {
+    return NextResponse.json({ error: "Aanvraag is te groot." }, { status: 413 });
+  }
+
   let body: { inhoud?: unknown };
   try {
-    body = await request.json();
+    body = JSON.parse(bodyResult.text);
   } catch {
     return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
   }
 
-  const inhoud = Array.isArray(body.inhoud)
-    ? body.inhoud
-        .filter((regel): regel is string => typeof regel === "string")
-        .map((regel) => regel.trim())
-        .filter(Boolean)
-    : [];
+  if (!Array.isArray(body.inhoud) || !body.inhoud.every((regel) => typeof regel === "string")) {
+    return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
+  }
+
+  if (body.inhoud.length > 12) {
+    return NextResponse.json(
+      { error: "Een sectie mag maximaal 12 regels bevatten." },
+      { status: 400 }
+    );
+  }
+
+  if (body.inhoud.some((regel: string) => regel.length > 500)) {
+    return NextResponse.json(
+      { error: "Elke regel mag maximaal 500 tekens zijn." },
+      { status: 400 }
+    );
+  }
+
+  const inhoud = body.inhoud.map((regel: string) => regel.trim()).filter(Boolean);
 
   if (inhoud.length === 0) {
     return NextResponse.json({ error: "Inhoud mag niet leeg zijn." }, { status: 400 });

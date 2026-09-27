@@ -3,6 +3,7 @@ import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
+import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -31,16 +32,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
+  const bodyResult = await readBodyWithLimit(request);
+  if (!bodyResult.ok) {
+    return NextResponse.json({ error: "Aanvraag is te groot." }, { status: 413 });
+  }
+
   let body: Partial<TestInput>;
   try {
-    body = await request.json();
+    body = JSON.parse(bodyResult.text);
   } catch {
     return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
   }
 
-  const leerdoel = typeof body.leerdoel === "string" ? body.leerdoel.trim() : "";
+  const leerdoel = limitString(body.leerdoel, 2000);
   if (!leerdoel) {
-    return NextResponse.json({ error: "Leerdoel is verplicht." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Leerdoel is verplicht en mag maximaal 2000 tekens zijn." },
+      { status: 400 }
+    );
+  }
+
+  const kernbegrippen =
+    body.kernbegrippen === undefined ? "" : limitString(body.kernbegrippen, 2000);
+  if (kernbegrippen === null) {
+    return NextResponse.json(
+      { error: "Kernbegrippen mogen maximaal 2000 tekens zijn." },
+      { status: 400 }
+    );
+  }
+
+  const aantalVragen =
+    body.aantalVragen === undefined ? 8 : clampInt(body.aantalVragen, 1, 40);
+  if (aantalVragen === null) {
+    return NextResponse.json(
+      { error: "Aantal vragen moet tussen 1 en 40 liggen." },
+      { status: 400 }
+    );
   }
 
   const input: TestInput = {
@@ -48,8 +75,8 @@ export async function POST(request: NextRequest) {
     niveau: isNiveau(body.niveau) ? body.niveau : "havo",
     leerjaar: Number.isFinite(body.leerjaar) ? Number(body.leerjaar) : 4,
     leerdoel,
-    kernbegrippen: typeof body.kernbegrippen === "string" ? body.kernbegrippen : "",
-    aantalVragen: Number.isFinite(body.aantalVragen) ? Number(body.aantalVragen) : 8,
+    kernbegrippen,
+    aantalVragen,
   };
 
   try {
