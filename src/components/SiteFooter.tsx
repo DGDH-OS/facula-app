@@ -33,6 +33,8 @@ export default function SiteFooter() {
               <li>AVG-vriendelijk — geen leerlingdata nodig</li>
               <li>Export naar PowerPoint, Word en PDF</li>
               <li>Gebouwd voor Nederlandse kerndoelen</li>
+              <li><Link href="/privacy" className="hover:text-[var(--color-marine)]">Privacy</Link></li>
+              <li><Link href="/voorwaarden" className="hover:text-[var(--color-marine)]">Voorwaarden</Link></li>
             </ul>
           </div>
         </div>

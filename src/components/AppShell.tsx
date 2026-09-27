@@ -53,6 +53,7 @@ export function AppShell({
           {navItem("/app/lessons/new", "Nieuwe les")}
           {navItem("/app/tests/new", "Nieuwe toets")}
           {navItem("/app/reports/new", "Rapport & communicatie")}
+          {navItem("/app/account", "Account")}
         </nav>
         <div className="mt-auto" />
         <div className="mt-14 border-t border-[var(--color-lijn)] pt-6">
@@ -76,6 +77,7 @@ export function AppShell({
             {navItem("/app/lessons/new", "Les")}
             {navItem("/app/tests/new", "Toets")}
             {navItem("/app/reports/new", "Rapport")}
+            {navItem("/app/account", "Account")}
           </nav>
         </div>
         <div className="px-6 py-10 md:px-10">{children}</div>

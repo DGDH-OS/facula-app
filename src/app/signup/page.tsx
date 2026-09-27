@@ -104,6 +104,18 @@ export default function SignupPage() {
             {fout && (
               <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
             )}
+
+            <p className="text-xs text-[var(--color-inkt)]/60">
+              Door een account aan te maken ga je akkoord met de{" "}
+              <Link href="/voorwaarden" className="underline underline-offset-4 hover:text-[var(--color-marine)]">
+                voorwaarden
+              </Link>{" "}
+              en de{" "}
+              <Link href="/privacy" className="underline underline-offset-4 hover:text-[var(--color-marine)]">
+                privacyverklaring
+              </Link>
+              .
+            </p>
           </form>
         )}
 
