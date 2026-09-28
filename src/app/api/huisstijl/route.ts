@@ -131,7 +131,9 @@ export async function PUT(request: NextRequest) {
         lettertype: kleuren.lettertype,
         schoolnaam: schoolnaam || null,
         logo_standaard_aan: logoStandaardAan,
-        updated_at: new Date().toISOString(),
+        // updated_at niet: die zet de database zelf (trigger
+        // huisstijl_set_updated_at), zodat alle tijden in deze tabel van
+        // dezelfde klok komen.
       },
       { onConflict: "user_id" }
     )

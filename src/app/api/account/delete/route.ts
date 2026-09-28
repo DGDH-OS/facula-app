@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { verwijderAlleLogoObjecten } from "@/lib/huisstijl/server";
+import {
+  claimLogoLease,
+  LOGO_LEASE_BEZET_MELDING,
+  releaseLogoLease,
+  verwijderAlleLogoObjecten,
+} from "@/lib/huisstijl/server";
 import { readBodyWithLimit } from "@/lib/validation";
 
 /**
@@ -66,27 +71,54 @@ export async function POST(request: NextRequest) {
   // terwijl het logo blijft staan is geen verwijdering maar een onbereikbaar
   // restant, en dat is precies wat een docent niet vraagt als hij op
   // "verwijder mijn account" klikt.
-  const logosWeg = await verwijderAlleLogoObjecten(supabase, user.id);
-  if (!logosWeg) {
-    return NextResponse.json(
-      {
-        error:
-          "Je schoollogo kon niet worden verwijderd, dus je account is niet verwijderd. Probeer het later opnieuw.",
-      },
-      { status: 500 }
-    );
+  // Onder dezelfde lease als POST en DELETE op /api/huisstijl/logo. Zonder die
+  // lease kan een upload die net bezig is zijn object neerzetten nádat deze
+  // route de map heeft leeggemaakt en gecontroleerd: het account is dan weg en
+  // het logo blijft liggen, buiten bereik van iedereen die het nog mag
+  // verwijderen. Precies het restant dat de controle hieronder hoort uit te
+  // sluiten.
+  const lease = await claimLogoLease(supabase);
+  if (lease.status === "bezet") {
+    return NextResponse.json({ error: LOGO_LEASE_BEZET_MELDING }, { status: 409 });
   }
-
-  try {
-    const serviceRole = createServiceRoleClient();
-    const { error } = await serviceRole.auth.admin.deleteUser(user.id);
-    if (error) throw error;
-  } catch (err) {
-    console.error("Account verwijderen mislukt", err);
+  if (lease.status === "fout") {
     return NextResponse.json(
       { error: "Er ging iets mis bij het verwijderen van je account." },
       { status: 500 }
     );
+  }
+
+  let accountVerwijderd = false;
+  try {
+    const logosWeg = await verwijderAlleLogoObjecten(supabase, user.id);
+    if (!logosWeg) {
+      return NextResponse.json(
+        {
+          error:
+            "Je schoollogo kon niet worden verwijderd, dus je account is niet verwijderd. Probeer het later opnieuw.",
+        },
+        { status: 500 }
+      );
+    }
+
+    try {
+      const serviceRole = createServiceRoleClient();
+      const { error } = await serviceRole.auth.admin.deleteUser(user.id);
+      if (error) throw error;
+      accountVerwijderd = true;
+    } catch (err) {
+      console.error("Account verwijderen mislukt", err);
+      return NextResponse.json(
+        { error: "Er ging iets mis bij het verwijderen van je account." },
+        { status: 500 }
+      );
+    }
+  } finally {
+    // Alleen teruggeven zolang er nog iets is om terug te geven: is de
+    // auth-user weg, dan is de huisstijl-rij met de lease erin via ON DELETE
+    // CASCADE mee verdwenen en zou de aanroep alleen een foutregel in de logs
+    // opleveren.
+    if (!accountVerwijderd) await releaseLogoLease(supabase, lease.token);
   }
 
   await supabase.auth.signOut();

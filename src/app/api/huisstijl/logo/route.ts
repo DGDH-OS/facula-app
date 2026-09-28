@@ -4,12 +4,14 @@ import {
   claimLogoLease,
   geldigLogoPad,
   haalHuisstijl,
-  HUISSTIJL_KOLOMMEN,
   LOGO_BUCKET,
   LOGO_LEASE_BEZET_MELDING,
+  LOGO_LEASE_VERLOPEN_MELDING,
+  logoLeaseNogGeldig,
   logoMimeType,
   logoPad,
   releaseLogoLease,
+  schrijfLogoMetLease,
   verwijderLogoObjecten,
 } from "@/lib/huisstijl/server";
 import { isToegestaanLogoType, maakLogo } from "@/lib/huisstijl/logo";
@@ -35,7 +37,13 @@ import { zelfdeOrigin } from "@/lib/validation";
  * zetten. Daarom claimen POST en DELETE eerst een lease op het logo van deze
  * docent (facula.claim_logo_lock, 30 seconden) en geven die in een finally
  * terug. Is de lease bezet, dan volgt een 409 in plaats van een tweede
- * gelijktijdige mutatie. Zie 20260928120000_facula_huisstijl.sql.
+ * gelijktijdige mutatie.
+ *
+ * Elke claim krijgt een eigen token, en dat token moet mee bij elke
+ * schrijfactie. Een aanvraag die langer doet dan 30 seconden is zijn lease
+ * kwijt; zonder token zou hij daarna alsnog schrijven en bovendien de lease van
+ * zijn opvolger wissen. Met token raakt hij nul rijen en eindigt hij in een
+ * 409. Zie 20260928120000_facula_huisstijl.sql.
  *
  * Elk logo wordt bij de upload genormaliseerd (gedraaid volgens EXIF,
  * metadata eraf, verkleind tot binnen 600x300 px): zie normalize-logo.ts.
@@ -188,10 +196,10 @@ export async function POST(request: NextRequest) {
   // aanvraag ook gebruikt. Zo staat de lease alleen tijdens het schrijfwerk en
   // wacht een tweede poging niet op een verwerking die nog nergens toe leidt.
   const lease = await claimLogoLease(supabase);
-  if (lease === "bezet") {
+  if (lease.status === "bezet") {
     return NextResponse.json({ error: LOGO_LEASE_BEZET_MELDING }, { status: 409 });
   }
-  if (lease === "fout") {
+  if (lease.status === "fout") {
     return NextResponse.json(
       { error: "Het uploaden lukte niet. Probeer het opnieuw." },
       { status: 500 }
@@ -226,23 +234,32 @@ export async function POST(request: NextRequest) {
     // Volgorde: eerst uploaden, dan pad én bestandstype in de database zetten.
     // Andersom zou een mislukte upload een rij achterlaten die naar een object
     // wijst dat er niet is.
-    const { data, error } = await supabase
-      .schema("facula")
-      .from("huisstijl")
-      .upsert(
-        {
-          user_id: user.id,
-          logo_path: pad,
-          logo_mime: genormaliseerd.mimeType,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
-      .select(HUISSTIJL_KOLOMMEN)
-      .single();
+    //
+    // De schrijfactie controleert zelf, in hetzelfde statement, of de lease met
+    // dit token nog loopt. Duurde het uploaden hierboven zo lang dat de lease
+    // verliep en een andere aanvraag hem overnam, dan raakt dit nul rijen en
+    // schrijft deze aanvraag niets: zijn pad zou dwars door de mutatie van die
+    // ander heen gaan.
+    const geschreven = await schrijfLogoMetLease(
+      supabase,
+      lease.token,
+      pad,
+      genormaliseerd.mimeType
+    );
 
-    if (error) {
-      console.error("Logopad opslaan mislukt", error);
+    if (geschreven.status === "verlopen") {
+      // Het object staat er wel, de rij wijst er niet naar. Dat is dezelfde
+      // toestand als een mislukte rijmutatie hieronder: het object ligt op het
+      // ene bekende pad van deze docent en gaat mee met de volgende upload of
+      // met accountverwijdering.
+      console.error("Logo-lease verlopen vóór de rijmutatie", { userId: user.id });
+      return NextResponse.json(
+        { error: LOGO_LEASE_VERLOPEN_MELDING },
+        { status: 409 }
+      );
+    }
+
+    if (geschreven.status === "fout") {
       // Het object blijft staan, en dat is hier de veilige keuze. Het ligt op
       // het ene bekende pad van deze docent: de volgende upload overschrijft
       // het, en accountverwijdering haalt het weg. Opruimen zou de docent geen
@@ -254,11 +271,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
+    return NextResponse.json({ huisstijl: resolveHuisstijl(geschreven.rij) });
   } finally {
     // Ook bij een fout of een exception: blijft de lease staan, dan kan deze
     // docent 30 seconden lang zijn logo niet wijzigen.
-    await releaseLogoLease(supabase);
+    await releaseLogoLease(supabase, lease.token);
   }
 }
 
@@ -282,10 +299,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   const lease = await claimLogoLease(supabase);
-  if (lease === "bezet") {
+  if (lease.status === "bezet") {
     return NextResponse.json({ error: LOGO_LEASE_BEZET_MELDING }, { status: 409 });
   }
-  if (lease === "fout") {
+  if (lease.status === "fout") {
     return NextResponse.json(
       { error: "Er ging iets mis bij het verwijderen van het logo." },
       { status: 500 }
@@ -301,6 +318,16 @@ export async function DELETE(request: NextRequest) {
     // het bestand nog in de bucket ligt. Lukt het verwijderen niet, dan stopt
     // deze route met een fout en blijft de rij naar het object wijzen dat er
     // ook echt nog is: één toestand, en opnieuw proberen doet precies hetzelfde.
+    // Het object staat buiten de database, dus deze controle kan niet in
+    // hetzelfde statement als de verwijdering. Ze voorkomt wat wél te
+    // voorkomen is: een aanvraag wiens lease verliep, sloopt hier niet meer het
+    // verse object van zijn opvolger. De harde grens blijft de rijmutatie
+    // hieronder, die de lease nog eens in hetzelfde statement controleert.
+    if (!(await logoLeaseNogGeldig(supabase, lease.token))) {
+      console.error("Logo-lease verlopen vóór het verwijderen", { userId: user.id });
+      return NextResponse.json({ error: LOGO_LEASE_VERLOPEN_MELDING }, { status: 409 });
+    }
+
     if (!(await verwijderLogoObjecten(supabase, [logoPad(user.id)]))) {
       console.error("Schoollogo-object verwijderen mislukt", { userId: user.id });
       return NextResponse.json(
@@ -309,36 +336,31 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .schema("facula")
-      .from("huisstijl")
-      .upsert(
-        {
-          user_id: user.id,
-          logo_path: null,
-          logo_mime: null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
-      .select(HUISSTIJL_KOLOMMEN)
-      .single();
+    const geschreven = await schrijfLogoMetLease(supabase, lease.token, null, null);
 
-    if (error) {
+    if (geschreven.status !== "ok") {
       // Het object is al weg en de rij wijst er nog naar. De docent ziet een
       // fout en probeert het opnieuw; die tweede poging verwijdert een object
       // dat er niet meer is (geen fout in storage) en leegt de rij alsnog. In
       // de tussentijd toont geen enkele export een logo: het downloaden faalt
       // en haalLogo() geeft dan null.
-      console.error("Logopad wissen mislukt", error);
+      if (geschreven.status === "verlopen") {
+        console.error("Logo-lease verlopen vóór het wissen van het pad", {
+          userId: user.id,
+        });
+        return NextResponse.json(
+          { error: LOGO_LEASE_VERLOPEN_MELDING },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         { error: "Er ging iets mis bij het verwijderen van het logo." },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
+    return NextResponse.json({ huisstijl: resolveHuisstijl(geschreven.rij) });
   } finally {
-    await releaseLogoLease(supabase);
+    await releaseLogoLease(supabase, lease.token);
   }
 }

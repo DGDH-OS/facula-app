@@ -49,6 +49,17 @@
 -- afdwingen voor de client-kant.
 --
 -- Idempotent: opnieuw draaien mag (create or replace, drop ... if exists).
+--
+-- Deze migratie is bewust additief: ze voegt facula.save_with_quota toe en
+-- haalt niets weg wat de versie van de app die nu in productie draait (map
+-- facula-app) nog gebruikt. Daardoor mag ze vóór de deploy van deze branch
+-- toegepast worden zonder dat er iets omvalt. Het intrekken en weghalen van
+-- facula.try_increment_usage, de oude en omzeilbare quota-RPC die die versie
+-- wél aanroept, staat apart in
+-- 20260928170000_facula_drop_old_quota_rpc.sql — dat bestand hoort pas ná de
+-- deploy te draaien. Twee bestanden dus, en de volgorde ertussen is het hele
+-- punt: samen zouden ze een venster maken waarin de oude app niets meer kan
+-- opslaan.
 
 -- Weg met de terugboeking. Bewust een drop en geen "laat maar staan": een
 -- functie die het quotum kan verlagen is precies wat je niet wil laten
@@ -63,45 +74,6 @@ drop function if exists facula.refund_usage(uuid, text);
 -- de vier-argumentversie nooit bestaan. De drop staat er voor omgevingen waar
 -- een eerdere versie van dit bestand al wél gedraaid heeft.)
 drop function if exists facula.save_with_quota(text, jsonb, jsonb, integer);
-
--- En weg met facula.try_increment_usage, de RPC die deze functie vervangt.
---
--- Die functie is SECURITY DEFINER, mag door authenticated uitgevoerd worden en
--- neemt de limiet als parameter (p_limit) aan. Dat laatste maakt hem tot een
--- volwaardige omweg om het quotum heen: wie een sessietoken heeft, kan hem
--- rechtstreeks via PostgREST aanroepen met p_limit => 10000 en zo de teller
--- straffeloos laten oplopen. De guard erin controleert alleen WIE je bent, niet
--- HOEVEEL je mag. Zolang hij bestaat, is de limiet hierboven dus optioneel, en
--- een optionele limiet is geen limiet.
---
--- Eerst het uitvoerrecht intrekken, dan de functie weghalen. De intrekking is
--- wat de bevinding dicht (niemand mag hem nog aanroepen); de drop haalt daarna
--- weg wat niemand meer nodig heeft, zodat een latere grant hem ook niet per
--- ongeluk weer kan openzetten. De lus pakt elke overload die er in een
--- omgeving ooit is aangemaakt, niet alleen de signatuur van vandaag.
---
--- LET OP bij het toepassen: de vorige versie van de app (map facula-app) die nu
--- nog in productie draait, doet zijn quota-check WEL via deze RPC. Deze
--- migratie hoort dus samen met of na de deploy van deze branch toegepast te
--- worden. Ertussenin faalt het opslaan in de oude versie met een fout; dat is
--- fail-closed (er wordt niets geteld en niets opgeslagen), maar wel zichtbaar
--- voor een docent.
-do $$
-declare
-  r record;
-begin
-  for r in
-    select p.oid::regprocedure::text as signatuur
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'facula'
-      and p.proname = 'try_increment_usage'
-  loop
-    execute 'revoke execute on function ' || r.signatuur
-      || ' from public, anon, authenticated';
-    execute 'drop function ' || r.signatuur;
-  end loop;
-end $$;
 
 create or replace function facula.save_with_quota(
   p_kind text,

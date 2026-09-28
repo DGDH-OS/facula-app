@@ -9,7 +9,12 @@ import {
   type Logo,
   type LogoBestand,
 } from "./logo";
-import { resolveHuisstijl, STANDAARD_HUISSTIJL, type Huisstijl } from "./themes";
+import {
+  resolveHuisstijl,
+  STANDAARD_HUISSTIJL,
+  type Huisstijl,
+  type HuisstijlRij,
+} from "./themes";
 
 /**
  * Server-side kant van de huisstijl: de rij ophalen en het logo uit de
@@ -74,36 +79,55 @@ export const LOGO_LEASE_BEZET_MELDING =
   "Er loopt al een wijziging aan je logo, probeer het over een paar seconden opnieuw.";
 
 /**
+ * De melding als de lease onderweg verliep en een andere aanvraag hem heeft
+ * overgenomen. Een ander geval dan "bezet": daar begon deze aanvraag nooit,
+ * hier duurde hij te lang en is er intussen iets anders met het logo gebeurd.
+ * Opnieuw proberen helpt in beide gevallen, maar de docent mag weten dat er
+ * iets gebeurd is.
+ */
+export const LOGO_LEASE_VERLOPEN_MELDING =
+  "Je logo is ondertussen door een andere wijziging aangepast. Probeer het opnieuw.";
+
+/**
  * Uitkomst van een claimpoging op de logo-lease.
  *
  * Drie gevallen en niet twee, omdat "bezet" en "de claim zelf ging stuk" een
  * ander antwoord aan de docent verdienen: het eerste is een 409 waar opnieuw
  * proberen echt helpt, het tweede een 500. Ze samennemen zou een kapotte
  * database als drukte laten klinken.
+ *
+ * Bij een geslaagde claim hoort een token. Dat token is van déze claim en van
+ * geen enkele volgende: het gaat mee naar elke schrijfactie en naar het
+ * teruggeven, zodat een aanvraag wiens lease verliep niets meer kan raken wat
+ * inmiddels van zijn opvolger is.
  */
-export type LogoLeaseUitkomst = "geclaimd" | "bezet" | "fout";
+export type LogoLease =
+  | { status: "geclaimd"; token: string }
+  | { status: "bezet" }
+  | { status: "fout" };
 
 /**
  * Claimt het recht om het logo van deze docent te wijzigen (30 seconden).
  *
  * Elke mutatie van het logo loopt hierlangs: POST en DELETE op
- * /api/huisstijl/logo raken allebei het object in de bucket én de rij in
- * facula.huisstijl, en die twee zijn niet in één transactie te zetten. Zonder
- * lease kan een verwijdering het object weghalen dat een upload er net heeft
- * neergezet, terwijl de rij ernaar blijft wijzen.
+ * /api/huisstijl/logo en de accountverwijdering raken allemaal het object in de
+ * bucket én de rij in facula.huisstijl, en die twee zijn niet in één transactie
+ * te zetten. Zonder lease kan een verwijdering het object weghalen dat een
+ * upload er net heeft neergezet, terwijl de rij ernaar blijft wijzen.
  *
  * Fail-closed: gaat de claim zelf stuk, dan wordt er niets gewijzigd.
  */
-export async function claimLogoLease(
-  supabase: SupabaseClient
-): Promise<LogoLeaseUitkomst> {
+export async function claimLogoLease(supabase: SupabaseClient): Promise<LogoLease> {
   const { data, error } = await supabase.schema("facula").rpc("claim_logo_lock");
 
   if (error) {
     console.error("Logo-lease claimen mislukt", error);
-    return "fout";
+    return { status: "fout" };
   }
-  return data === true ? "geclaimd" : "bezet";
+  // De RPC geeft het token van de claim terug, of null als een andere aanvraag
+  // de lease al heeft.
+  if (typeof data === "string" && data) return { status: "geclaimd", token: data };
+  return { status: "bezet" };
 }
 
 /**
@@ -111,14 +135,92 @@ export async function claimLogoLease(
  * de lease tot 30 seconden staan en wacht de volgende poging van dezelfde
  * docent voor niets.
  *
+ * Het token moet mee. Is de lease onderweg verlopen en door een andere aanvraag
+ * overgenomen, dan raakt dit nul rijen en blijft die nieuwe lease staan — dat
+ * is precies de bedoeling, want anders zou een trage aanvraag de bescherming
+ * van een snelle wegnemen.
+ *
  * Mislukt het teruggeven, dan is dat geen fout voor de docent — de lease
  * verloopt zelf — maar wel iets om te zien in de logs.
  */
-export async function releaseLogoLease(supabase: SupabaseClient): Promise<void> {
-  const { error } = await supabase.schema("facula").rpc("release_logo_lock");
+export async function releaseLogoLease(
+  supabase: SupabaseClient,
+  token: string
+): Promise<void> {
+  const { error } = await supabase
+    .schema("facula")
+    .rpc("release_logo_lock", { p_token: token });
   if (error) {
     console.error("Logo-lease vrijgeven mislukt", error);
   }
+}
+
+/**
+ * Of de lease met dit token nu nog loopt, gemeten op de klok van de database.
+ *
+ * Alleen nodig vlak vóór iets dat buiten de database gebeurt en dus niet in
+ * hetzelfde statement te controleren is: het verwijderen van het object in de
+ * bucket. Voor de rijmutatie is deze functie overbodig — die controleert zelf
+ * (zie schrijfLogoMetLease).
+ *
+ * Fail-closed: gaat de controle stuk, dan geldt de lease als weg.
+ */
+export async function logoLeaseNogGeldig(
+  supabase: SupabaseClient,
+  token: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .schema("facula")
+    .rpc("logo_lock_held", { p_token: token });
+  if (error) {
+    console.error("Logo-lease controleren mislukt", error);
+    return false;
+  }
+  return data === true;
+}
+
+/**
+ * Uitkomst van het wegschrijven van logo_path/logo_mime onder de lease.
+ *
+ * "verlopen" is geen fout maar een uitslag: de lease was onderweg verlopen en
+ * een andere aanvraag heeft intussen iets met het logo gedaan. Deze aanvraag
+ * schrijft dan niets en meldt een 409, in plaats van dwars door de mutatie van
+ * die ander heen te schrijven.
+ */
+export type LogoRijUitkomst =
+  | { status: "ok"; rij: HuisstijlRij }
+  | { status: "verlopen" }
+  | { status: "fout" };
+
+/**
+ * Schrijft het logopad en -bestandstype van deze docent weg, maar alleen
+ * zolang de lease met dit token nog loopt.
+ *
+ * Bewust een RPC en geen upsert vanuit de route: voorwaarde en schrijfactie
+ * horen in hetzelfde statement te zitten. Een route die eerst de lease
+ * controleert en daarna schrijft, heeft daartussen een gat waarin de lease
+ * alsnog kan verlopen.
+ */
+export async function schrijfLogoMetLease(
+  supabase: SupabaseClient,
+  token: string,
+  pad: string | null,
+  mime: string | null
+): Promise<LogoRijUitkomst> {
+  const { data, error } = await supabase.schema("facula").rpc("set_logo_with_lease", {
+    p_token: token,
+    p_logo_path: pad,
+    p_logo_mime: mime,
+  });
+
+  if (error) {
+    console.error("Logopad opslaan mislukt", error);
+    return { status: "fout" };
+  }
+
+  const rijen: HuisstijlRij[] = Array.isArray(data) ? data : data ? [data] : [];
+  if (rijen.length === 0) return { status: "verlopen" };
+  return { status: "ok", rij: rijen[0] };
 }
 
 /** De kolommen die samen een Huisstijl opleveren. Eén lijst, overal dezelfde. */
