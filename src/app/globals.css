@@ -218,3 +218,21 @@ pre {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Stapovergang in een wizard: één korte fade van 200ms, niets meer. Staat
+ * hier en niet in een component, zodat de reduced-motion-regel hierboven
+ * hem met !important uitzet zonder extra code per pagina.
+ */
+@keyframes stap-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.stap-fade {
+  animation: stap-fade-in 200ms ease-out;
+}
