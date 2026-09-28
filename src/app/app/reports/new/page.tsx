@@ -79,14 +79,19 @@ export default function NewReportPage() {
     <div>
       <div className="flex items-center gap-2">
         <h1 className="font-display text-3xl text-[var(--color-marine)]">Rapport &amp; communicatie</h1>
-        <StatusBadge label="AVG" tone="warning" title="Bevat mogelijk leerlinggegevens — AVG-let-op" />
+        <StatusBadge
+          label="AVG-gevoelig"
+          tone="warning"
+          uitleg="Deze module bevat mogelijk leerlinggegevens"
+        />
       </div>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[420px_1fr]">
         <FormCard onSubmit={handleSubmit} className="h-fit">
           <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">Leerling</label>
+            <label htmlFor="rapport-leerling" className="block text-sm font-medium text-[var(--color-marine)]">Leerling</label>
             <input
+              id="rapport-leerling"
               required
               type="text"
               value={input.leerlingLabel}
@@ -95,16 +100,22 @@ export default function NewReportPage() {
               className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
             />
             {/* AVG-vereiste, harde productregel — altijd zichtbaar, niet uitzetbaar. */}
-            <p className="mt-2 text-base font-semibold text-[var(--color-goud)]">
-              ⚠ Gebruik geen volledige naam — AVG.
+            {/* Goud haalde hier 2,65:1. Waarschuwing-paar: 10,43:1. */}
+            <p className="mt-2 flex gap-2 rounded-lg bg-waarschuwing-vlak px-3 py-2 text-base font-semibold text-waarschuwing-tekst">
+              <span aria-hidden>⚠</span>
+              <span>Gebruik geen volledige naam, dat vraagt de AVG.</span>
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">
+            <label
+              htmlFor="rapport-aantekeningen"
+              className="block text-sm font-medium text-[var(--color-marine)]"
+            >
               Aantekeningen
             </label>
             <textarea
+              id="rapport-aantekeningen"
               required
               rows={6}
               value={input.aantekeningen}
@@ -128,8 +139,9 @@ export default function NewReportPage() {
 
           <MoreOptions>
             <div>
-              <label className="block text-base font-semibold text-[var(--color-marine)]">Output-type</label>
+              <label htmlFor="rapport-outputtype" className="block text-base font-semibold text-[var(--color-marine)]">Output-type</label>
               <select
+                id="rapport-outputtype"
                 value={input.outputType}
                 onChange={(e) => setInput({ ...input, outputType: e.target.value as RapportOutputType })}
                 className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
@@ -140,8 +152,9 @@ export default function NewReportPage() {
               </select>
             </div>
             <div>
-              <label className="block text-base font-semibold text-[var(--color-marine)]">Toon</label>
+              <label htmlFor="rapport-toon" className="block text-base font-semibold text-[var(--color-marine)]">Toon</label>
               <select
+                id="rapport-toon"
                 value={input.toon}
                 onChange={(e) => setInput({ ...input, toon: e.target.value as RapportToon })}
                 className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
@@ -153,9 +166,9 @@ export default function NewReportPage() {
             </div>
           </MoreOptions>
 
-          <p className="text-base text-[var(--color-inkt)]/70">
-            Geen automatische koppeling met Magister/Somtoday —{" "}
-            <Link href="/privacy/rapport-module" className="underline underline-offset-4 hover:text-[var(--color-marine)]">
+          <p className="text-base text-tekst-zacht">
+            Geen automatische koppeling met Magister of Somtoday.{" "}
+            <Link href="/privacy/rapport-module" className="font-semibold text-marine underline underline-offset-4">
               privacy-uitleg
             </Link>
             .

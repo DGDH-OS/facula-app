@@ -98,7 +98,7 @@ export default async function AppDashboard() {
             <StatusBadge
               label="Let op leerlinggegevens"
               tone="warning"
-              title="Gebruik geen volledige namen: dit valt onder de AVG"
+              uitleg="Gebruik geen volledige namen: dit valt onder de AVG"
             />
           }
         />
@@ -153,13 +153,13 @@ export default async function AppDashboard() {
                 <StatusBadge
                   label="Abonnee"
                   tone="success"
-                  title="Onbeperkt gebruik als betalend abonnee"
+                  uitleg="Onbeperkt gebruik als betalend abonnee"
                 />
               ) : (
                 <StatusBadge
                   label="Gratis"
                   tone="neutral"
-                  title={`Gratis: ${FREE_QUOTA_PER_MONTH} per soort per maand`}
+                  uitleg={`Gratis: ${FREE_QUOTA_PER_MONTH} per soort per maand`}
                 />
               )}
             </div>

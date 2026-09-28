@@ -74,8 +74,9 @@ export default function NewTestPage() {
       <div className="mt-8 grid gap-10 lg:grid-cols-[420px_1fr]">
         <FormCard onSubmit={handleSubmit} className="h-fit">
           <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">Leerdoel</label>
+            <label htmlFor="toets-leerdoel" className="block text-sm font-medium text-[var(--color-marine)]">Leerdoel</label>
             <textarea
+              id="toets-leerdoel"
               required
               rows={4}
               value={input.leerdoel}
@@ -85,8 +86,9 @@ export default function NewTestPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">Kernbegrippen</label>
+            <label htmlFor="toets-kernbegrippen" className="block text-sm font-medium text-[var(--color-marine)]">Kernbegrippen</label>
             <textarea
+              id="toets-kernbegrippen"
               rows={2}
               value={input.kernbegrippen}
               onChange={(e) => setInput({ ...input, kernbegrippen: e.target.value })}
@@ -109,8 +111,9 @@ export default function NewTestPage() {
 
           <MoreOptions>
             <div>
-              <label className="block text-base font-semibold text-[var(--color-marine)]">Vak</label>
+              <label htmlFor="toets-vak" className="block text-base font-semibold text-[var(--color-marine)]">Vak</label>
               <select
+                id="toets-vak"
                 value={input.vak}
                 onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
                 className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
@@ -121,8 +124,9 @@ export default function NewTestPage() {
               </select>
             </div>
             <div>
-              <label className="block text-base font-semibold text-[var(--color-marine)]">Niveau</label>
+              <label htmlFor="toets-niveau" className="block text-base font-semibold text-[var(--color-marine)]">Niveau</label>
               <select
+                id="toets-niveau"
                 value={input.niveau}
                 onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
                 className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
@@ -133,8 +137,9 @@ export default function NewTestPage() {
               </select>
             </div>
             <div>
-              <label className="block text-base font-semibold text-[var(--color-marine)]">Leerjaar</label>
+              <label htmlFor="toets-leerjaar" className="block text-base font-semibold text-[var(--color-marine)]">Leerjaar</label>
               <input
+                id="toets-leerjaar"
                 type="number"
                 min={1}
                 max={6}
@@ -144,8 +149,9 @@ export default function NewTestPage() {
               />
             </div>
             <div>
-              <label className="block text-base font-semibold text-[var(--color-marine)]">Aantal vragen</label>
+              <label htmlFor="toets-aantal" className="block text-base font-semibold text-[var(--color-marine)]">Aantal vragen</label>
               <input
+                id="toets-aantal"
                 type="number"
                 min={3}
                 max={20}
@@ -161,12 +167,15 @@ export default function NewTestPage() {
           {!resultaat && <PreviewPlaceholder>Vul het formulier in om de toets hier te zien.</PreviewPlaceholder>}
           {resultaat && (
             <article className="space-y-8">
-              <header className="rounded-2xl border border-[var(--color-lijn)] bg-[var(--color-marine)] p-8 text-[var(--color-ivoor)]">
-                <p className="text-base font-semibold uppercase tracking-[0.2em] text-[var(--color-goud)]">
+              {/* `op-donker` zet de tekstkleur op marine én draait de
+                  focusring om. Het kopje was goud op marine (3,55:1) en is
+                  nu op-donker-zacht (10,34:1). */}
+              <header className="op-donker rounded-2xl border-2 border-marine bg-marine p-8">
+                <p className="text-base font-semibold uppercase tracking-[0.2em] text-op-donker-zacht">
                   {resultaat.input.vak} · {resultaat.input.niveau} {resultaat.input.leerjaar}
                 </p>
                 <h2 className="mt-3 font-display text-2xl">{resultaat.titel}</h2>
-                <p className="mt-3 text-sm text-[var(--color-ivoor)]/75">
+                <p className="mt-3 text-base text-op-donker-zacht">
                   {resultaat.vragen.length} vragen · {resultaat.totaalPunten} punten · circa{" "}
                   {resultaat.tijdsduur} min
                 </p>
@@ -181,13 +190,13 @@ export default function NewTestPage() {
                         <p className="text-sm font-medium text-[var(--color-inkt)]">
                           {v.nummer}. {v.vraag}
                         </p>
-                        <span className="shrink-0 text-base text-[var(--color-inkt)]/70">
+                        <span className="shrink-0 text-base text-tekst-zacht">
                           {v.punten} {v.punten === 1 ? "punt" : "punten"} ·{" "}
                           {v.type === "meerkeuze" ? "meerkeuze" : v.type === "open" ? "open" : "invulvraag"}
                         </span>
                       </div>
                       {v.opties && (
-                        <ul className="mt-2 space-y-1 pl-4 text-sm text-[var(--color-inkt)]/75">
+                        <ul className="mt-2 space-y-1 pl-4 text-base text-tekst">
                           {v.opties.map((o) => (
                             <li key={o.label}>
                               {o.label}. {o.tekst}
@@ -204,8 +213,8 @@ export default function NewTestPage() {
                 <h3 className="font-display text-xl text-[var(--color-marine)]">Antwoordsleutel</h3>
                 <ol className="mt-6 space-y-3">
                   {resultaat.vragen.map((v) => (
-                    <li key={v.nummer} className="text-sm text-[var(--color-inkt)]/80">
-                      <span className="font-medium text-[var(--color-groen)]">{v.nummer}.</span>{" "}
+                    <li key={v.nummer} className="text-base text-tekst">
+                      <span className="font-semibold text-succes-tekst">{v.nummer}.</span>{" "}
                       {v.antwoordsleutel}
                     </li>
                   ))}

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/Button";
+import { Field, VELD_KLASSEN } from "@/components/ui/Field";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,61 +40,70 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--color-ivoor)] px-6 py-16">
+    <main className="flex min-h-screen items-center justify-center bg-ivoor px-6 py-16">
       <div className="w-full max-w-md">
-        <Link href="/" className="font-display text-2xl text-[var(--color-marine)]">
+        {/*
+          Het logo is ook een link naar de homepage en moet daarom zelf het
+          doelformaat van 44px halen; als losse tekstregel was het 34px hoog.
+        */}
+        <Link href="/" className="inline-flex min-h-14 items-center font-display text-2xl text-marine">
           Facula
         </Link>
-        <h1 className="mt-8 font-display text-3xl text-[var(--color-marine)]">
-          Welkom terug
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-inkt)]/70">
+        <h1 className="mt-8 font-display text-3xl text-marine">Welkom terug</h1>
+        <p className="mt-2 text-base text-tekst-zacht">
           Log in om verder te werken aan je lessen en toetsen.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">
-              E-mailadres
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-marine)]"
-              placeholder="jij@school.nl"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-marine)]">
-              Wachtwoord
-            </label>
-            <input
-              type="password"
-              required
-              value={wachtwoord}
-              onChange={(e) => setWachtwoord(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-marine)]"
-              placeholder="••••••••"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={bezig}
-            className="w-full rounded-full bg-[var(--color-marine)] px-6 py-3 text-sm font-medium text-[var(--color-ivoor)] transition hover:bg-[var(--color-marine-deep)] disabled:opacity-60"
-          >
-            {bezig ? "Bezig…" : "Inloggen"}
-          </button>
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <Field label="E-mailadres" verplicht>
+            {(ids) => (
+              <input
+                {...ids}
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={VELD_KLASSEN}
+              />
+            )}
+          </Field>
+
+          <Field label="Wachtwoord" verplicht>
+            {(ids) => (
+              <input
+                {...ids}
+                type="password"
+                required
+                autoComplete="current-password"
+                value={wachtwoord}
+                onChange={(e) => setWachtwoord(e.target.value)}
+                className={VELD_KLASSEN}
+              />
+            )}
+          </Field>
+
+          <Button type="submit" variant="primary" volleBreedte disabled={bezig}>
+            {bezig ? "Bezig met inloggen..." : "Inloggen"}
+          </Button>
 
           {fout && (
-            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{fout}</p>
+            <p
+              aria-live="polite"
+              className="flex gap-2 rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
+            >
+              <span aria-hidden>✕</span>
+              <span>{fout}</span>
+            </p>
           )}
         </form>
 
-        <p className="mt-8 text-sm text-[var(--color-inkt)]/70">
+        <p className="mt-8 text-base text-tekst-zacht">
           Nog geen account?{" "}
-          <Link href="/signup" className="font-medium text-[var(--color-marine)] underline underline-offset-4">
+          <Link
+            href="/signup"
+            className="font-semibold text-marine underline underline-offset-4"
+          >
             Account aanmaken
           </Link>
         </p>

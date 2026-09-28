@@ -70,10 +70,14 @@ export default function NewLessonPage() {
 
       <FormCard onSubmit={handleSubmit} className="mt-8">
         <div>
-          <label className="block text-base font-semibold text-[var(--color-marine)]">
+          <label
+            htmlFor="les-leerdoel"
+            className="block text-base font-semibold text-[var(--color-marine)]"
+          >
             Leerdoel
           </label>
           <textarea
+            id="les-leerdoel"
             required
             autoFocus
             rows={7}
@@ -98,8 +102,9 @@ export default function NewLessonPage() {
 
         <MoreOptions>
           <div>
-            <label className="block text-base font-semibold text-[var(--color-marine)]">Vak</label>
+            <label htmlFor="les-vak" className="block text-base font-semibold text-[var(--color-marine)]">Vak</label>
             <select
+              id="les-vak"
               value={input.vak}
               onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
               className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
@@ -110,8 +115,9 @@ export default function NewLessonPage() {
             </select>
           </div>
           <div>
-            <label className="block text-base font-semibold text-[var(--color-marine)]">Niveau</label>
+            <label htmlFor="les-niveau" className="block text-base font-semibold text-[var(--color-marine)]">Niveau</label>
             <select
+              id="les-niveau"
               value={input.niveau}
               onChange={(e) => setInput({ ...input, niveau: e.target.value as Niveau })}
               className="mt-1 w-full rounded-lg border border-[var(--color-lijn)] bg-[var(--color-ivoor)] px-3 py-2 text-sm outline-none focus:border-[var(--color-marine)]"
@@ -122,8 +128,9 @@ export default function NewLessonPage() {
             </select>
           </div>
           <div>
-            <label className="block text-base font-semibold text-[var(--color-marine)]">Leerjaar</label>
+            <label htmlFor="les-leerjaar" className="block text-base font-semibold text-[var(--color-marine)]">Leerjaar</label>
             <input
+              id="les-leerjaar"
               type="number"
               min={1}
               max={6}
@@ -133,8 +140,9 @@ export default function NewLessonPage() {
             />
           </div>
           <div>
-            <label className="block text-base font-semibold text-[var(--color-marine)]">Lesduur (min)</label>
+            <label htmlFor="les-lesduur" className="block text-base font-semibold text-[var(--color-marine)]">Lesduur (min)</label>
             <input
+              id="les-lesduur"
               type="number"
               min={20}
               max={120}
@@ -145,8 +153,9 @@ export default function NewLessonPage() {
             />
           </div>
           <div>
-            <label className="block text-base font-semibold text-[var(--color-marine)]">Aantal lessen</label>
+            <label htmlFor="les-aantal" className="block text-base font-semibold text-[var(--color-marine)]">Aantal lessen</label>
             <input
+              id="les-aantal"
               type="number"
               min={1}
               max={6}

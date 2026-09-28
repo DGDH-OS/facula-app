@@ -28,11 +28,16 @@ export function knopKlassen(variant: ButtonVariant, extra = ""): string {
 /**
  * Eén knop-patroon voor de hele app. Minimaal 56px hoog (min-h-14),
  * label als werkwoord + object, en per scherm precies één `primary`.
+ *
+ * `type` staat standaard op "button", niet op de HTML-default "submit":
+ * een knop die per ongeluk een formulier verstuurt is hier de duurste
+ * fout (halve invoer weg). Verstuurknoppen zetten `type="submit"` zelf.
  */
 export function Button({
   variant = "secondary",
   className = "",
   volleBreedte = false,
+  type = "button",
   children,
   ...rest
 }: Omit<ComponentProps<"button">, "className"> & {
@@ -44,6 +49,7 @@ export function Button({
   return (
     <button
       {...rest}
+      type={type}
       className={knopKlassen(variant, `${volleBreedte ? "w-full" : ""} ${className}`)}
     >
       {children}

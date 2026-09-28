@@ -146,14 +146,18 @@ function VersionRow({
         </div>
       </div>
 
-      <div aria-live="polite">
-        {bekijken &&
-          (laden ? (
-            <p className="mt-3 text-base text-tekst-zacht">Bezig met ophalen...</p>
-          ) : (
-            detail && <VersionPreview output={detail.output} />
-          ))}
-      </div>
+      {/*
+        Eerder stond aria-live om de hele preview. Een schermlezer las dan
+        de volledige lesinhoud voor zodra die verscheen, en opnieuw bij elke
+        wijziging. Nu meldt de live-regio alleen de status in één regel; de
+        preview zelf is gewone inhoud die je met aria-expanded en de
+        knoptekst kunt vinden.
+      */}
+      <p aria-live="polite" className="mt-3 text-base text-tekst-zacht empty:hidden">
+        {laden ? "Bezig met ophalen..." : ""}
+      </p>
+
+      {bekijken && !laden && detail && <VersionPreview output={detail.output} />}
 
       {fout && (
         <p
@@ -210,11 +214,18 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
         <span aria-hidden>{open ? "▾" : "▸"}</span>
       </button>
 
+      {/* aria-live staat per statusregel, niet om de hele lijst: anders
+          wordt elke versie voorgelezen zodra de lijst binnenkomt. */}
       {open && (
-        <div className="mt-4" aria-live="polite">
-          {laden && <p className="text-base text-tekst-zacht">Bezig met ophalen...</p>}
+        <div className="mt-4">
+          <p aria-live="polite" className="text-base text-tekst-zacht empty:hidden">
+            {laden ? "Bezig met ophalen..." : ""}
+          </p>
           {fout && (
-            <p className="rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst">
+            <p
+              aria-live="polite"
+              className="rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
+            >
               {fout}
             </p>
           )}

@@ -19,26 +19,33 @@ const TONE_TEKENS: Record<StatusTone, string> = {
 };
 
 /**
- * Eén status-component voor de hele suite. `title` geeft de volledige
- * uitleg als tooltip; omdat een tooltip op touch niet bestaat, staat de
- * uitleg altijd óók ergens als gewone tekst op de pagina.
+ * Eén status-component voor de hele suite.
+ *
+ * `uitleg` stond eerder alleen in `title`. Een tooltip bestaat niet op
+ * touch, komt niet mee in een schermlezer-scan van de pagina en verdwijnt
+ * bij zoomen, dus de betekenis mocht daar niet als enige wonen. Nu geldt:
+ * het label zelf zegt al wat het is ("AVG-gevoelig", niet "AVG"), en
+ * `uitleg` staat als echte tekst in de badge, visueel verborgen voor wie
+ * de kleur en het label al ziet maar voorgelezen voor wie dat niet doet.
+ * `title` blijft erbij als extra voor de muisgebruiker, nooit als enige.
  */
 export function StatusBadge({
   label,
   tone,
-  title,
+  uitleg,
 }: {
   label: string;
   tone: StatusTone;
-  title?: string;
+  uitleg?: string;
 }) {
   return (
     <span
-      title={title}
+      title={uitleg}
       className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${TONE_STYLES[tone]}`}
     >
       <span aria-hidden>{TONE_TEKENS[tone]}</span>
       {label}
+      {uitleg && <span className="sr-only">. {uitleg}</span>}
     </span>
   );
 }

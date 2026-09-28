@@ -6,13 +6,15 @@ import { useId, type ReactNode } from "react";
 export const VELD_KLASSEN =
   "w-full min-h-14 rounded-lg border-2 border-lijn bg-ivoor px-4 py-3 text-base text-tekst placeholder:text-tekst-zacht focus:border-marine";
 
+/**
+ * De sleutels zijn bewust de echte attribuutnamen, zodat `{...ids}` op een
+ * input direct geldige HTML/ARIA oplevert en de aanroeper niets hoeft te
+ * hernoemen (een `describedBy`-prop belandt stil als niets in de DOM).
+ */
 export interface VeldIds {
-  /** Zet dit op het invoerelement zelf. */
   id: string;
-  /** Zet dit op `aria-describedby` van het invoerelement. */
-  describedBy: string | undefined;
-  /** Zet dit op `aria-invalid` van het invoerelement. */
-  invalid: boolean;
+  "aria-describedby": string | undefined;
+  "aria-invalid": boolean | undefined;
 }
 
 /**
@@ -66,7 +68,11 @@ export function Field({
       )}
 
       <div className="mt-2">
-        {children({ id, describedBy, invalid: Boolean(fout) })}
+        {children({
+          id,
+          "aria-describedby": describedBy,
+          "aria-invalid": fout ? true : undefined,
+        })}
       </div>
 
       {fout && (

@@ -42,16 +42,18 @@ export default async function LessonDetailPage({
     <div className="mx-auto max-w-3xl">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl text-[var(--color-marine)]">{output.titel}</h1>
-          <p className="mt-2 text-sm text-[var(--color-inkt)]/60">
+          <h1 className="font-display text-3xl text-marine">{output.titel}</h1>
+          <p className="mt-2 text-base text-tekst-zacht">
             {input.vak} · {input.niveau} {input.leerjaar}
           </p>
           {output.kernbegrippen.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {output.kernbegrippen.map((begrip) => (
+                /* Kernbegrippen zijn geen status: neutraal vlak met
+                   --color-tekst erop (11,78:1), geen goud-op-goud. */
                 <span
                   key={begrip}
-                  className="rounded-full bg-[var(--color-goud)]/15 px-3 py-1 text-base font-semibold text-[var(--color-goud)]"
+                  className="rounded-full bg-neutraal-vlak px-3 py-1 text-base font-semibold text-tekst"
                 >
                   {begrip}
                 </span>

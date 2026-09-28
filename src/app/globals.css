@@ -135,11 +135,63 @@ body {
   --focus-buiten: var(--color-ivoor);
 }
 
-/* Altijd zichtbare focus, ook op marine knoppen. */
+/*
+ * Altijd zichtbare focus, ook op marine knoppen.
+ *
+ * Opbouw van binnen naar buiten: 2px gat in de binnenring-kleur, dan een
+ * 3px outline in de buitenring-kleur, dan nog 1px binnenring-kleur als
+ * halo. Die halo maakt de ring onafhankelijk van de paginakleur: de
+ * outline grenst altijd aan --focus-binnen, nooit alleen aan wat er
+ * toevallig achter staat.
+ *
+ * Gemeten ratio's (niet-tekst-contrast, WCAG 1.4.11 vraagt >= 3:1):
+ *   licht  ring marine #16233b op ivoor #faf6ef ...... 14,57:1
+ *          halo ivoor op marine knop #16233b ......... 14,57:1
+ *   donker ring ivoor #faf6ef op marine #16233b ...... 14,57:1
+ *          halo marine-deep #0d1626 op ivoor knop .... 16,81:1
+ */
 :focus-visible {
   outline: 3px solid var(--focus-buiten);
   outline-offset: 2px;
-  box-shadow: 0 0 0 2px var(--focus-binnen);
+  box-shadow: 0 0 0 6px var(--focus-binnen);
+}
+
+/*
+ * Dezelfde ring, maar met één extra element in de selector. Nodig omdat
+ * een utility-klasse als `outline-none` op een input dezelfde
+ * specificiteit heeft als `:focus-visible` alleen; met een elementnaam
+ * erbij wint de ring altijd. Zo heeft ELK focusbaar element zichtbare
+ * focus, ook de losse inputs en links in /login en /signup.
+ */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--focus-buiten);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--focus-binnen);
+}
+
+/*
+ * Een lange kop of een e-mailadres mag een smal scherm (320px) niet
+ * horizontaal laten scrollen. "Privacyverklaring" op 40px past daar niet
+ * op één regel, dus breken we het woord af in plaats van de pagina.
+ */
+h1,
+h2,
+h3,
+h4 {
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+a,
+code,
+pre {
+  overflow-wrap: anywhere;
 }
 
 ::selection {
