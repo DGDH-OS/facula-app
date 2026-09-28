@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { haalHuisstijl, verwijderLogoObject } from "@/lib/huisstijl/server";
 import { readBodyWithLimit } from "@/lib/validation";
 
 /**
@@ -49,6 +50,13 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Het schoollogo staat in storage en niet in een tabel, dus de
+  // ON DELETE CASCADE op auth.users ruimt het niet mee op. Het object moet er
+  // dus eerst uit, zolang de sessie nog bestaat: daarna is de gebruiker weg en
+  // is er niemand meer die er volgens het storage-beleid bij mag.
+  const huisstijl = await haalHuisstijl(supabase, user.id);
+  await verwijderLogoObject(supabase, huisstijl.logoPath);
 
   try {
     const serviceRole = createServiceRoleClient();

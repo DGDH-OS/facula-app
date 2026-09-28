@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ExportDataButton, DeleteAccountSection } from "@/components/ui/AccountActions";
+import { ButtonLink } from "@/components/ui/Button";
 
 export default async function AccountPage() {
   const supabase = await createServerSupabaseClient();
@@ -14,6 +15,17 @@ export default async function AccountPage() {
       <section className="mt-8 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
         <h2 className="font-display text-lg text-marine">Je gegevens</h2>
         <p className="mt-2 text-base text-tekst">{user?.email}</p>
+      </section>
+
+      <section className="mt-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
+        <h2 className="font-display text-lg text-marine">Je huisstijl</h2>
+        <p className="mt-2 max-w-[70ch] text-base text-tekst">
+          Kleuren, lettertype, schoolnaam en schoollogo voor je lessen,
+          toetsen en rapportteksten.
+        </p>
+        <div className="mt-4">
+          <ButtonLink href="/app/huisstijl">Huisstijl instellen</ButtonLink>
+        </div>
       </section>
 
       <section className="mt-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">

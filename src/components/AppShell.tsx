@@ -10,10 +10,17 @@ import { wisAlleConcepten } from "@/lib/useDraft";
  * layout.tsx (server-side sessie-check) — dit component toont alleen de
  * al-geverifieerde gebruiker en regelt de uitlog-actie.
  *
- * Navigatie is bewust maximaal drie bestemmingen plus uitloggen (brief 4):
- * "Mijn werk" wijst naar de lijst op het startscherm, want een eigen
- * overzichtspagina bestaat nog niet. Uitloggen is visueel secundair en
- * staat rechts (brief 10.10), zonder bevestigingsmodal.
+ * Navigatie is bewust kort (brief 4): "Mijn werk" wijst naar de lijst op
+ * het startscherm, want een eigen overzichtspagina bestaat nog niet.
+ * Uitloggen is visueel secundair en staat rechts (brief 10.10), zonder
+ * bevestigingsmodal.
+ *
+ * "Huisstijl" is de vierde bestemming en rekt de oorspronkelijke grens van
+ * drie op. Dat is een bewuste keuze: het is een instelscherm dat een docent
+ * eenmalig gebruikt maar wel moet kunnen vinden, en wegstoppen onder Account
+ * zou het onvindbaar maken voor precies de docent die het nodig heeft. De
+ * balk breekt netjes af op smalle schermen (flex-wrap), dus een vierde item
+ * kost geen leesbaarheid.
  *
  * De balk plakt alleen mee op een scherm dat er ruimte voor heeft: de
  * klasse `app-balk` in globals.css zet `position: sticky` pas vanaf 48rem
@@ -30,6 +37,7 @@ import { wisAlleConcepten } from "@/lib/useDraft";
 const NAV_ITEMS: { href: string; label: string; actiefOp?: string }[] = [
   { href: "/app", label: "Start", actiefOp: "/app" },
   { href: "/app#werk", label: "Mijn werk" },
+  { href: "/app/huisstijl", label: "Huisstijl", actiefOp: "/app/huisstijl" },
   { href: "/app/account", label: "Account", actiefOp: "/app/account" },
 ];
 

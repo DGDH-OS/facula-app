@@ -37,3 +37,22 @@ export function limitString(value: unknown, maxLength: number): string | null {
   if (trimmed.length > maxLength) return null;
   return trimmed;
 }
+
+/**
+ * Weigert een verzoek dat niet van onze eigen pagina komt.
+ *
+ * De sessie zit in een cookie, dus de browser stuurt hem ook mee bij een
+ * formulier op een andere site. Voor alles wat schrijft is de Origin-header
+ * daarom de goedkoopste controle: hij is niet door scriptcode te vervalsen.
+ * Zelfde patroon als POST /api/account/delete.
+ */
+export function zelfdeOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  const host = request.headers.get("host");
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}

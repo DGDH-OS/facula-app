@@ -20,7 +20,7 @@ export async function GET() {
 
   // Naast RLS ook expliciet op user_id filteren — zelfde verdedigingslaag
   // als de andere account-scoped routes in deze codebase.
-  const [profileRes, lessonsRes, testsRes, reportsRes, versionsRes, usageRes] =
+  const [profileRes, lessonsRes, testsRes, reportsRes, versionsRes, usageRes, huisstijlRes] =
     await Promise.all([
       supabase.schema("facula").from("profiles").select("*").eq("id", user.id).maybeSingle(),
       supabase.schema("facula").from("lessons").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
@@ -28,11 +28,18 @@ export async function GET() {
       supabase.schema("facula").from("reports").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       supabase.schema("facula").from("content_versions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       supabase.schema("facula").from("usage_counters").select("*").eq("user_id", user.id),
+      supabase.schema("facula").from("huisstijl").select("*").eq("user_id", user.id).maybeSingle(),
     ]);
 
-  const fout = [profileRes, lessonsRes, testsRes, reportsRes, versionsRes, usageRes].find(
-    (res) => res.error
-  );
+  const fout = [
+    profileRes,
+    lessonsRes,
+    testsRes,
+    reportsRes,
+    versionsRes,
+    usageRes,
+    huisstijlRes,
+  ].find((res) => res.error);
   if (fout) {
     console.error("Gegevens-export ophalen mislukt", fout.error);
     return NextResponse.json(
@@ -50,6 +57,10 @@ export async function GET() {
     reports: reportsRes.data,
     contentVersions: versionsRes.data,
     usageCounters: usageRes.data,
+    // Alleen de rij, niet het logobestand zelf: dat is een afbeelding die de
+    // docent zelf heeft geüpload en al bezit. logo_path laat wel zien dát er
+    // een logo bewaard wordt, wat het punt is van een inzageverzoek.
+    huisstijl: huisstijlRes.data,
   };
 
   const datum = new Date().toISOString().slice(0, 10);
