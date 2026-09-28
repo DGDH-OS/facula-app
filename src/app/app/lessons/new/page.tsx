@@ -88,11 +88,25 @@ export default function NewLessonPage() {
     }
   }, []);
 
+  /**
+   * Staat er `?van=<id>` in de URL, dan is die les de bron van de invoer en
+   * mag een bewaard concept er niet tussen komen. Eén keer vaststellen bij
+   * het opzetten van de pagina: de lezing hieronder doet dat ook, en beide
+   * moeten hetzelfde antwoord hebben.
+   */
+  const [vanUrl] = useState(() =>
+    typeof window === "undefined"
+      ? false
+      : new URLSearchParams(window.location.search).has("van")
+  );
+
   const {
     waarde: input,
     zetWaarde: setInput,
     wisConcept,
-  } = useDraft<LessonInput>("lesson", DEFAULT_INPUT, herstelLesInput, naHerstel);
+  } = useDraft<LessonInput>("lesson", DEFAULT_INPUT, herstelLesInput, naHerstel, {
+    slaHerstelOver: vanUrl,
+  });
 
   const leerdoelRef = useRef<HTMLTextAreaElement>(null);
   const lesduurRef = useRef<HTMLInputElement>(null);
@@ -184,6 +198,10 @@ export default function NewLessonPage() {
         if (ruw === null || typeof ruw !== "object" || Array.isArray(ruw)) return;
 
         const hersteld = herstelLesInput(ruw as Record<string, unknown>, DEFAULT_INPUT);
+        // Het oude concept is nu achterhaald: weg ermee, vóór de nieuwe
+        // invoer erin gaat. Daarna bewaart de wizard wijzigingen weer
+        // gewoon, dit zet de opslag niet stil.
+        wisConcept();
         setInput(hersteld);
         naHerstel(hersteld);
         if (naarOverzichtDirect) {
@@ -195,7 +213,7 @@ export default function NewLessonPage() {
     return () => {
       afgebroken = true;
     };
-  }, [setInput, naHerstel, focusKop]);
+  }, [setInput, naHerstel, focusKop, wisConcept]);
 
   function valideer(): Fouten {
     const nieuw: Fouten = {};

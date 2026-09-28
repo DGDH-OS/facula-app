@@ -81,13 +81,22 @@ export function conceptKeuze<T extends string>(
  *
  * Alle argumenten moeten stabiel zijn (module-constante of useCallback
  * zonder deps), anders herhaalt de terugzet-poging zich.
+ *
+ * `slaHerstelOver` is er voor het geval dat de pagina een eigen, betere
+ * bron heeft dan het bewaarde concept: "Pas aan" en "Maak opnieuw" laden de
+ * invoer van een bestaande les uit de database. Zonder deze schakelaar
+ * racet het terugzetten van een oud concept met die lezing en kan het de
+ * geladen invoer overschrijven. Opslaan blijft in dat geval gewoon werken,
+ * alleen het terugzetten vervalt.
  */
 export function useDraft<T>(
   soort: string,
   defaults: T,
   herstel: (ruw: Record<string, unknown>, defaults: T) => T,
-  naHerstel?: (hersteld: T) => void
+  naHerstel?: (hersteld: T) => void,
+  opties?: { slaHerstelOver?: boolean }
 ) {
+  const slaHerstelOver = opties?.slaHerstelOver ?? false;
   const [waarde, zetWaardeIntern] = useState<T>(defaults);
   // Zolang de sleutel null is wordt er niets opgeslagen: of de user-id is
   // nog niet binnen, of er is geen ingelogde gebruiker.
@@ -118,7 +127,7 @@ export function useDraft<T>(
           return;
         }
 
-        if (ruw && !gewijzigd.current) {
+        if (ruw && !gewijzigd.current && !slaHerstelOver) {
           try {
             const geparsed: unknown = JSON.parse(ruw);
             if (
@@ -149,7 +158,7 @@ export function useDraft<T>(
     return () => {
       afgebroken = true;
     };
-  }, [soort, defaults, herstel, naHerstel]);
+  }, [soort, defaults, herstel, naHerstel, slaHerstelOver]);
 
   useEffect(() => {
     if (!sleutel) return;
