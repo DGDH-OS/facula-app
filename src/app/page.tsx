@@ -96,6 +96,43 @@ export default function Home() {
               </ButtonLink>
             </div>
           </div>
+
+          {/*
+            Eén rustig visueel moment: een echte dia zoals Facula hem maakt,
+            stil op de pagina, één keer zacht omhoog bij het laden. Geen 3D,
+            geen video, geen scroll-effect — de dia zelf is het beeld, en hij
+            toont meteen de regel uit PRESENTATIE-METHODIEK.md: korte
+            assertion als titel, hooguit vier regels eronder.
+          */}
+          <figure className="rustig-fade mx-auto mt-16 max-w-2xl">
+            <div className="rounded-2xl border-2 border-lijn bg-ivoor-deep p-8 sm:p-10">
+              <p className="font-display text-base uppercase tracking-[0.2em] text-tekst-zacht">
+                Maatschappijleer · havo 4 · les 1
+              </p>
+              <h2 className="mt-4 max-w-[26ch] font-display text-2xl text-marine sm:text-3xl">
+                Je referentiekader stuurt wat je ziet
+              </h2>
+              <div className="mt-6 h-1 w-20 rounded-full bg-goud" aria-hidden />
+              <ul className="mt-6 space-y-3 text-lg text-tekst">
+                <li className="flex gap-3">
+                  <span aria-hidden>•</span>
+                  <span>Waarden en ervaring kleuren je oordeel</span>
+                </li>
+                <li className="flex gap-3">
+                  <span aria-hidden>•</span>
+                  <span>Selectieve waarneming filtert het nieuws</span>
+                </li>
+                <li className="flex gap-3">
+                  <span aria-hidden>•</span>
+                  <span>Casus: 68% haalt nieuws via social media</span>
+                </li>
+              </ul>
+            </div>
+            <figcaption className="mx-auto mt-4 max-w-[62ch] text-center text-base text-tekst-zacht">
+              Een dia zoals Facula hem maakt: korte kop, hooguit vier regels,
+              direct klaar voor PowerPoint.
+            </figcaption>
+          </figure>
         </section>
 
         {/* Hoe het werkt */}

@@ -236,3 +236,24 @@ pre {
 .stap-fade {
   animation: stap-fade-in 200ms ease-out;
 }
+
+/*
+ * Het enige visuele moment op de publieke homepage: de voorbeelddia komt
+ * één keer rustig omhoog. Geen scroll-effect, geen herhaling, geen 3D. De
+ * eindtoestand is de gewone toestand, dus met reduced motion (of zonder
+ * CSS-animaties) staat de dia gewoon meteen goed.
+ */
+@keyframes rustig-omhoog {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rustig-fade {
+  animation: rustig-omhoog 400ms ease-out both;
+}
