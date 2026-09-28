@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
+  claimLogoLease,
   geldigLogoPad,
   haalHuisstijl,
   HUISSTIJL_KOLOMMEN,
   LOGO_BUCKET,
+  LOGO_LEASE_BEZET_MELDING,
   logoMimeType,
   logoPad,
+  releaseLogoLease,
   verwijderLogoObjecten,
 } from "@/lib/huisstijl/server";
 import { isToegestaanLogoType, maakLogo } from "@/lib/huisstijl/logo";
@@ -25,6 +28,14 @@ import { zelfdeOrigin } from "@/lib/validation";
  * twee mogelijke objecten, en moest elke upload het andere opruimen — waarmee
  * twee gelijktijdige uploads elkaars verse logo konden weghalen. Wat het pad
  * niet meer vertelt (het bestandstype) staat nu in facula.huisstijl.logo_mime.
+ *
+ * Wat één vast pad niet oplost, is een upload en een verwijdering die door
+ * elkaar lopen: die raken hetzelfde object van twee kanten, en het object
+ * (storage) en de rij (facula.huisstijl) zijn niet samen in een transactie te
+ * zetten. Daarom claimen POST en DELETE eerst een lease op het logo van deze
+ * docent (facula.claim_logo_lock, 30 seconden) en geven die in een finally
+ * terug. Is de lease bezet, dan volgt een 409 in plaats van een tweede
+ * gelijktijdige mutatie. Zie 20260928120000_facula_huisstijl.sql.
  *
  * Elk logo wordt bij de upload genormaliseerd (gedraaid volgens EXIF,
  * metadata eraf, verkleind tot binnen 600x300 px): zie normalize-logo.ts.
@@ -172,68 +183,89 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Het pad hangt alleen van de gebruiker af, niet van het bestandstype:
-  // '<uid>/logo', de enige naam die het storage-beleid toelaat. Een png die
-  // een jpg vervangt, schrijft dus over hetzelfde object heen. Daarmee hoeft
-  // deze route niets te verwijderen, en kan een gelijktijdige upload van
-  // dezelfde docent hooguit de laatste winnen — nooit een object weghalen
-  // waar de rij naar wijst.
-  const pad = logoPad(user.id);
-
-  const { error: uploadFout } = await supabase.storage
-    .from(LOGO_BUCKET)
-    .upload(pad, genormaliseerd.bytes, {
-      // Het bestandstype staat alleen nog hier en in logo_mime; het pad
-      // draagt het niet meer.
-      contentType: genormaliseerd.mimeType,
-      upsert: true,
-    });
-
-  if (uploadFout) {
-    console.error("Schoollogo uploaden mislukt", uploadFout);
+  // Pas hier de lease claimen, en niet bovenaan: alles hierboven leest en
+  // controleert alleen het aangeleverde bestand en raakt niets wat een andere
+  // aanvraag ook gebruikt. Zo staat de lease alleen tijdens het schrijfwerk en
+  // wacht een tweede poging niet op een verwerking die nog nergens toe leidt.
+  const lease = await claimLogoLease(supabase);
+  if (lease === "bezet") {
+    return NextResponse.json({ error: LOGO_LEASE_BEZET_MELDING }, { status: 409 });
+  }
+  if (lease === "fout") {
     return NextResponse.json(
       { error: "Het uploaden lukte niet. Probeer het opnieuw." },
       { status: 500 }
     );
   }
 
-  // Volgorde: eerst uploaden, dan pad én bestandstype in de database zetten.
-  // Andersom zou een mislukte upload een rij achterlaten die naar een object
-  // wijst dat er niet is.
-  const { data, error } = await supabase
-    .schema("facula")
-    .from("huisstijl")
-    .upsert(
-      {
-        user_id: user.id,
-        logo_path: pad,
-        logo_mime: genormaliseerd.mimeType,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    )
-    .select(HUISSTIJL_KOLOMMEN)
-    .single();
+  try {
+    // Het pad hangt alleen van de gebruiker af, niet van het bestandstype:
+    // '<uid>/logo', de enige naam die het storage-beleid toelaat. Een png die
+    // een jpg vervangt, schrijft dus over hetzelfde object heen. Deze route
+    // hoeft dus niets te verwijderen; wat er tijdens het schrijven niet naast
+    // kan gebeuren, houdt de lease tegen.
+    const pad = logoPad(user.id);
 
-  if (error) {
-    console.error("Logopad opslaan mislukt", error);
-    // Het object blijft staan, en dat is hier de veilige keuze. Het ligt op
-    // het ene bekende pad van deze docent: de volgende upload overschrijft
-    // het, en accountverwijdering haalt het weg. Het is dus begrensd, in
-    // tegenstelling tot een opruimpoging die bij samenloop het object kan
-    // weghalen waar de rij van een andere aanvraag net naar is gaan wijzen.
-    return NextResponse.json(
-      { error: "Het logo kon niet worden opgeslagen. Probeer het opnieuw." },
-      { status: 500 }
-    );
+    const { error: uploadFout } = await supabase.storage
+      .from(LOGO_BUCKET)
+      .upload(pad, genormaliseerd.bytes, {
+        // Het bestandstype staat alleen nog hier en in logo_mime; het pad
+        // draagt het niet meer.
+        contentType: genormaliseerd.mimeType,
+        upsert: true,
+      });
+
+    if (uploadFout) {
+      console.error("Schoollogo uploaden mislukt", uploadFout);
+      return NextResponse.json(
+        { error: "Het uploaden lukte niet. Probeer het opnieuw." },
+        { status: 500 }
+      );
+    }
+
+    // Volgorde: eerst uploaden, dan pad én bestandstype in de database zetten.
+    // Andersom zou een mislukte upload een rij achterlaten die naar een object
+    // wijst dat er niet is.
+    const { data, error } = await supabase
+      .schema("facula")
+      .from("huisstijl")
+      .upsert(
+        {
+          user_id: user.id,
+          logo_path: pad,
+          logo_mime: genormaliseerd.mimeType,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      )
+      .select(HUISSTIJL_KOLOMMEN)
+      .single();
+
+    if (error) {
+      console.error("Logopad opslaan mislukt", error);
+      // Het object blijft staan, en dat is hier de veilige keuze. Het ligt op
+      // het ene bekende pad van deze docent: de volgende upload overschrijft
+      // het, en accountverwijdering haalt het weg. Opruimen zou de docent geen
+      // stap verder brengen en een geslaagde upload weggooien waarvan alleen
+      // de rij nog miste.
+      return NextResponse.json(
+        { error: "Het logo kon niet worden opgeslagen. Probeer het opnieuw." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
+  } finally {
+    // Ook bij een fout of een exception: blijft de lease staan, dan kan deze
+    // docent 30 seconden lang zijn logo niet wijzigen.
+    await releaseLogoLease(supabase);
   }
-
-  return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
 }
 
 /**
  * DELETE /api/huisstijl/logo
- * Verwijdert het logo uit storage en haalt het pad uit de huisstijl.
+ * Verwijdert het logo uit storage en haalt daarna het pad uit de huisstijl.
+ * Onder dezelfde lease als POST, dus nooit tegelijk met een upload.
  */
 export async function DELETE(request: NextRequest) {
   if (!zelfdeOrigin(request)) {
@@ -249,46 +281,64 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
-  // Eerst de rij leegmaken, dan pas het object. De rij is wat de app leest:
-  // zodra logo_path leeg is, toont geen enkel scherm en geen enkele export het
-  // logo nog, en is het ook niet meer op te halen via GET hierboven.
-  //
-  // Andersom zou een mislukte rij-update een docent achterlaten die "verwijder
-  // logo" zag slagen terwijl zijn huisstijl het logo gewoon blijft gebruiken.
-  const { data, error } = await supabase
-    .schema("facula")
-    .from("huisstijl")
-    .upsert(
-      {
-        user_id: user.id,
-        logo_path: null,
-        logo_mime: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    )
-    .select(HUISSTIJL_KOLOMMEN)
-    .single();
-
-  if (error) {
-    console.error("Logopad wissen mislukt", error);
+  const lease = await claimLogoLease(supabase);
+  if (lease === "bezet") {
+    return NextResponse.json({ error: LOGO_LEASE_BEZET_MELDING }, { status: 409 });
+  }
+  if (lease === "fout") {
     return NextResponse.json(
       { error: "Er ging iets mis bij het verwijderen van het logo." },
       { status: 500 }
     );
   }
 
-  // Nu pas het object. Lukt dat niet, dan is dat geen mislukte verwijdering
-  // voor de docent: het logo is nergens meer zichtbaar of op te halen, en het
-  // achtergebleven object ligt op het ene bekende pad — de volgende upload
-  // overschrijft het, accountverwijdering haalt het weg. Begrensd dus, en een
-  // 500 teruggeven zou de docent laten denken dat er niets gebeurd is terwijl
-  // zijn huisstijl al bijgewerkt is.
-  if (!(await verwijderLogoObjecten(supabase, [logoPad(user.id)]))) {
-    console.error("Schoollogo-object bleef staan na wissen van de rij", {
-      userId: user.id,
-    });
-  }
+  try {
+    // Eerst het object, dan de rij. Die volgorde kan nu pas: de lease sluit
+    // uit dat er tussen deze twee stappen een upload van dezelfde docent een
+    // nieuw object neerzet dat deze verwijdering meteen weer weghaalt.
+    //
+    // Deze kant op, omdat "logo verwijderd" niet gemeld hoort te worden zolang
+    // het bestand nog in de bucket ligt. Lukt het verwijderen niet, dan stopt
+    // deze route met een fout en blijft de rij naar het object wijzen dat er
+    // ook echt nog is: één toestand, en opnieuw proberen doet precies hetzelfde.
+    if (!(await verwijderLogoObjecten(supabase, [logoPad(user.id)]))) {
+      console.error("Schoollogo-object verwijderen mislukt", { userId: user.id });
+      return NextResponse.json(
+        { error: "Het logo kon niet verwijderd worden. Probeer het opnieuw." },
+        { status: 500 }
+      );
+    }
 
-  return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
+    const { data, error } = await supabase
+      .schema("facula")
+      .from("huisstijl")
+      .upsert(
+        {
+          user_id: user.id,
+          logo_path: null,
+          logo_mime: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      )
+      .select(HUISSTIJL_KOLOMMEN)
+      .single();
+
+    if (error) {
+      // Het object is al weg en de rij wijst er nog naar. De docent ziet een
+      // fout en probeert het opnieuw; die tweede poging verwijdert een object
+      // dat er niet meer is (geen fout in storage) en leegt de rij alsnog. In
+      // de tussentijd toont geen enkele export een logo: het downloaden faalt
+      // en haalLogo() geeft dan null.
+      console.error("Logopad wissen mislukt", error);
+      return NextResponse.json(
+        { error: "Er ging iets mis bij het verwijderen van het logo." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
+  } finally {
+    await releaseLogoLease(supabase);
+  }
 }

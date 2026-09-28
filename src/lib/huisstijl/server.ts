@@ -66,6 +66,61 @@ export function geldigLogoPad(pad: string | null | undefined, userId: string): b
   return LOGO_PAD_VORM.test(pad) && pad === logoPad(userId);
 }
 
+/**
+ * De Nederlandse melding bij een bezette logo-lease. Staat hier zodat de route
+ * en de tests dezelfde tekst gebruiken.
+ */
+export const LOGO_LEASE_BEZET_MELDING =
+  "Er loopt al een wijziging aan je logo, probeer het over een paar seconden opnieuw.";
+
+/**
+ * Uitkomst van een claimpoging op de logo-lease.
+ *
+ * Drie gevallen en niet twee, omdat "bezet" en "de claim zelf ging stuk" een
+ * ander antwoord aan de docent verdienen: het eerste is een 409 waar opnieuw
+ * proberen echt helpt, het tweede een 500. Ze samennemen zou een kapotte
+ * database als drukte laten klinken.
+ */
+export type LogoLeaseUitkomst = "geclaimd" | "bezet" | "fout";
+
+/**
+ * Claimt het recht om het logo van deze docent te wijzigen (30 seconden).
+ *
+ * Elke mutatie van het logo loopt hierlangs: POST en DELETE op
+ * /api/huisstijl/logo raken allebei het object in de bucket én de rij in
+ * facula.huisstijl, en die twee zijn niet in één transactie te zetten. Zonder
+ * lease kan een verwijdering het object weghalen dat een upload er net heeft
+ * neergezet, terwijl de rij ernaar blijft wijzen.
+ *
+ * Fail-closed: gaat de claim zelf stuk, dan wordt er niets gewijzigd.
+ */
+export async function claimLogoLease(
+  supabase: SupabaseClient
+): Promise<LogoLeaseUitkomst> {
+  const { data, error } = await supabase.schema("facula").rpc("claim_logo_lock");
+
+  if (error) {
+    console.error("Logo-lease claimen mislukt", error);
+    return "fout";
+  }
+  return data === true ? "geclaimd" : "bezet";
+}
+
+/**
+ * Geeft de logo-lease terug. Hoort in een finally: zonder deze aanroep blijft
+ * de lease tot 30 seconden staan en wacht de volgende poging van dezelfde
+ * docent voor niets.
+ *
+ * Mislukt het teruggeven, dan is dat geen fout voor de docent — de lease
+ * verloopt zelf — maar wel iets om te zien in de logs.
+ */
+export async function releaseLogoLease(supabase: SupabaseClient): Promise<void> {
+  const { error } = await supabase.schema("facula").rpc("release_logo_lock");
+  if (error) {
+    console.error("Logo-lease vrijgeven mislukt", error);
+  }
+}
+
 /** De kolommen die samen een Huisstijl opleveren. Eén lijst, overal dezelfde. */
 export const HUISSTIJL_KOLOMMEN =
   "preset, accent, tekst, achtergrond, lettertype, schoolnaam, logo_path, logo_mime, logo_standaard_aan";

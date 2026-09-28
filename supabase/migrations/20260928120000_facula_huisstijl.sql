@@ -31,6 +31,12 @@
 -- extensie meer draagt, kan het bestandstype er niet meer uit afgeleid worden;
 -- vandaar de kolom logo_mime ernaast.
 --
+-- Wat één vast pad NIET oplost: een upload en een verwijdering van dezelfde
+-- docent die door elkaar lopen. Die raken hetzelfde object van twee kanten, en
+-- object en rij zijn niet samen in een transactie te zetten. Daarvoor staat
+-- onderaan deze migratie de logo-lease: de kolom logo_lock_until plus
+-- facula.claim_logo_lock() / facula.release_logo_lock().
+--
 -- Idempotent: opnieuw draaien mag.
 
 create table if not exists facula.huisstijl (
@@ -61,6 +67,11 @@ create table if not exists facula.huisstijl (
   -- vertrouwen op de content-type die storage teruggeeft.
   logo_mime text check (logo_mime is null or logo_mime in ('image/png', 'image/jpeg')),
   logo_standaard_aan boolean not null default true,
+  -- Lease die logomutaties van dezelfde docent op een rij zet: zolang deze
+  -- tijdstempel in de toekomst ligt, heeft een aanvraag het logo van deze
+  -- docent in handen en krijgt een tweede aanvraag een 409. Zie
+  -- facula.claim_logo_lock() onderaan deze migratie voor het waarom.
+  logo_lock_until timestamptz,
   updated_at timestamptz not null default now()
 );
 
@@ -69,6 +80,9 @@ create table if not exists facula.huisstijl (
 -- nieuwe kolom en de aangescherpte padvorm moeten er apart bij.
 alter table facula.huisstijl
   add column if not exists logo_mime text;
+
+alter table facula.huisstijl
+  add column if not exists logo_lock_until timestamptz;
 
 alter table facula.huisstijl drop constraint if exists huisstijl_logo_path_check;
 alter table facula.huisstijl drop constraint if exists huisstijl_logo_mime_check;
@@ -135,6 +149,111 @@ create policy "huisstijl_delete_own"
 grant usage on schema facula to authenticated;
 grant select, insert, update, delete on facula.huisstijl to authenticated;
 grant all on facula.huisstijl to service_role;
+
+-- ---------------------------------------------------------------------------
+-- De logo-lease: logomutaties van dezelfde docent serialiseren.
+-- ---------------------------------------------------------------------------
+-- Waarom dit nodig is. Een upload en een verwijdering raken twee dingen die
+-- bij elkaar horen: het object '<user_id>/logo' in de bucket en de kolommen
+-- logo_path/logo_mime in de rij hieronder. Die twee zijn niet in een
+-- transactie te vatten (storage staat buiten deze database), dus gebeuren ze
+-- na elkaar. Lopen een POST en een DELETE van dezelfde docent door elkaar, dan
+-- is er geen ordening waarin het altijd goed gaat: de verwijdering kan het
+-- object weghalen dat de upload er net heeft neergezet terwijl de rij ernaar
+-- verwijst (huisstijl die naar een verdwenen bestand wijst), of de upload zet
+-- een pad in de rij dat de verwijdering een moment later leegt terwijl het
+-- object blijft liggen.
+--
+-- De oplossing is niet een slimmere volgorde maar minder gelijktijdigheid: per
+-- docent mag er maar één logomutatie tegelijk lopen. Deze functie claimt dat
+-- recht voor 30 seconden.
+--
+-- SECURITY INVOKER, in tegenstelling tot de usage-RPC's: hier is niets nodig
+-- wat de docent zelf niet mag. Hij mag zijn eigen huisstijl-rij schrijven (zie
+-- de policies hierboven), dus de claim loopt gewoon onder zijn eigen rechten
+-- en RLS blijft de grens. Een definer-functie zou die grens hier onnodig
+-- opheffen.
+--
+-- Waarom een tijdstempel in de rij en geen advisory lock: een lock leeft in
+-- één databasesessie, en de route praat via PostgREST — elke aanroep kan een
+-- andere sessie zijn, en een sessie die halverwege wegvalt geeft zijn lock
+-- meteen terug. Een tijdstempel overleeft dat, en loopt na 30 seconden zelf af
+-- als een aanvraag crasht voordat hij hem vrijgaf.
+--
+-- De volgorde in de functie is de kern. De update filtert op
+-- "logo_lock_until is null or logo_lock_until < now()" en pakt daarmee een
+-- rijlock. Twee gelijktijdige claims kunnen dus niet samen slagen: de tweede
+-- wacht op de rijlock van de eerste, ziet daarna de bijgewerkte waarde in de
+-- toekomst liggen, raakt nul rijen en geeft false terug. De klok is die van de
+-- database (now()), niet die van de aanroeper.
+create or replace function facula.claim_logo_lock()
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null then
+    raise exception 'Authenticatie vereist' using errcode = '42501';
+  end if;
+
+  -- De rij moet bestaan voordat er iets te vergrendelen valt: een docent die
+  -- zijn eerste logo uploadt heeft nog geen huisstijl-rij.
+  insert into facula.huisstijl (user_id)
+  values (v_user_id)
+  on conflict (user_id) do nothing;
+
+  update facula.huisstijl
+  set logo_lock_until = now() + interval '30 seconds'
+  where user_id = v_user_id
+    and (logo_lock_until is null or logo_lock_until < now());
+
+  return found;
+end;
+$$;
+
+comment on function facula.claim_logo_lock() is
+  'Claimt het recht om het logo van de ingelogde docent te wijzigen, 30 seconden. Geeft false als een andere aanvraag het al heeft. Serialiseert POST en DELETE op /api/huisstijl/logo per docent.';
+
+-- Teruggeven na afloop, zodat een volgende aanvraag niet de 30 seconden hoeft
+-- uit te zitten. Zonder deze functie zou de lease alleen op tijd verlopen; met
+-- de functie is de wachttijd normaal nul.
+--
+-- Eén bekende scherpe rand: duurt een aanvraag langer dan 30 seconden, dan is
+-- zijn lease verlopen, kan een volgende aanvraag claimen, en wist de eerste bij
+-- het afronden alsnog de lease van die tweede. Dat is bewust niet met een
+-- claim-token dichtgezet: 30 seconden is ruim voor een upload van maximaal 2 MB
+-- plus een storage-write, en het enige gevolg is dat de serialisatie in dat
+-- zeldzame geval één keer niet geldt — precies de situatie van vóór deze lease,
+-- niet erger.
+create or replace function facula.release_logo_lock()
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+begin
+  if v_user_id is null then
+    return;
+  end if;
+
+  update facula.huisstijl
+  set logo_lock_until = null
+  where user_id = v_user_id;
+end;
+$$;
+
+comment on function facula.release_logo_lock() is
+  'Geeft de logo-lease van de ingelogde docent terug (logo_lock_until = null).';
+
+revoke execute on function facula.claim_logo_lock() from public, anon;
+revoke execute on function facula.release_logo_lock() from public, anon;
+grant execute on function facula.claim_logo_lock() to authenticated;
+grant execute on function facula.release_logo_lock() to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Storage: bucket school-logos, privé.
