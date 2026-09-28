@@ -170,6 +170,7 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
     null
   );
   const [status, setStatus] = useState<string | null>(null);
+  const [lijstFout, setLijstFout] = useState<string | null>(null);
   const loopt = useRef(false);
 
   async function haalVersies(): Promise<VersionSummary[]> {
@@ -212,6 +213,12 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
     `router.refresh()` haalt de lespagina zelf opnieuw op, zodat de titel en
     de onderdelen de teruggezette versie tonen zonder volledige herlading —
     en zonder de undo-melding kwijt te raken, wat met een reload wel gebeurde.
+
+    Het opnieuw ophalen van de lijst staat in een eigen try: als de restore
+    zelf lukte maar de lijst niet binnenkomt, is het terugzetten wél gebeurd.
+    Dan blijft het een succesmelding met een undo, en gaat er alleen een
+    zachte regel bij dat het overzicht niet ververst kon worden. Een rode
+    foutmelding zou hier suggereren dat de les nog is zoals hij was.
   */
   async function zetTerug(versionNumber: number, alsUndo = false) {
     if (loopt.current) return;
@@ -219,6 +226,7 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
 
     setBezigMetVersie(versionNumber);
     setFout(null);
+    setLijstFout(null);
     setStatus(null);
     setUndo(null);
 
@@ -232,14 +240,31 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
         throw new Error(d?.error ?? "Terugzetten mislukt.");
       }
 
-      const lijst = await haalVersies();
-      setVersions(lijst);
       router.refresh();
 
-      const snapshot = lijst.reduce(
-        (hoogste, v) => Math.max(hoogste, v.versionNumber),
-        0
-      );
+      // De staat van vóór dit terugzetten is zelf als nieuwe versie
+      // weggeschreven, en dat is altijd het hoogste versienummer. Lukt het
+      // ophalen niet, dan is het hoogste bekende nummer plus één de beste
+      // schatting; klopt die onverhoopt niet, dan meldt de undo-poging zelf
+      // netjes dat die versie niet bestaat.
+      let snapshot = 0;
+      try {
+        const lijst = await haalVersies();
+        setVersions(lijst);
+        snapshot = lijst.reduce(
+          (hoogste, v) => Math.max(hoogste, v.versionNumber),
+          0
+        );
+      } catch {
+        setLijstFout(
+          "Het overzicht van eerdere versies kon niet ververst worden. Herlaad de pagina om het bij te werken."
+        );
+        snapshot = (versions ?? []).reduce(
+          (hoogste, v) => Math.max(hoogste, v.versionNumber),
+          0
+        );
+        if (snapshot > 0) snapshot += 1;
+      }
 
       if (alsUndo) {
         setStatus("De les staat weer zoals hij was.");
@@ -288,6 +313,17 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
       >
         {status ?? ""}
       </p>
+
+      {/* Zacht, niet rood: het terugzetten is gelukt, alleen dit overzicht
+          liep achter. */}
+      {lijstFout && (
+        <p
+          aria-live="polite"
+          className="mt-4 max-w-[70ch] text-base text-tekst-zacht"
+        >
+          {lijstFout}
+        </p>
+      )}
 
       {fout && (
         <p

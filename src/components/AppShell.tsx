@@ -15,14 +15,22 @@ import { wisAlleConcepten } from "@/lib/useDraft";
  * overzichtspagina bestaat nog niet. Uitloggen is visueel secundair en
  * staat rechts (brief 10.10), zonder bevestigingsmodal.
  *
- * De balk is sticky. `scroll-padding-top` in globals.css zorgt dat een
- * element dat via Tab of een anker focus krijgt niet onder deze balk
- * verdwijnt (WCAG 2.4.11).
+ * De balk plakt alleen mee op een scherm dat er ruimte voor heeft: de
+ * klasse `app-balk` in globals.css zet `position: sticky` pas vanaf 48rem
+ * breed én 32rem hoog. Op 320px of bij 400% zoom staat de balk gewoon
+ * boven de pagina, en kan hij dus nooit een element met focus afdekken
+ * (WCAG 2.4.11). `scroll-padding-top` hoort bij dezelfde media query.
  */
-const NAV_ITEMS: { href: string; label: string }[] = [
-  { href: "/app", label: "Start" },
+
+/**
+ * `actiefOp` is het pad waarop dit item "page" is, en de match is exact.
+ * "Mijn werk" heeft er geen: het is een anker op /app, en anders zouden
+ * Start en Mijn werk allebei tegelijk aria-current="page" dragen.
+ */
+const NAV_ITEMS: { href: string; label: string; actiefOp?: string }[] = [
+  { href: "/app", label: "Start", actiefOp: "/app" },
   { href: "/app#werk", label: "Mijn werk" },
-  { href: "/app/account", label: "Account" },
+  { href: "/app/account", label: "Account", actiefOp: "/app/account" },
 ];
 
 export function AppShell({
@@ -47,16 +55,19 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-ivoor">
-      <header className="sticky top-0 z-20 border-b border-lijn bg-ivoor-deep">
+      <header className="app-balk z-20 border-b border-lijn bg-ivoor-deep">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-          <Link href="/" className="font-display text-xl text-marine">
+          {/* min-h-12 en min-w-12: een klikvlak van minstens 48x48px, ook
+              als de merknaam ooit korter wordt (WCAG 2.5.8). */}
+          <Link
+            href="/"
+            className="flex min-h-12 min-w-12 items-center font-display text-xl text-marine"
+          >
             Facula
           </Link>
           <nav aria-label="Hoofdnavigatie" className="flex flex-wrap items-center gap-2">
-            {NAV_ITEMS.map(({ href, label }) => {
-              const doel = href.split("#")[0];
-              const actief =
-                pathname === doel || (doel !== "/app" && Boolean(pathname?.startsWith(doel)));
+            {NAV_ITEMS.map(({ href, label, actiefOp }) => {
+              const actief = actiefOp !== undefined && pathname === actiefOp;
               return (
                 <Link
                   key={label}

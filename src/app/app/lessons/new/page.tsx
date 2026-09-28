@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LessonInput, Vak, Niveau } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
@@ -148,6 +149,53 @@ export default function NewLessonPage() {
     },
     [focusNaar]
   );
+
+  /**
+   * "Pas aan" en "Maak opnieuw" op de lespagina sturen hierheen met
+   * `?van=<id>`, en "Maak opnieuw" ook met `&stap=2`. De invoer van die les
+   * komt binnen via de gewone Supabase-client-lezing, dezelfde weg als de
+   * rest van de app: RLS geeft alleen de eigen lessen terug. Geen nieuwe
+   * API-route, geen extra validatie-pad — de invoer gaat langs precies
+   * dezelfde `herstelLesInput` als een bewaard concept.
+   *
+   * Er wordt hier nooit uit zichzelf gegenereerd: "Maak opnieuw" zet de
+   * docent op het overzicht van stap 2, en daar drukt die zelf op "Maak de
+   * les". Zo is er altijd één bevestiging vóór er quotum op gaat.
+   */
+  const overgenomen = useRef(false);
+  useEffect(() => {
+    if (overgenomen.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const van = params.get("van");
+    if (!van) return;
+    overgenomen.current = true;
+    const naarOverzichtDirect = params.get("stap") === "2";
+
+    let afgebroken = false;
+    createClient()
+      .schema("facula")
+      .from("lessons")
+      .select("input")
+      .eq("id", van)
+      .single()
+      .then(({ data, error }) => {
+        if (afgebroken || error || !data) return;
+        const ruw = data.input;
+        if (ruw === null || typeof ruw !== "object" || Array.isArray(ruw)) return;
+
+        const hersteld = herstelLesInput(ruw as Record<string, unknown>, DEFAULT_INPUT);
+        setInput(hersteld);
+        naHerstel(hersteld);
+        if (naarOverzichtDirect) {
+          setStap(2);
+          focusKop("overzicht");
+        }
+      });
+
+    return () => {
+      afgebroken = true;
+    };
+  }, [setInput, naHerstel, focusKop]);
 
   function valideer(): Fouten {
     const nieuw: Fouten = {};

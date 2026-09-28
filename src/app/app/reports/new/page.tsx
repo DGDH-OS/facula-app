@@ -8,7 +8,7 @@ import type {
   RapportOutputType,
   RapportToon,
 } from "@/lib/types";
-import { conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
+import { conceptKeuze, useDraft } from "@/lib/useDraft";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
@@ -48,27 +48,38 @@ const TONEN: { waarde: RapportToon; label: string }[] = [
 const MAX_LEERLING = 2000;
 const MAX_AANTEKENINGEN = 2000;
 
-const DEFAULT_INPUT: ReportInput = {
-  leerlingLabel: "",
-  aantekeningen: "",
+/*
+ * AVG: het leerling-label en de aantekeningen gaan bewust NIET naar
+ * sessionStorage. Dat zijn persoonsgegevens over een minderjarige, en
+ * bewaren mag alleen als het nodig is (dataminimalisatie, art. 5 lid 1 sub
+ * c AVG). Op een gedeelde docentencomputer blijven ze anders in de browser
+ * van de school staan tot het tabblad sluit, buiten het zicht van de
+ * docent. Alleen de onpersoonlijke instellingen (soort tekst en toon)
+ * worden als concept bewaard; die zeggen niets over een leerling.
+ */
+type RapportInstellingen = Pick<ReportInput, "outputType" | "toon">;
+type RapportPersoonlijk = Pick<ReportInput, "leerlingLabel" | "aantekeningen">;
+
+const DEFAULT_INSTELLINGEN: RapportInstellingen = {
   outputType: "rapporttekst",
   toon: "vriendelijk-direct",
 };
 
+const LEEG_PERSOONLIJK: RapportPersoonlijk = {
+  leerlingLabel: "",
+  aantekeningen: "",
+};
+
 /**
  * Een bewaard concept komt uit sessionStorage en is dus niet te
- * vertrouwen: elk veld langs hetzelfde type en dezelfde grenzen als de
- * serverside route, en wat niet klopt valt terug op de default. Hier weegt
- * dat extra: in de aantekeningen staat gevoelige tekst over een leerling,
- * die mag nooit ongecontroleerd de state in.
+ * vertrouwen: elk veld langs hetzelfde type en dezelfde toegestane waarden
+ * als de serverside route, en wat niet klopt valt terug op de default.
  */
-function herstelRapportInput(
+function herstelInstellingen(
   ruw: Record<string, unknown>,
-  defaults: ReportInput
-): ReportInput {
+  defaults: RapportInstellingen
+): RapportInstellingen {
   return {
-    leerlingLabel: conceptTekst(ruw.leerlingLabel, MAX_LEERLING) ?? defaults.leerlingLabel,
-    aantekeningen: conceptTekst(ruw.aantekeningen, MAX_AANTEKENINGEN) ?? defaults.aantekeningen,
     outputType:
       conceptKeuze(
         ruw.outputType,
@@ -122,11 +133,20 @@ export default function NewReportPage() {
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
 
+  // Persoonlijke velden blijven in gewone component-state: die verdwijnen
+  // bij het verlaten van de pagina, en komen nergens in opslag terecht.
+  const [persoonlijk, setPersoonlijk] = useState<RapportPersoonlijk>(LEEG_PERSOONLIJK);
   const {
-    waarde: input,
-    zetWaarde: setInput,
+    waarde: instellingen,
+    zetWaarde: setInstellingen,
     wisConcept,
-  } = useDraft<ReportInput>("reports", DEFAULT_INPUT, herstelRapportInput);
+  } = useDraft<RapportInstellingen>(
+    "reports",
+    DEFAULT_INSTELLINGEN,
+    herstelInstellingen
+  );
+
+  const input: ReportInput = { ...persoonlijk, ...instellingen };
 
   const leerlingRef = useRef<HTMLInputElement>(null);
   const aantekeningenRef = useRef<HTMLTextAreaElement>(null);
@@ -376,7 +396,7 @@ export default function NewReportPage() {
                   maxLength={MAX_LEERLING}
                   value={input.leerlingLabel}
                   onChange={(e) =>
-                    setInput({ ...input, leerlingLabel: e.target.value })
+                    setPersoonlijk({ ...persoonlijk, leerlingLabel: e.target.value })
                   }
                   placeholder="Sanne"
                   className={VELD_KLASSEN}
@@ -399,7 +419,7 @@ export default function NewReportPage() {
                     maxLength={MAX_AANTEKENINGEN}
                     value={input.aantekeningen}
                     onChange={(e) =>
-                      setInput({ ...input, aantekeningen: e.target.value })
+                      setPersoonlijk({ ...persoonlijk, aantekeningen: e.target.value })
                     }
                     placeholder="Bijv. doet goed mee, moeite met plannen, sterke mondelinge bijdrage, huiswerk 2x niet af"
                     className={`${VELD_KLASSEN} leading-relaxed`}
@@ -430,7 +450,9 @@ export default function NewReportPage() {
                       legend="Wat moet Facula schrijven?"
                       keuzes={OUTPUT_TYPES}
                       waarde={input.outputType}
-                      onChange={(waarde) => setInput({ ...input, outputType: waarde })}
+                      onChange={(waarde) =>
+                        setInstellingen({ ...instellingen, outputType: waarde })
+                      }
                     />
                   </div>
 
@@ -440,7 +462,9 @@ export default function NewReportPage() {
                       hulptekst="Je kunt de tekst daarna nog zelf bijschaven."
                       keuzes={TONEN}
                       waarde={input.toon}
-                      onChange={(waarde) => setInput({ ...input, toon: waarde })}
+                      onChange={(waarde) =>
+                        setInstellingen({ ...instellingen, toon: waarde })
+                      }
                       kolommen={3}
                     />
                   </div>

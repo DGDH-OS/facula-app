@@ -103,13 +103,28 @@
   --focus-buiten: var(--color-marine);
 }
 
-html {
-  /*
-   * De app-balk is sticky. Zonder scroll-padding schuift de browser een
-   * element dat via toetsenbord of anker-link focus krijgt onder die
-   * balk (WCAG 2.4.11).
-   */
-  scroll-padding-top: 6.5rem;
+/*
+ * De app-balk plakt alleen mee op een scherm dat er ruimte voor heeft.
+ * Op 320px breed of bij 400% zoom kost een vastgezette balk een groot
+ * deel van het venster en kan hij een element met focus afdekken, ook
+ * mét scroll-padding (WCAG 2.4.11, 1.4.10). Daar scrollt hij dus gewoon
+ * mee weg. Vanaf 48rem breed en 32rem hoog plakt hij wel, en dan zorgt
+ * scroll-padding-top dat een element dat via Tab of een anker focus
+ * krijgt niet onder de balk verdwijnt.
+ */
+.app-balk {
+  position: static;
+}
+
+@media (min-width: 48rem) and (min-height: 32rem) {
+  .app-balk {
+    position: sticky;
+    top: 0;
+  }
+
+  html {
+    scroll-padding-top: 6.5rem;
+  }
 }
 
 body {

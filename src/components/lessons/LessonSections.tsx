@@ -24,6 +24,23 @@ function RefreshIcon({ spinning }: { spinning: boolean }) {
   );
 }
 
+/**
+ * Sleutel van één sectiekaart, met de inhoud erin verwerkt. Verandert de
+ * sectie van buitenaf (een versie terugzetten, of een regenerate), dan
+ * krijgt de kaart een nieuwe sleutel en dus een verse `draft` uit de
+ * props. Zonder dat zou de kaart de oude tekst in zijn lokale state
+ * houden en die bij "Bewaar dit onderdeel" over de teruggezette versie
+ * heen schrijven.
+ */
+function sectieSleutel(sectionIndex: number, section: LessonSection): string {
+  const tekst = section.titel + "\n" + section.inhoud.join("\n");
+  let hash = 5381;
+  for (let i = 0; i < tekst.length; i++) {
+    hash = ((hash << 5) + hash + tekst.charCodeAt(i)) | 0;
+  }
+  return `${sectionIndex}-${hash}`;
+}
+
 function SectionCard({
   lessonId,
   partIndex,
@@ -56,8 +73,9 @@ function SectionCard({
         throw new Error(d?.error ?? "Regenereren mislukt.");
       }
       const data = await res.json();
+      // Geen setDraft: de nieuwe inhoud gaat naar boven, de kaart krijgt
+      // daardoor een nieuwe sleutel en leest zijn draft opnieuw uit de props.
       onUpdate(data.inhoud);
-      setDraft(data.inhoud.join("\n"));
     } catch (err) {
       setFout(err instanceof Error ? err.message : "Er ging iets mis.");
     } finally {
@@ -225,7 +243,7 @@ export function LessonSections({
           <div className="mt-4 space-y-4">
             {deel.secties.map((sectie, sectionIndex) => (
               <SectionCard
-                key={sectionIndex}
+                key={sectieSleutel(sectionIndex, sectie)}
                 lessonId={lessonId}
                 partIndex={partIndex}
                 sectionIndex={sectionIndex}

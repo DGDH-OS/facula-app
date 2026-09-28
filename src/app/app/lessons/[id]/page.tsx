@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ExportPptxButton } from "@/components/lessons/ExportPptxButton";
@@ -42,10 +43,12 @@ export default async function LessonDetailPage({
   return (
     <div className="mx-auto max-w-3xl">
       {/*
-        Eén ding staat hier voorop: de les downloaden. De titel vertelt welke
-        les je voor je hebt, daaronder staat precies één hoofdknop en één
-        zijweg ("Maak een nieuwe les"). Aanpassen en opnieuw maken zitten bij
-        het onderdeel zelf, verderop op de pagina, waar ze thuishoren.
+        Eén ding staat hier voorop: de les downloaden (brief 10.8). Daarnaast
+        twee secundaire wegen terug naar de wizard, mét de invoer van deze les:
+        "Pas aan" opent stap 1 om iets te veranderen, "Maak opnieuw" springt
+        naar het overzicht in stap 2. Geen van beide genereert uit zichzelf:
+        de docent drukt zelf op "Maak de les". Aanpassen per onderdeel zit
+        verderop op de pagina, bij het onderdeel zelf.
       */}
       <header>
         <h1 className="max-w-[70ch] font-display text-3xl text-marine">
@@ -69,17 +72,35 @@ export default async function LessonDetailPage({
           </div>
         )}
 
-        <div className="mt-6 flex flex-col gap-3 border-t-2 border-lijn pt-6 sm:flex-row sm:items-start">
+        <div className="mt-6 flex flex-col gap-3 border-t-2 border-lijn pt-6 sm:flex-row sm:flex-wrap sm:items-start">
           <ExportPptxButton lessonId={rij.id} />
           <ButtonLink
-            href="/app/lessons/new"
+            href={`/app/lessons/new?van=${rij.id}`}
             variant="secondary"
             volleBreedte
             className="sm:w-auto"
           >
-            Maak een nieuwe les
+            Pas aan
+          </ButtonLink>
+          <ButtonLink
+            href={`/app/lessons/new?van=${rij.id}&stap=2`}
+            variant="secondary"
+            volleBreedte
+            className="sm:w-auto"
+          >
+            Maak opnieuw
           </ButtonLink>
         </div>
+
+        <p className="mt-4 text-base text-tekst">
+          <Link
+            href="/app/lessons/new"
+            className="font-semibold text-marine underline underline-offset-4"
+          >
+            Maak een nieuwe les
+          </Link>{" "}
+          met een ander leerdoel.
+        </p>
       </header>
 
       <LessonSections lessonId={rij.id} onderdelen={output.onderdelen} />
