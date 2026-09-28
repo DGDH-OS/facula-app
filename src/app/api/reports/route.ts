@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ReportInput, RapportOutputType, RapportToon } from "@/lib/types";
 import { genereerRapportTekst } from "@/lib/report-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
+import { quotaLimitBoodschap, saveWithQuota } from "@/lib/quota";
 import { limitString, readBodyWithLimit } from "@/lib/validation";
 
 const OUTPUT_TYPES: RapportOutputType[] = ["rapporttekst", "oudergesprek", "oudermail"];
@@ -62,17 +62,9 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const paid = await isPaidSubscriber(supabase, user.id);
-    if (!paid) {
-      const usage = await checkAndIncrementUsage(supabase, user.id, "reports");
-      if (!usage.allowed) {
-        return NextResponse.json(
-          { error: quotaLimitBoodschap("reports") },
-          { status: 402 }
-        );
-      }
-    }
-
+    // Zelfde volgorde als bij een toets: genereerRapportTekst() is lokaal en
+    // kost niets, dus een voorcheck op het quotum spaart niets uit. De limiet
+    // valt in saveWithQuota(), samen met de insert in één transactie.
     const rapport = genereerRapportTekst(input);
     const output = {
       id: rapport.id,
@@ -81,16 +73,15 @@ export async function POST(request: NextRequest) {
       guardrail: rapport.guardrail,
     };
 
-    const { data: rij, error } = await supabase
-      .schema("facula")
-      .from("reports")
-      .insert({ user_id: user.id, input, output })
-      .select("id, created_at")
-      .single();
+    const opslag = await saveWithQuota(supabase, "reports", input, output);
+    if (opslag.quotaExceeded) {
+      return NextResponse.json(
+        { error: quotaLimitBoodschap("reports") },
+        { status: 402 }
+      );
+    }
 
-    if (error) throw error;
-
-    return NextResponse.json({ id: rij.id, createdAt: rij.created_at, report: rapport });
+    return NextResponse.json({ id: opslag.id, createdAt: opslag.createdAt, report: rapport });
   } catch (err) {
     console.error("Rapport genereren/opslaan mislukt", err);
     return NextResponse.json(

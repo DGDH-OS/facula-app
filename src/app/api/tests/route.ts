@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
+import { quotaLimitBoodschap, saveWithQuota } from "@/lib/quota";
 import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
@@ -80,17 +80,11 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const paid = await isPaidSubscriber(supabase, user.id);
-    if (!paid) {
-      const usage = await checkAndIncrementUsage(supabase, user.id, "tests");
-      if (!usage.allowed) {
-        return NextResponse.json(
-          { error: quotaLimitBoodschap("tests") },
-          { status: 402 }
-        );
-      }
-    }
-
+    // Eerst genereren, dan opslaan. Anders dan bij een les kost dat hier geen
+    // AI-aanroep: genereerToets() is een lokale functie, dus een voorcheck op
+    // het quotum zou niets uitsparen. De limiet valt in saveWithQuota(), dat
+    // controleren, opslaan en tellen in één databasetransactie doet — zodat er
+    // geen toets van het quotum af kan zonder dat de toets er ook echt staat.
     const toets = genereerToets(input);
     const output = {
       id: toets.id,
@@ -101,16 +95,15 @@ export async function POST(request: NextRequest) {
       tijdsduur: toets.tijdsduur,
     };
 
-    const { data: rij, error } = await supabase
-      .schema("facula")
-      .from("tests")
-      .insert({ user_id: user.id, input, output })
-      .select("id, created_at")
-      .single();
+    const opslag = await saveWithQuota(supabase, "tests", input, output);
+    if (opslag.quotaExceeded) {
+      return NextResponse.json(
+        { error: quotaLimitBoodschap("tests") },
+        { status: 402 }
+      );
+    }
 
-    if (error) throw error;
-
-    return NextResponse.json({ id: rij.id, createdAt: rij.created_at, test: toets });
+    return NextResponse.json({ id: opslag.id, createdAt: opslag.createdAt, test: toets });
   } catch (err) {
     console.error("Toets genereren/opslaan mislukt", err);
     return NextResponse.json(

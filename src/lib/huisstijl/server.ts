@@ -93,12 +93,24 @@ export async function haalLogoBestand(
 }
 
 /**
+ * De enige twee objectnamen die een docent in de bucket school-logos kan
+ * hebben. Het storage-beleid (zie 20260928120000_facula_huisstijl.sql) staat
+ * exact deze twee toe, dus elk opruimpad weet precies wat het kan aantreffen
+ * en hoeft niet op een listing te vertrouwen om compleet te zijn.
+ */
+export function logoPaden(userId: string): string[] {
+  return [userId + "/logo.png", userId + "/logo.jpg"];
+}
+
+/**
  * Verwijdert één logo-object uit storage. Faalt stil met een log: dit wordt
- * gebruikt om een vervangen of uitgezet logo op te ruimen, waar de rij in de
- * database leidend is en een achtergebleven object hooguit ruimte kost.
+ * gebruikt om een vervangen logo op te ruimen, waar de rij in de database
+ * leidend is en een achtergebleven object hooguit ruimte kost.
  *
- * NIET gebruiken bij accountverwijdering: daar moet een mislukte verwijdering
- * juist hard falen, zie verwijderAlleLogoObjecten().
+ * NIET gebruiken waar een mislukte verwijdering iets betekent: bij het wissen
+ * van een logo (DELETE /api/huisstijl/logo) en bij accountverwijdering moet de
+ * aanroeper erop kunnen afgaan — zie verwijderLogoObjecten() en
+ * verwijderAlleLogoObjecten(), die een boolean teruggeven.
  */
 export async function verwijderLogoObject(
   supabase: SupabaseClient,
@@ -110,47 +122,95 @@ export async function verwijderLogoObject(
 }
 
 /**
- * Ruimt alles op wat er onder '<user_id>/' in de bucket school-logos staat.
+ * Verwijdert de opgegeven objecten en geeft terug of dat gelukt is.
  *
- * Bewust niet op logo_path uit de huisstijl-rij vertrouwen: die kent maar één
- * bestand, terwijl een eerdere upload (bijvoorbeeld een jpg die later door
- * een png vervangen is) een tweede object achtergelaten kan hebben. Bij het
- * verwijderen van een account moet de hele map leeg, niet alleen het laatst
- * bekende pad.
+ * Paden die niet bestaan zijn geen fout: storage.remove() meldt daar niets
+ * over, en dat is hier precies goed — een docent met alleen een png laat de
+ * jpg-naam simpelweg leeg.
+ */
+export async function verwijderLogoObjecten(
+  supabase: SupabaseClient,
+  paden: string[]
+): Promise<boolean> {
+  if (paden.length === 0) return true;
+  const { error } = await supabase.storage.from(LOGO_BUCKET).remove(paden);
+  if (error) {
+    console.error("Schoollogo's verwijderen mislukt", { paden, error });
+    return false;
+  }
+  return true;
+}
+
+/** Alle bestandsnamen onder '<user_id>/', paginerend tot de map uit is. */
+async function lijstLogoObjecten(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<string[] | null> {
+  const paginaGrootte = 100;
+  const paden: string[] = [];
+
+  for (let offset = 0; ; offset += paginaGrootte) {
+    const { data, error } = await supabase.storage
+      .from(LOGO_BUCKET)
+      .list(userId, { limit: paginaGrootte, offset });
+
+    if (error) {
+      console.error("Schoollogo-map uitlezen mislukt", error);
+      return null;
+    }
+
+    const items = data ?? [];
+    // Een item zonder id is een map, geen bestand. Die kunnen hier niet
+    // voorkomen (het storage-beleid staat alleen de twee namen uit
+    // logoPaden() toe), maar remove() zou er wel op stukgaan.
+    for (const item of items) {
+      if (item.id !== null) paden.push(userId + "/" + item.name);
+    }
+
+    if (items.length < paginaGrootte) return paden;
+
+    // Vangnet tegen een listing die blijft doorlopen: bij dit aantal is er
+    // iets grondig anders aan de hand dan twee logo's.
+    if (offset > 10_000) {
+      console.error("Schoollogo-map onverwacht groot", { userId, aantal: paden.length });
+      return null;
+    }
+  }
+}
+
+/**
+ * Ruimt alles op wat er onder '<user_id>/' in de bucket school-logos staat, en
+ * controleert daarna dat de map echt leeg is.
  *
- * Geeft false terug als er ook maar iets misging. De aanroeper hoort de
- * accountverwijdering dan af te breken: de auth-user weggooien terwijl er nog
- * een bestand van die docent in de bucket staat, laat persoonsgegevens achter
- * die daarna door niemand meer op te ruimen zijn.
+ * Drie lagen, omdat één ervan kan tekortschieten:
+ *   1. de twee namen uit logoPaden() altijd expliciet verwijderen, ook als een
+ *      listing ze niet teruggeeft (eventual consistency, een lege
+ *      listing-respons, of een logo dat wél bestaat maar niet in de index
+ *      staat);
+ *   2. daarnaast de volledige, paginerende listing van de map, zodat iets wat
+ *      er buiten die twee namen om toch in staat mee weggaat;
+ *   3. een hercontrole na het verwijderen: pas als de map leeg IS, mag de
+ *      aanroeper verder.
+ *
+ * Geeft false terug als er ook maar iets misging of iets bleef staan. De
+ * aanroeper hoort de accountverwijdering dan af te breken: de auth-user
+ * weggooien terwijl er nog een bestand van die docent in de bucket staat, laat
+ * persoonsgegevens achter die daarna door niemand meer op te ruimen zijn.
  */
 export async function verwijderAlleLogoObjecten(
   supabase: SupabaseClient,
   userId: string
 ): Promise<boolean> {
-  const { data, error } = await supabase.storage
-    .from(LOGO_BUCKET)
-    .list(userId, { limit: 100 });
+  const gelijst = await lijstLogoObjecten(supabase, userId);
+  if (gelijst === null) return false;
 
-  if (error) {
-    console.error("Schoollogo-map uitlezen mislukt", error);
-    return false;
-  }
+  const paden = Array.from(new Set([...logoPaden(userId), ...gelijst]));
+  if (!(await verwijderLogoObjecten(supabase, paden))) return false;
 
-  // Een item zonder id is een map, geen bestand. Die kunnen hier niet
-  // voorkomen (het storage-beleid staat alleen '<uid>/logo.png' en
-  // '<uid>/logo.jpg' toe), maar remove() zou er wel op stukgaan.
-  const paden = (data ?? [])
-    .filter((item) => item.id !== null)
-    .map((item) => userId + "/" + item.name);
-
-  if (paden.length === 0) return true;
-
-  const { error: verwijderFout } = await supabase.storage
-    .from(LOGO_BUCKET)
-    .remove(paden);
-
-  if (verwijderFout) {
-    console.error("Schoollogo's verwijderen mislukt", verwijderFout);
+  const resterend = await lijstLogoObjecten(supabase, userId);
+  if (resterend === null) return false;
+  if (resterend.length > 0) {
+    console.error("Schoollogo-map niet leeg na verwijderen", { userId, resterend });
     return false;
   }
   return true;

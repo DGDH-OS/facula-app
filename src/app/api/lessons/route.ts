@@ -3,12 +3,11 @@ import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
 import { genereerLesMetAi } from "@/lib/ai/generate-lesson";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
-  checkAndIncrementUsage,
   FREE_QUOTA_PER_MONTH,
   getCurrentUsage,
   isPaidSubscriber,
   quotaLimitBoodschap,
-  refundUsage,
+  saveWithQuota,
 } from "@/lib/quota";
 import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
@@ -97,23 +96,20 @@ export async function POST(request: NextRequest) {
     aantalLessen,
   };
 
-  // Staat aan zodra de teller daadwerkelijk is opgehoogd, zodat het foutpad
-  // hieronder weet dat er iets terug te boeken valt.
-  let quotumAfgeboekt = false;
+  // Het quotum kost de docent pas iets als er ook echt een les is opgeslagen.
+  // Daarom twee stappen:
+  //   1. een goedkope leescheck vóór de AI-aanroep — wie al over de limiet is,
+  //      hoort geen modelaanroep te kosten. Deze check hoogt niets op en is
+  //      bewust niet bindend;
+  //   2. saveWithQuota(): limiet controleren, opslaan en de teller ophogen in
+  //      één databasetransactie. Alleen die is bestand tegen twee
+  //      gelijktijdige aanvragen door dezelfde laatste vrije plek, en er kan
+  //      geen les van het quotum af zonder dat de les er ook echt staat.
+  // Betaalde abonnees lopen door geen limiet: stap 1 wordt overgeslagen en
+  // stap 2 slaat alleen op zonder te tellen.
   const paid = await isPaidSubscriber(supabase, user.id);
 
   try {
-    // Het quotum kost de docent pas iets als er ook echt een les uitkomt.
-    // Daarom drie stappen:
-    //   1. een leescheck vóór de AI-aanroep — wie al over de limiet is, hoort
-    //      geen modelaanroep te kosten;
-    //   2. de bindende, atomaire check-en-verhoging na een geslaagde
-    //      generatie, want alleen die is bestand tegen twee gelijktijdige
-    //      aanvragen door dezelfde laatste vrije plek;
-    //   3. een terugboeking (refundUsage) als het opslaan daarna alsnog
-    //      mislukt, zodat een mislukte insert geen les van het quotum afhaalt.
-    // Betaalde abonnees lopen door geen van de drie stappen: die hebben geen
-    // quotum.
     if (!paid) {
       const verbruik = await getCurrentUsage(supabase, user.id);
       if (verbruik.lessons >= FREE_QUOTA_PER_MONTH) {
@@ -129,17 +125,6 @@ export async function POST(request: NextRequest) {
     // te zien of productie stil op de sjabloongenerator is teruggevallen.
     console.info("Les gegenereerd", { bron: les.bron, pogingen });
 
-    if (!paid) {
-      const usage = await checkAndIncrementUsage(supabase, user.id, "lessons");
-      if (!usage.allowed) {
-        return NextResponse.json(
-          { error: quotaLimitBoodschap("lessons") },
-          { status: 402 }
-        );
-      }
-      quotumAfgeboekt = true;
-    }
-
     const output: Omit<GeneratedLesson, "input"> = {
       id: les.id,
       createdAt: les.createdAt,
@@ -151,21 +136,16 @@ export async function POST(request: NextRequest) {
       ...(les.model ? { model: les.model } : {}),
     };
 
-    const { data: rij, error } = await supabase
-      .schema("facula")
-      .from("lessons")
-      .insert({ user_id: user.id, input, output })
-      .select("id, created_at")
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({ id: rij.id, createdAt: rij.created_at, lesson: les });
-  } catch (err) {
-    // De les is er niet gekomen: dan hoort hij ook niet van het quotum af.
-    if (quotumAfgeboekt) {
-      await refundUsage(supabase, user.id, "lessons");
+    const opslag = await saveWithQuota(supabase, "lessons", input, output);
+    if (opslag.quotaExceeded) {
+      return NextResponse.json(
+        { error: quotaLimitBoodschap("lessons") },
+        { status: 402 }
+      );
     }
+
+    return NextResponse.json({ id: opslag.id, createdAt: opslag.createdAt, lesson: les });
+  } catch (err) {
     console.error("Les genereren/opslaan mislukt", err);
     return NextResponse.json(
       { error: "Er ging iets mis bij het genereren van de les." },

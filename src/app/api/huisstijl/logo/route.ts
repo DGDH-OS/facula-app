@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { haalHuisstijl, LOGO_BUCKET, verwijderLogoObject } from "@/lib/huisstijl/server";
+import {
+  haalHuisstijl,
+  LOGO_BUCKET,
+  logoPaden,
+  verwijderLogoObject,
+  verwijderLogoObjecten,
+} from "@/lib/huisstijl/server";
 import { bestandsExtensie, isToegestaanLogoType, maakLogo } from "@/lib/huisstijl/logo";
 import { normaliseerLogo } from "@/lib/huisstijl/normalize-logo";
 import { MAX_LOGO_BYTES, resolveHuisstijl } from "@/lib/huisstijl/themes";
@@ -23,6 +29,14 @@ import { zelfdeOrigin } from "@/lib/validation";
  */
 
 const MAX_UPLOAD_BYTES = MAX_LOGO_BYTES;
+
+/**
+ * Grens voor de aangekondigde content-length, vóór er een byte gelezen wordt.
+ * Iets boven MAX_UPLOAD_BYTES omdat een multipart-body naast het bestand ook
+ * de veldnamen en scheidingsregels meestuurt: ~2,2 MB laat een logo van 2 MB
+ * ruim passeren en weigert de rest meteen.
+ */
+const MAX_AANGEKONDIGDE_BYTES = Math.round(MAX_LOGO_BYTES * 1.1);
 
 /**
  * GET /api/huisstijl/logo
@@ -88,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   // Grootte eerst uit de header, vóór er een byte gelezen wordt.
   const aangekondigd = Number(request.headers.get("content-length"));
-  if (Number.isFinite(aangekondigd) && aangekondigd > MAX_UPLOAD_BYTES * 2) {
+  if (Number.isFinite(aangekondigd) && aangekondigd > MAX_AANGEKONDIGDE_BYTES) {
     return NextResponse.json({ error: "Het bestand is te groot." }, { status: 413 });
   }
 
@@ -139,8 +153,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const huidige = await haalHuisstijl(supabase, user.id);
+  // Het pad is volledig bepaald door de gebruiker en het bestandstype:
+  // '<uid>/logo.png' of '<uid>/logo.jpg', de enige twee namen die het
+  // storage-beleid toelaat. Dat maakt opruimen eenvoudig: het nieuwe object
+  // overschrijft zichzelf (upsert), en het enige dat kán achterblijven is het
+  // object met de ándere extensie.
   const pad = user.id + "/logo." + bestandsExtensie(genormaliseerd.mimeType);
+  const anderPad = logoPaden(user.id).find((p) => p !== pad) ?? null;
 
   const { error: uploadFout } = await supabase.storage
     .from(LOGO_BUCKET)
@@ -157,10 +176,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Volgorde: eerst uploaden, dan het pad in de database zetten, en pas
-  // daarna het oude object weggooien. Andersom (eerst het oude weg) zou een
-  // mislukte database-update een docent zonder logo achterlaten terwijl zijn
-  // huisstijl nog naar het verdwenen bestand wijst.
+  // Volgorde: eerst uploaden, dan het pad in de database zetten, en pas daarna
+  // opruimen. Andersom (eerst het oude weg) zou een mislukte database-update
+  // een docent zonder logo achterlaten terwijl zijn huisstijl nog naar het
+  // verdwenen bestand wijst.
   const { data, error } = await supabase
     .schema("facula")
     .from("huisstijl")
@@ -172,11 +191,21 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error("Logopad opslaan mislukt", error);
-    // De rij verwijst niet naar dit object, dus het hoort er niet te blijven
-    // staan. Alleen als het nieuwe pad hetzelfde is als het opgeslagen pad
-    // blijft het staan: dan is het het bestand waar de huisstijl nog naar
-    // wijst, en zou opruimen juist een werkend logo slopen.
-    if (pad !== huidige.logoPath) {
+    // Onze rij verwijst niet naar dit object, dus het hoort er niet te blijven
+    // staan. Maar eerst opnieuw lezen: een gelijktijdige upload van hetzelfde
+    // bestandstype kan het pad wél hebben opgeslagen, en dan zou opruimen een
+    // werkend logo slopen. Lukt dat lezen niet, dan blijft het object staan:
+    // een verweesd object kost ruimte en gaat bij de volgende upload of bij
+    // accountverwijdering mee, een verkeerd verwijderd object kost een docent
+    // zijn logo.
+    const { data: rij, error: leesFout } = await supabase
+      .schema("facula")
+      .from("huisstijl")
+      .select("logo_path")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!leesFout && rij?.logo_path !== pad) {
       await verwijderLogoObject(supabase, pad);
     }
     return NextResponse.json(
@@ -186,9 +215,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Een png die een jpg vervangt laat het oude object achter: dat heeft een
-  // andere extensie en wordt dus niet overschreven.
-  if (huidige.logoPath && huidige.logoPath !== pad) {
-    await verwijderLogoObject(supabase, huidige.logoPath);
+  // andere extensie en is dus niet overschreven. Alleen dat andere object mag
+  // weg, en alleen als de rij nu echt naar het nieuwe pad wijst — het pad dat
+  // we net schreven, raken we nooit aan.
+  if (data.logo_path === pad && anderPad) {
+    await verwijderLogoObject(supabase, anderPad);
   }
 
   return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
@@ -212,11 +243,22 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
-  const huidige = await haalHuisstijl(supabase, user.id);
+  // Eerst het object weg, dan pas het pad uit de rij. Andersom zou een
+  // mislukte verwijdering een logo in de bucket laten staan waar de docent
+  // niet meer bij kan en niemand meer naar kijkt: hij denkt dat het weg is,
+  // terwijl het merk van zijn school er nog ligt.
+  //
+  // Beide toegestane namen gaan eruit, niet alleen het pad uit de rij: een
+  // eerdere upload met de andere extensie kan een tweede object hebben
+  // achtergelaten, en "verwijder mijn logo" hoort dat ook mee te nemen.
+  const objectenWeg = await verwijderLogoObjecten(supabase, logoPaden(user.id));
+  if (!objectenWeg) {
+    return NextResponse.json(
+      { error: "Het logo kon niet worden verwijderd. Probeer het later opnieuw." },
+      { status: 500 }
+    );
+  }
 
-  // Zelfde volgorde-gedachte als bij de upload: eerst de database, dan pas het
-  // object. Zou het object er eerst uit gaan en de update daarna mislukken,
-  // dan wees de huisstijl naar een bestand dat niet meer bestaat.
   const { data, error } = await supabase
     .schema("facula")
     .from("huisstijl")
@@ -233,8 +275,6 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-
-  await verwijderLogoObject(supabase, huidige.logoPath);
 
   return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
 }

@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Fase B — gratis-quotum per categorie per kalendermaand. Eén genoemde
  * constante i.p.v. verspreide magic numbers, zodat een limietwijziging op
  * één plek gebeurt. Betaalde abonnees (facula.profiles.subscription_status
- * === 'active') omzeilen dit quotum volledig — zie isPaidSubscriber().
+ * === 'active') omzeilen dit quotum volledig — zie saveWithQuota(), dat die
+ * status database-side leest.
  */
 export const FREE_QUOTA_PER_MONTH = 5;
 
@@ -26,7 +27,9 @@ export function quotaLimitBoodschap(kind: UsageKind): string {
 
 /**
  * Vraagt op of de ingelogde gebruiker een actief betaald abonnement heeft.
- * Betaalde abonnees slaan de quota-check in checkAndIncrementUsage() over.
+ * Alleen voor de goedkope voorcheck in de routes: wie betaalt, hoeft daar
+ * niet tegen de limiet aangehouden te worden. De bindende beslissing valt in
+ * saveWithQuota(), die het abonnement zelf opnieuw leest.
  */
 export async function isPaidSubscriber(
   supabase: SupabaseClient,
@@ -43,73 +46,77 @@ export async function isPaidSubscriber(
   return data.subscription_status === "active";
 }
 
-export interface UsageCheckResult {
-  allowed: boolean;
+export interface SaveWithQuotaResult {
+  /** True als de limiet vol was: er is niets opgeslagen en niets geteld. */
+  quotaExceeded: boolean;
+  /** Id van de nieuwe rij, of null als quotaExceeded. */
+  id: string | null;
+  /** created_at van de nieuwe rij, of null als quotaExceeded. */
+  createdAt: string | null;
+  /** Stand van de teller na deze aanroep (bij abonnees ongewijzigd). */
   newCount: number;
 }
 
 /**
- * Atomaire quota-check + increment via de facula.try_increment_usage-RPC
- * (SELECT ... FOR UPDATE in de database, zie migratie facula_fase_b_quota_
- * and_subscriptions). Dit voorkomt race conditions bij gelijktijdige
- * requests van dezelfde gebruiker — de check en de verhoging gebeuren in
- * één databasetransactie, nooit als aparte read-then-write vanuit deze
- * route/functie.
+ * Slaat een gegenereerde les/toets/rapport op en verrekent het quotum in
+ * dezelfde databasetransactie, via facula.save_with_quota (zie migratie
+ * 20260928160000_facula_quota_atomic_save.sql).
  *
- * Betaalde abonnees (isPaidSubscriber === true) worden hier NIET doorheen
- * gestuurd door de aanroeper — zie gebruik in de API-routes: als de
- * gebruiker betaalt, wordt deze functie helemaal niet aangeroepen en wordt
- * er ook niet geteld (geen quotum voor abonnees).
+ * Waarom dit één aanroep is en geen check-dan-insert: de teller en de
+ * opgeslagen rij horen niet uit elkaar te kunnen lopen. De RPC vergrendelt de
+ * teller-rij van de lopende maand, controleert de limiet, doet de insert en
+ * hoogt daarna op. Mislukt de insert, dan rolt de verhoging mee terug — er
+ * valt dus niets terug te boeken, en twee gelijktijdige aanvragen kunnen niet
+ * samen door dezelfde laatste vrije plek.
+ *
+ * De user-id staat bewust niet in de parameters: de RPC leest auth.uid() uit
+ * de sessie van de meegegeven client. Of de docent betaalt, bepaalt de RPC
+ * ook zelf uit facula.profiles.
  */
-export async function checkAndIncrementUsage(
+export async function saveWithQuota(
   supabase: SupabaseClient,
-  userId: string,
-  kind: UsageKind
-): Promise<UsageCheckResult> {
+  kind: UsageKind,
+  input: unknown,
+  output: unknown
+): Promise<SaveWithQuotaResult> {
   const { data, error } = await supabase
     .schema("facula")
-    .rpc("try_increment_usage", {
-      p_user_id: userId,
+    .rpc("save_with_quota", {
       p_kind: kind,
+      p_input: input,
+      p_output: output,
       p_limit: FREE_QUOTA_PER_MONTH,
     })
     .single();
 
   if (error || !data) {
-    // Fail-closed: als de quota-RPC zelf faalt, blokkeer de generatie
-    // liever dan een gebruiker onbeperkt door te laten genereren.
-    console.error("Quota-RPC try_increment_usage mislukt", error);
-    throw new Error("Quotum kon niet worden gecontroleerd.");
+    // Fail-closed, net als de oude quota-RPC: gaat dit mis, dan is er niets
+    // opgeslagen en niets geteld, en hoort de route een 500 te geven in
+    // plaats van te doen alsof het gelukt is.
+    console.error("save_with_quota mislukt", { kind, error });
+    throw new Error("Opslaan mislukt.");
   }
 
-  const row = data as { allowed: boolean; new_count: number };
-  return { allowed: row.allowed, newCount: row.new_count };
-}
+  const row = data as {
+    content_id: string | null;
+    content_created_at: string | null;
+    quota_exceeded: boolean;
+    new_count: number;
+  };
 
-/**
- * Boekt één eenheid terug die met checkAndIncrementUsage is afgeboekt, via
- * de facula.refund_usage-RPC. Bedoeld als compensatie: de teller gaat vóór
- * het opslaan omhoog (anders kunnen twee gelijktijdige aanvragen door
- * dezelfde laatste vrije plek), en als het opslaan daarna alsnog mislukt,
- * hoort de docent die les niet kwijt te zijn.
- *
- * Gooit bewust niet: dit draait in het foutpad van een route die toch al een
- * 500 teruggeeft. Een mislukte terugboeking mag die fout niet overschrijven,
- * hij hoort wel in de log te staan.
- */
-export async function refundUsage(
-  supabase: SupabaseClient,
-  userId: string,
-  kind: UsageKind
-): Promise<void> {
-  const { error } = await supabase
-    .schema("facula")
-    .rpc("refund_usage", { p_user_id: userId, p_kind: kind })
-    .single();
-
-  if (error) {
-    console.error("Quota-RPC refund_usage mislukt", { kind, error });
+  if (!row.quota_exceeded && (!row.content_id || !row.content_created_at)) {
+    // Kan alleen als de RPC iets anders teruggeeft dan zijn contract. Liever
+    // hier hard stoppen dan een les met een lege id naar de client sturen.
+    console.error("save_with_quota gaf geen id terug", { kind, row });
+    throw new Error("Opslaan mislukt.");
   }
+
+  return {
+    quotaExceeded: row.quota_exceeded,
+    id: row.content_id,
+    createdAt: row.content_created_at,
+    newCount: row.new_count,
+  };
 }
 
 export interface CurrentUsage {
