@@ -143,9 +143,14 @@ function SectionCard({
         </div>
       ) : (
         <>
-          <ul className="mt-3 space-y-2 text-base text-tekst">
+          {/* max-w-[70ch]: langer dan ongeveer 70 tekens verliest het oog de
+              volgende regel. text-base is 18px, de basismaat uit de brief. */}
+          <ul className="mt-3 max-w-[70ch] space-y-2 text-base text-tekst">
             {section.inhoud.map((regel, i) => (
-              <li key={i}>• {regel}</li>
+              <li key={i} className="flex gap-2">
+                <span aria-hidden>•</span>
+                <span>{regel}</span>
+              </li>
             ))}
           </ul>
           <button
@@ -178,6 +183,19 @@ export function LessonSections({
   onderdelen: LessonPart[];
 }) {
   const [onderdelen, setOnderdelen] = useState(initieel);
+  const [vorigeProps, setVorigeProps] = useState(initieel);
+
+  /*
+    Zet een versie terug, en de server stuurt via router.refresh() nieuwe
+    onderdelen mee. Zonder deze afstemming zou dit component zijn eigen
+    (oude) state blijven tonen en leek het terugzetten niet te werken. De
+    lokale state is nooit meer dan een kopie van wat er op de server staat,
+    dus hem gelijktrekken kan geen bewerking kwijtmaken.
+  */
+  if (initieel !== vorigeProps) {
+    setVorigeProps(initieel);
+    setOnderdelen(initieel);
+  }
 
   function updateSectie(partIndex: number, sectionIndex: number, inhoud: string[]) {
     setOnderdelen((prev) =>

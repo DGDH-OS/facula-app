@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { GeneratedLesson } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { InlineUndo } from "@/components/ui/InlineUndo";
 
 type LessonOutput = Omit<GeneratedLesson, "input">;
 
@@ -25,7 +27,7 @@ function formatTimestamp(iso: string): string {
 
 function VersionPreview({ output }: { output: LessonOutput }) {
   return (
-    <div className="mt-3 space-y-5 rounded-lg border-2 border-lijn bg-ivoor-deep p-5">
+    <div className="mt-3 max-w-[70ch] space-y-5 rounded-lg border-2 border-lijn bg-ivoor-deep p-5">
       <div>
         <p className="font-display text-xl text-marine">{output.titel}</p>
         {output.kernbegrippen.length > 0 && (
@@ -60,14 +62,17 @@ function VersionPreview({ output }: { output: LessonOutput }) {
 function VersionRow({
   lessonId,
   version,
+  onTerugzetten,
+  terugzettenBezig,
 }: {
   lessonId: string;
   version: VersionSummary;
+  onTerugzetten: () => void;
+  terugzettenBezig: boolean;
 }) {
   const [bekijken, setBekijken] = useState(false);
   const [detail, setDetail] = useState<VersionDetail | null>(null);
   const [laden, setLaden] = useState(false);
-  const [herstellen, setHerstellen] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
 
   const basisPad = "/api/lessons/" + lessonId + "/versions/" + version.versionNumber;
@@ -97,30 +102,6 @@ function VersionRow({
     }
   }
 
-  async function terugzetten() {
-    if (
-      !window.confirm(
-        `Les terugzetten naar versie ${version.versionNumber}? De huidige staat wordt zelf ook als versie bewaard.`
-      )
-    ) {
-      return;
-    }
-
-    setHerstellen(true);
-    setFout(null);
-    try {
-      const res = await fetch(basisPad + "/restore", { method: "POST" });
-      if (!res.ok) {
-        const d = await res.json().catch(() => null);
-        throw new Error(d?.error ?? "Terugzetten mislukt.");
-      }
-      window.location.reload();
-    } catch (err) {
-      setFout(err instanceof Error ? err.message : "Er ging iets mis.");
-      setHerstellen(false);
-    }
-  }
-
   return (
     <li className="rounded-xl border-2 border-lijn p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -140,8 +121,15 @@ function VersionRow({
           >
             {bekijken ? "Verberg deze versie" : "Bekijk deze versie"}
           </Button>
-          <Button variant="secondary" onClick={terugzetten} disabled={herstellen}>
-            {herstellen ? "Bezig met terugzetten..." : "Zet deze versie terug"}
+          {/* Geen disabled-knop tijdens het terugzetten (brief 10.3): de
+              knop blijft bereikbaar, een dubbele klik wordt in de ouder
+              met een ref tegengehouden. */}
+          <Button
+            variant="secondary"
+            onClick={onTerugzetten}
+            aria-busy={terugzettenBezig}
+          >
+            {terugzettenBezig ? "Bezig met terugzetten..." : "Zet deze versie terug"}
           </Button>
         </div>
       </div>
@@ -172,10 +160,27 @@ function VersionRow({
 }
 
 export function VersionHistory({ lessonId }: { lessonId: string }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [versions, setVersions] = useState<VersionSummary[] | null>(null);
   const [laden, setLaden] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
+  const [bezigMetVersie, setBezigMetVersie] = useState<number | null>(null);
+  const [undo, setUndo] = useState<{ melding: string; snapshot: number } | null>(
+    null
+  );
+  const [status, setStatus] = useState<string | null>(null);
+  const loopt = useRef(false);
+
+  async function haalVersies(): Promise<VersionSummary[]> {
+    const res = await fetch("/api/lessons/" + lessonId + "/versions");
+    if (!res.ok) {
+      const d = await res.json().catch(() => null);
+      throw new Error(d?.error ?? "Versiegeschiedenis ophalen mislukt.");
+    }
+    const data = await res.json();
+    return data.versions as VersionSummary[];
+  }
 
   async function toggleOpen() {
     if (open) {
@@ -188,17 +193,69 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
     setLaden(true);
     setFout(null);
     try {
-      const res = await fetch("/api/lessons/" + lessonId + "/versions");
-      if (!res.ok) {
-        const d = await res.json().catch(() => null);
-        throw new Error(d?.error ?? "Versiegeschiedenis ophalen mislukt.");
-      }
-      const data = await res.json();
-      setVersions(data.versions);
+      setVersions(await haalVersies());
     } catch (err) {
       setFout(err instanceof Error ? err.message : "Er ging iets mis.");
     } finally {
       setLaden(false);
+    }
+  }
+
+  /*
+    Terugzetten vraagt niets vooraf, maar biedt achteraf "Ongedaan maken"
+    (brief 10.6), in plaats van de oude confirm-dialoog. Dat kan zonder één
+    regel API-wijziging: de restore-route bewaart de staat van vóór het
+    terugzetten zelf als nieuwe versie, en dat is altijd het hoogste
+    versienummer in de lijst die we er direct na ophalen. Die versie
+    terugzetten ís de undo.
+
+    `router.refresh()` haalt de lespagina zelf opnieuw op, zodat de titel en
+    de onderdelen de teruggezette versie tonen zonder volledige herlading —
+    en zonder de undo-melding kwijt te raken, wat met een reload wel gebeurde.
+  */
+  async function zetTerug(versionNumber: number, alsUndo = false) {
+    if (loopt.current) return;
+    loopt.current = true;
+
+    setBezigMetVersie(versionNumber);
+    setFout(null);
+    setStatus(null);
+    setUndo(null);
+
+    try {
+      const res = await fetch(
+        "/api/lessons/" + lessonId + "/versions/" + versionNumber + "/restore",
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        throw new Error(d?.error ?? "Terugzetten mislukt.");
+      }
+
+      const lijst = await haalVersies();
+      setVersions(lijst);
+      router.refresh();
+
+      const snapshot = lijst.reduce(
+        (hoogste, v) => Math.max(hoogste, v.versionNumber),
+        0
+      );
+
+      if (alsUndo) {
+        setStatus("De les staat weer zoals hij was.");
+      } else if (snapshot > 0) {
+        setUndo({
+          melding: `De les is teruggezet naar versie ${versionNumber}.`,
+          snapshot,
+        });
+      } else {
+        setStatus(`De les is teruggezet naar versie ${versionNumber}.`);
+      }
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : "Er ging iets mis.");
+    } finally {
+      loopt.current = false;
+      setBezigMetVersie(null);
     }
   }
 
@@ -214,6 +271,33 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
         <span aria-hidden>{open ? "▾" : "▸"}</span>
       </button>
 
+      {/* Undo en foutmelding staan buiten het inklapbare deel: ze moeten
+          ook zichtbaar blijven als de lijst daarna dichtgeklapt wordt. */}
+      {undo && (
+        <div className="mt-4">
+          <InlineUndo
+            melding={undo.melding}
+            onUndo={() => zetTerug(undo.snapshot, true)}
+          />
+        </div>
+      )}
+
+      <p
+        aria-live="polite"
+        className="mt-4 max-w-[70ch] text-base text-tekst empty:hidden"
+      >
+        {status ?? ""}
+      </p>
+
+      {fout && (
+        <p
+          role="alert"
+          className="mt-4 max-w-[70ch] rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
+        >
+          {fout}
+        </p>
+      )}
+
       {/* aria-live staat per statusregel, niet om de hele lijst: anders
           wordt elke versie voorgelezen zodra de lijst binnenkomt. */}
       {open && (
@@ -221,16 +305,8 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
           <p aria-live="polite" className="text-base text-tekst-zacht empty:hidden">
             {laden ? "Bezig met ophalen..." : ""}
           </p>
-          {fout && (
-            <p
-              aria-live="polite"
-              className="rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
-            >
-              {fout}
-            </p>
-          )}
           {versions && versions.length === 0 && (
-            <p className="text-base text-tekst-zacht">
+            <p className="max-w-[70ch] text-base text-tekst-zacht">
               Nog geen eerdere versies. Deze les is nog niet aangepast of opnieuw
               gemaakt.
             </p>
@@ -238,7 +314,13 @@ export function VersionHistory({ lessonId }: { lessonId: string }) {
           {versions && versions.length > 0 && (
             <ul className="space-y-3">
               {versions.map((v) => (
-                <VersionRow key={v.versionNumber} lessonId={lessonId} version={v} />
+                <VersionRow
+                  key={v.versionNumber}
+                  lessonId={lessonId}
+                  version={v}
+                  onTerugzetten={() => zetTerug(v.versionNumber)}
+                  terugzettenBezig={bezigMetVersie === v.versionNumber}
+                />
               ))}
             </ul>
           )}

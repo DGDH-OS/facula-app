@@ -1,18 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ProgressNotice } from "@/components/ui/ProgressNotice";
 
 /**
- * Verplaatst vanuit de generatie-flow (`/app/lessons/new`) naar de
- * les-detailpagina: export hoort bij de opgeslagen les, niet bij het
- * generatie-moment zelf.
+ * De enige hoofdknop op de lesdetailpagina: downloaden als PowerPoint.
+ *
+ * De knop blijft bewust actief tijdens het maken (brief 10.3: liever geen
+ * disabled knoppen). Een tweede klik wordt daarom in code tegengehouden met
+ * een ref: state loopt een render achter, een ref niet, dus een dubbelklik
+ * kan hier nooit twee downloads starten.
+ *
+ * De exportlogica zelf (fetch, Content-Disposition, blob-download) is
+ * ongewijzigd — alleen de begeleiding eromheen is nieuw.
  */
 export function ExportPptxButton({ lessonId }: { lessonId: string }) {
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
+  const loopt = useRef(false);
 
   async function exporteer() {
+    if (loopt.current) return;
+    loopt.current = true;
+
     setBezig(true);
     setFout(null);
 
@@ -38,24 +49,45 @@ export function ExportPptxButton({ lessonId }: { lessonId: string }) {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setFout(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
+      setFout(
+        err instanceof Error
+          ? err.message
+          : "Het downloaden lukte niet. Probeer het opnieuw."
+      );
     } finally {
+      loopt.current = false;
       setBezig(false);
     }
   }
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <Button variant="primary" onClick={exporteer} disabled={bezig}>
+    <div className="flex flex-col gap-3">
+      <Button
+        variant="primary"
+        onClick={exporteer}
+        aria-busy={bezig}
+        volleBreedte
+        className="sm:w-auto"
+      >
         {bezig ? "Bezig met maken..." : "Download als PowerPoint"}
       </Button>
+
+      <ProgressNotice bezig={bezig} tekst="Je PowerPoint wordt gemaakt..." />
+
       {fout && (
-        <p
-          aria-live="polite"
-          className="rounded-lg border-2 border-fout-tekst bg-fout-vlak px-4 py-3 text-base font-medium text-fout-tekst"
+        /* role="alert" in plaats van aria-live: een mislukte download moet
+           meteen voorgelezen worden, niet pas als de gebruiker uitgepraat is. */
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4"
         >
-          {fout}
-        </p>
+          <p className="max-w-[70ch] text-base font-medium text-fout-tekst">{fout}</p>
+          <div>
+            <Button variant="secondary" onClick={exporteer}>
+              Probeer opnieuw
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
