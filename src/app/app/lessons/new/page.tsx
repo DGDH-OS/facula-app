@@ -325,7 +325,7 @@ export default function NewLessonPage() {
             <Field
               label="Leerdoel"
               verplicht
-              hulptekst="Schrijf in je eigen woorden wat leerlingen na de les kunnen."
+              hulptekst="Schrijf in je eigen woorden wat leerlingen na de les kunnen. Je mag 1 tot 5 leerdoelen invullen, elk op een eigen regel."
               fout={fouten.leerdoel}
             >
               {(ids) => (
@@ -533,7 +533,17 @@ export default function NewLessonPage() {
               />
             </dl>
 
-            <ProgressNotice bezig={bezig} />
+            {/* Een AI-les kost ongeveer 30 seconden (gemeten, twee lesdelen).
+                De verwachting hoort er dan bij te staan, anders lijkt een
+                stille pagina van een halve minuut een fout. De geduldregel
+                schuift mee naar 60 seconden, zodat die niet bij elke normale
+                generatie vuurt maar wel bij een terugval op het tweede
+                model. */}
+            <ProgressNotice
+              bezig={bezig}
+              tekst="Facula schrijft je les. Dit duurt ongeveer 30 seconden."
+              geduldNaMs={60_000}
+            />
 
             {/* role="alert" meldt de fout zodra hij verschijnt, zonder dat
                 de focus hoeft te verspringen; de focus gaat daarna naar de
@@ -557,7 +567,7 @@ export default function NewLessonPage() {
               disabled={bezig}
               onClick={genereer}
             >
-              {bezig ? "Bezig met maken..." : fout ? "Probeer opnieuw" : "Maak de les"}
+              {bezig ? "Facula schrijft je les..." : fout ? "Probeer opnieuw" : "Maak de les"}
             </Button>
           </div>
         )}

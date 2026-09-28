@@ -19,6 +19,14 @@ export interface LessonSection {
   titel: string;
   inhoud: string[];
   duur?: number; // minuten, optioneel
+  /**
+   * Toelichting voor de docent, niet voor de slide. Optioneel omdat de
+   * sjabloongenerator die niet levert en oudere opgeslagen lessen hem niet
+   * hebben. Beide exportroutes kappen `inhoud` af op 7 woorden per bullet
+   * (PRESENTATIE-METHODIEK.md); een volledige controlevraag met antwoord
+   * hoort daarom hier en niet in `inhoud`.
+   */
+  docentnotities?: string[];
 }
 
 export interface LessonPart {
@@ -26,6 +34,12 @@ export interface LessonPart {
   titel: string;
   duur: number;
   secties: LessonSection[];
+  /**
+   * De leerdoelen die in dít lesdeel aan bod komen. Optioneel: de
+   * sjabloongenerator verdeelt alleen kernbegrippen, de AI-generator
+   * verdeelt ook de leerdoelen (1 tot 3 per les).
+   */
+  leerdoelen?: string[];
 }
 
 export interface GeneratedLesson {
@@ -35,7 +49,23 @@ export interface GeneratedLesson {
   titel: string;
   kernbegrippen: string[];
   onderdelen: LessonPart[];
+  /**
+   * Alle leerdoelen die de docent in het vrije tekstveld invoerde, opgesplitst
+   * in losse, toetsbare doelen (max 5). Optioneel: bestaande lessen en de
+   * sjabloongenerator hebben dit niet.
+   */
+  leerdoelen?: string[];
+  /**
+   * Waar de inhoud vandaan komt: `"ai"` (Vertex AI) of `"sjabloon"` (de
+   * deterministische genereerLes-fallback). Optioneel zodat oudere
+   * opgeslagen lessen geldig blijven.
+   */
+  bron?: LessonBron;
+  /** Het model dat de les schreef, bijv. "gemini-3.5-flash". Alleen bij bron "ai". */
+  model?: string;
 }
+
+export type LessonBron = "ai" | "sjabloon";
 
 export type VraagType = "meerkeuze" | "open" | "invulvraag";
 

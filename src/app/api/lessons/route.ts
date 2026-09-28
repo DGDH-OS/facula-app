@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
-import { genereerLes } from "@/lib/lesson-generator";
+import { genereerLesMetAi } from "@/lib/ai/generate-lesson";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { checkAndIncrementUsage, isPaidSubscriber, quotaLimitBoodschap } from "@/lib/quota";
+import {
+  checkAndIncrementUsage,
+  FREE_QUOTA_PER_MONTH,
+  getCurrentUsage,
+  isPaidSubscriber,
+  quotaLimitBoodschap,
+} from "@/lib/quota";
 import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
+
+/**
+ * Een AI-les kost ongeveer 22 seconden, en bij een terugval op het tweede
+ * model ongeveer 50 seconden meer. 180 s geeft de keten in generate-lesson.ts
+ * (budget 130 s) ruimte om daarna nog de sjabloon-fallback af te maken. Dit is
+ * een bovengrens en geen verwachting: bijna elke aanvraag is binnen een halve
+ * minuut klaar.
+ */
+export const maxDuration = 180;
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -18,7 +33,8 @@ function isNiveau(v: unknown): v is Niveau {
 
 /**
  * POST /api/lessons
- * Genereert een les via de ongewijzigde genereerLes()-functie en slaat het
+ * Genereert een les via de modelketen in src/lib/ai/generate-lesson.ts
+ * (Vertex AI, met de sjabloongenerator als laatste redmiddel) en slaat het
  * resultaat op in facula.lessons, gekoppeld aan de ingelogde gebruiker.
  * De user_id komt ALTIJD uit de server-side sessie, nooit uit de request-
  * body — een client kan dus nooit voor iemand anders opslaan.
@@ -81,7 +97,27 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    // Het quotum wordt in twee stappen afgehandeld. Eerst een leescheck, nog
+    // vóór de AI-aanroep: iemand die al over de limiet is, hoort geen
+    // modelaanroep te kosten. De bindende, atomaire check-en-verhoging gebeurt
+    // pas ná een geslaagde generatie, zodat een mislukking geen les van het
+    // quotum afhaalt (de RPC heeft geen tegenboeking).
     const paid = await isPaidSubscriber(supabase, user.id);
+    if (!paid) {
+      const verbruik = await getCurrentUsage(supabase, user.id);
+      if (verbruik.lessons >= FREE_QUOTA_PER_MONTH) {
+        return NextResponse.json(
+          { error: quotaLimitBoodschap("lessons") },
+          { status: 402 }
+        );
+      }
+    }
+
+    const { les, pogingen } = await genereerLesMetAi(input);
+    // Welke schakel de les schreef, hoort in de serverlog: zonder dit is niet
+    // te zien of productie stil op de sjabloongenerator is teruggevallen.
+    console.info("Les gegenereerd", { bron: les.bron, pogingen });
+
     if (!paid) {
       const usage = await checkAndIncrementUsage(supabase, user.id, "lessons");
       if (!usage.allowed) {
@@ -92,13 +128,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const les = genereerLes(input);
     const output: Omit<GeneratedLesson, "input"> = {
       id: les.id,
       createdAt: les.createdAt,
       titel: les.titel,
       kernbegrippen: les.kernbegrippen,
       onderdelen: les.onderdelen,
+      ...(les.leerdoelen ? { leerdoelen: les.leerdoelen } : {}),
+      ...(les.bron ? { bron: les.bron } : {}),
+      ...(les.model ? { model: les.model } : {}),
     };
 
     const { data: rij, error } = await supabase
