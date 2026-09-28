@@ -95,6 +95,7 @@ function resolveHuisstijlVeilig(huisstijl: Huisstijl): Huisstijl {
     lettertype: huisstijl.lettertype,
     schoolnaam: huisstijl.schoolnaam,
     logo_path: huisstijl.logoPath,
+    logo_mime: huisstijl.logoMime,
     logo_standaard_aan: huisstijl.logoStandaardAan,
   });
 }

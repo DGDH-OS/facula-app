@@ -12,8 +12,24 @@
 -- afgebakend met auth.uid() = user_id.
 --
 -- Het logo zelf staat niet in deze tabel maar in de private storage-bucket
--- school-logos; hier staat alleen het pad. Zo blijft de rij klein en kan een
--- logo vervangen worden zonder de rest van de huisstijl aan te raken.
+-- school-logos; hier staat alleen het pad plus het bestandstype. Zo blijft de
+-- rij klein en kan een logo vervangen worden zonder de rest van de huisstijl
+-- aan te raken.
+--
+-- Eén vast objectpad per docent: '<user_id>/logo', zonder extensie. Dat is
+-- een bewuste keuze na een fout in de eerste opzet, waar het pad de extensie
+-- van het bestandstype droeg. Daar kon één docent twee objecten hebben, en
+-- dus moest elke upload het object met de ándere extensie opruimen. Twee
+-- gelijktijdige uploads (de een png, de ander jpg) konden elkaars net
+-- geüploade logo verwijderen: A uploadt en gaat opruimen, B uploadt intussen
+-- het andere type, A's opruiming haalt B's verse object weg terwijl de rij er
+-- wél naar wijst. Resultaat: een huisstijl die naar een verdwenen bestand
+-- verwijst.
+--
+-- Met één pad bestaat dat probleem niet meer: een upload overschrijft altijd
+-- hetzelfde object (upsert) en verwijdert er nooit een. Omdat het pad geen
+-- extensie meer draagt, kan het bestandstype er niet meer uit afgeleid worden;
+-- vandaar de kolom logo_mime ernaast.
 --
 -- Idempotent: opnieuw draaien mag.
 
@@ -30,16 +46,56 @@ create table if not exists facula.huisstijl (
   achtergrond text not null default '#FAF6EF' check (achtergrond ~ '^#[0-9A-F]{6}$'),
   lettertype text not null default 'serif' check (lettertype in ('sans', 'serif')),
   schoolnaam text check (schoolnaam is null or char_length(schoolnaam) <= 120),
-  -- Pad binnen de bucket school-logos: '<user_id>/logo.png' of
-  -- '<user_id>/logo.jpg', de enige twee namen die het storage-beleid onderaan
-  -- deze migratie toelaat.
-  logo_path text check (logo_path is null or char_length(logo_path) <= 400),
+  -- Pad binnen de bucket school-logos: exact '<user_id>/logo', de enige naam
+  -- die het storage-beleid onderaan deze migratie toelaat. De check hier is
+  -- alleen een vormcheck (uuid gevolgd door /logo); dat het uuid de eigen
+  -- user_id is, dwingt het storage-beleid af, en de app controleert het nog
+  -- eens vóór elk gebruik van het pad (zie geldigLogoPad in
+  -- src/lib/huisstijl/server.ts).
+  logo_path text check (
+    logo_path is null
+    or logo_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/logo$'
+  ),
+  -- Het bestandstype van het object op dat pad. Nodig omdat het pad geen
+  -- extensie meer heeft: zonder deze kolom zou elke lezer moeten gokken of
+  -- vertrouwen op de content-type die storage teruggeeft.
+  logo_mime text check (logo_mime is null or logo_mime in ('image/png', 'image/jpeg')),
   logo_standaard_aan boolean not null default true,
   updated_at timestamptz not null default now()
 );
 
+-- Voor omgevingen waar een eerdere versie van dit bestand al gedraaid heeft:
+-- de create table hierboven doet niets meer zodra de tabel bestaat, dus de
+-- nieuwe kolom en de aangescherpte padvorm moeten er apart bij.
+alter table facula.huisstijl
+  add column if not exists logo_mime text;
+
+alter table facula.huisstijl drop constraint if exists huisstijl_logo_path_check;
+alter table facula.huisstijl drop constraint if exists huisstijl_logo_mime_check;
+
+-- Paden uit de oude opzet (met extensie) zouden de nieuwe vorm breken. Ze
+-- wijzen naar objecten die het storage-beleid hieronder niet meer toelaat en
+-- zijn dus toch onbruikbaar: leeghalen in plaats van de migratie erop laten
+-- stuklopen. De docent uploadt zijn logo opnieuw; het achtergebleven object
+-- gaat mee bij accountverwijdering, die de map uitlijst.
+update facula.huisstijl
+set logo_path = null, logo_mime = null
+where logo_path is not null
+  and logo_path !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/logo$';
+
+alter table facula.huisstijl
+  add constraint huisstijl_logo_path_check check (
+    logo_path is null
+    or logo_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/logo$'
+  );
+
+alter table facula.huisstijl
+  add constraint huisstijl_logo_mime_check check (
+    logo_mime is null or logo_mime in ('image/png', 'image/jpeg')
+  );
+
 comment on table facula.huisstijl is
-  'Eigen huisstijl per docent: kleuren, lettertype, schoolnaam en pad naar het schoollogo in de bucket school-logos.';
+  'Eigen huisstijl per docent: kleuren, lettertype, schoolnaam en pad (<user_id>/logo) plus bestandstype van het schoollogo in de bucket school-logos.';
 
 alter table facula.huisstijl enable row level security;
 
@@ -104,16 +160,15 @@ set
   allowed_mime_types = excluded.allowed_mime_types;
 
 -- Elke docent mag alleen bij zijn eigen logo, en het pad moet exact het pad
--- zijn dat de app schrijft: '<auth.uid()>/logo.png' of '<auth.uid()>/logo.jpg'
--- (zie src/app/api/huisstijl/logo/route.ts, dat user.id + '/logo.' +
--- bestandsExtensie() gebruikt).
+-- zijn dat de app schrijft: '<auth.uid()>/logo' (zie
+-- src/app/api/huisstijl/logo/route.ts, dat logoPad(user.id) gebruikt).
 --
--- Bewust exacte namen in plaats van "de eerste map is mijn user-id": met
+-- Bewust één exacte naam in plaats van "de eerste map is mijn user-id": met
 -- alleen een mapcheck kan een ingelogde docent onbeperkt eigen bestanden in
 -- zijn map zetten (andere namen, diepere mappen, willekeurig veel objecten)
--- en de bucket zo als gratis opslag gebruiken. Met deze vorm bestaan er per
--- docent hooguit twee objecten, en weet elk opruimpad (accountverwijdering,
--- logo vervangen) precies wat het kan aantreffen.
+-- en de bucket zo als gratis opslag gebruiken. Met deze vorm bestaat er per
+-- docent hooguit één object, overschrijft een upload altijd zichzelf, en
+-- hoeft geen enkel opruimpad ooit een ander object te verwijderen.
 drop policy if exists "school_logos_select_own" on storage.objects;
 drop policy if exists "school_logos_insert_own" on storage.objects;
 drop policy if exists "school_logos_update_own" on storage.objects;
@@ -125,7 +180,7 @@ create policy "school_logos_select_own"
   to authenticated
   using (
     bucket_id = 'school-logos'
-    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
+    and name = auth.uid()::text || '/logo'
   );
 
 create policy "school_logos_insert_own"
@@ -134,7 +189,7 @@ create policy "school_logos_insert_own"
   to authenticated
   with check (
     bucket_id = 'school-logos'
-    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
+    and name = auth.uid()::text || '/logo'
   );
 
 create policy "school_logos_update_own"
@@ -143,11 +198,11 @@ create policy "school_logos_update_own"
   to authenticated
   using (
     bucket_id = 'school-logos'
-    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
+    and name = auth.uid()::text || '/logo'
   )
   with check (
     bucket_id = 'school-logos'
-    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
+    and name = auth.uid()::text || '/logo'
   );
 
 create policy "school_logos_delete_own"
@@ -156,7 +211,7 @@ create policy "school_logos_delete_own"
   to authenticated
   using (
     bucket_id = 'school-logos'
-    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
+    and name = auth.uid()::text || '/logo'
   );
 
 notify pgrst, 'reload schema';

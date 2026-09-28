@@ -2,7 +2,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { bestandsExtensie, maakLogo, type Logo, type LogoBestand } from "./logo";
+import {
+  bestandsExtensie,
+  maakLogo,
+  mimeUitBytes,
+  type Logo,
+  type LogoBestand,
+} from "./logo";
 import { resolveHuisstijl, STANDAARD_HUISSTIJL, type Huisstijl } from "./themes";
 
 /**
@@ -16,6 +22,54 @@ import { resolveHuisstijl, STANDAARD_HUISSTIJL, type Huisstijl } from "./themes"
 
 export const LOGO_BUCKET = "school-logos";
 
+/**
+ * Het enige objectpad dat een docent in de bucket school-logos heeft:
+ * '<user_id>/logo', zonder extensie.
+ *
+ * Eén vast pad is de hele reden dat uploads elkaar niet meer kunnen slopen:
+ * een upload met upsert overschrijft precies dit object en verwijdert er nooit
+ * een ander. Het storage-beleid in 20260928120000_facula_huisstijl.sql staat
+ * exact deze naam toe, dus dit is ook wat elk opruimpad kan aantreffen.
+ */
+export function logoPad(userId: string): string {
+  return userId + "/logo";
+}
+
+/**
+ * Alle objectnamen die van deze docent kunnen zijn. Sinds het ene vaste pad is
+ * dat er precies één; de functie blijft bestaan omdat de opruimpaden met een
+ * lijst werken en er in oudere installaties nog objecten met een extensie
+ * kunnen liggen — die haalt de listing in verwijderAlleLogoObjecten() op.
+ */
+export function logoPaden(userId: string): string[] {
+  return [logoPad(userId)];
+}
+
+const LOGO_PAD_VORM =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/logo$/;
+
+/**
+ * Of dit pad het logopad van déze docent is.
+ *
+ * Het pad komt uit de database en de database staat onder RLS, dus het hóórt
+ * al te kloppen. Deze controle staat er voor het geval dat niet zo is: een rij
+ * uit een oudere versie, een handmatige aanpassing, of een bug die ooit een
+ * ander pad wegschrijft. Zonder deze check zou zo'n pad rechtstreeks in een
+ * storage-download belanden, en dat is precies het soort onbewaakte
+ * doorgeefluik waarmee een pad van iemand anders bruikbaar wordt.
+ *
+ * Gebruiken bij élk gebruik van een pad uit de database: het uitleveren van
+ * het logo, de exports en het opruimen.
+ */
+export function geldigLogoPad(pad: string | null | undefined, userId: string): boolean {
+  if (typeof pad !== "string") return false;
+  return LOGO_PAD_VORM.test(pad) && pad === logoPad(userId);
+}
+
+/** De kolommen die samen een Huisstijl opleveren. Eén lijst, overal dezelfde. */
+export const HUISSTIJL_KOLOMMEN =
+  "preset, accent, tekst, achtergrond, lettertype, schoolnaam, logo_path, logo_mime, logo_standaard_aan";
+
 /** De rij van deze docent, of de standaardstijl als er nog geen rij is. */
 export async function haalHuisstijl(
   supabase: SupabaseClient,
@@ -24,7 +78,7 @@ export async function haalHuisstijl(
   const { data, error } = await supabase
     .schema("facula")
     .from("huisstijl")
-    .select("preset, accent, tekst, achtergrond, lettertype, schoolnaam, logo_path, logo_standaard_aan")
+    .select(HUISSTIJL_KOLOMMEN)
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -34,19 +88,35 @@ export async function haalHuisstijl(
     console.error("Huisstijl ophalen mislukt", error);
     return STANDAARD_HUISSTIJL;
   }
-  return resolveHuisstijl(data);
+
+  const huisstijl = resolveHuisstijl(data);
+  // Eén plek waar elk pad uit de database langskomt vóór het iets doet. Een
+  // pad dat niet van deze docent is, telt als "geen logo": de rest van de
+  // huisstijl blijft gewoon werken, maar er wordt niets mee opgehaald.
+  if (huisstijl.logoPath && !geldigLogoPad(huisstijl.logoPath, userId)) {
+    console.error("Logopad hoort niet bij deze gebruiker, genegeerd", { userId });
+    return { ...huisstijl, logoPath: null, logoMime: null };
+  }
+  return huisstijl;
 }
 
-/** De logobytes uit storage, of null als er geen (bruikbaar) logo is. */
+/**
+ * De logobytes uit storage, of null als er geen (bruikbaar) logo is.
+ *
+ * userId is verplicht en niet af te leiden uit de huisstijl: het pad wordt
+ * hier nog eens tegen deze docent gecontroleerd voordat er iets gedownload
+ * wordt.
+ */
 export async function haalLogo(
   supabase: SupabaseClient,
-  huisstijl: Huisstijl
+  huisstijl: Huisstijl,
+  userId: string
 ): Promise<Logo | null> {
-  if (!huisstijl.logoPath) return null;
+  if (!geldigLogoPad(huisstijl.logoPath, userId)) return null;
 
   const { data, error } = await supabase.storage
     .from(LOGO_BUCKET)
-    .download(huisstijl.logoPath);
+    .download(logoPad(userId));
 
   if (error || !data) {
     console.error("Schoollogo ophalen mislukt", error);
@@ -54,14 +124,27 @@ export async function haalLogo(
   }
 
   const bytes = new Uint8Array(await data.arrayBuffer());
-  // data.type is wat storage teruggeeft; valt dat weg, dan leiden we het af
-  // uit de extensie van het pad dat wij zelf hebben geschreven.
-  const mime = data.type || mimeUitPad(huisstijl.logoPath);
-  return maakLogo(bytes, mime);
+  return maakLogo(bytes, logoMimeType(bytes, huisstijl.logoMime));
 }
 
-function mimeUitPad(logoPath: string): string {
-  return logoPath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+/**
+ * Het bestandstype van een opgehaald logo. Het pad draagt geen extensie meer,
+ * dus er zijn nog twee bronnen: de bestandskop van het object zelf en de kolom
+ * facula.huisstijl.logo_mime.
+ *
+ * De bytes gaan voor. Ze kunnen per definitie niet verouderd zijn, terwijl de
+ * kolom dat wel kan: een upload schrijft eerst het object en daarna de rij, en
+ * als die tweede stap stukloopt, staat er een jpeg op het pad terwijl de rij
+ * nog 'image/png' zegt. Een Content-Type dat niet bij de bytes past, levert
+ * een afbeelding op die de browser weigert te tonen.
+ *
+ * De kolom is dus de terugval, niet de waarheid: hij helpt bij bytes waar
+ * mimeUitBytes geen raad mee weet en houdt in de gegevens-export zichtbaar wat
+ * er geüpload is. Lege string als geen van beide iets oplevert; maakLogo
+ * weigert die, en dat is de bedoeling.
+ */
+export function logoMimeType(bytes: Uint8Array, opgeslagen: string | null): string {
+  return mimeUitBytes(bytes) ?? opgeslagen ?? "";
 }
 
 /**
@@ -85,48 +168,20 @@ export async function schrijfLogoNaarTemp(logo: Logo, sleutel: string): Promise<
 /** Het logo als bestand op schijf, of null als er geen logo is. */
 export async function haalLogoBestand(
   supabase: SupabaseClient,
-  huisstijl: Huisstijl
+  huisstijl: Huisstijl,
+  userId: string
 ): Promise<LogoBestand | null> {
-  const logo = await haalLogo(supabase, huisstijl);
-  if (!logo || !huisstijl.logoPath) return null;
-  return schrijfLogoNaarTemp(logo, huisstijl.logoPath);
-}
-
-/**
- * De enige twee objectnamen die een docent in de bucket school-logos kan
- * hebben. Het storage-beleid (zie 20260928120000_facula_huisstijl.sql) staat
- * exact deze twee toe, dus elk opruimpad weet precies wat het kan aantreffen
- * en hoeft niet op een listing te vertrouwen om compleet te zijn.
- */
-export function logoPaden(userId: string): string[] {
-  return [userId + "/logo.png", userId + "/logo.jpg"];
-}
-
-/**
- * Verwijdert één logo-object uit storage. Faalt stil met een log: dit wordt
- * gebruikt om een vervangen logo op te ruimen, waar de rij in de database
- * leidend is en een achtergebleven object hooguit ruimte kost.
- *
- * NIET gebruiken waar een mislukte verwijdering iets betekent: bij het wissen
- * van een logo (DELETE /api/huisstijl/logo) en bij accountverwijdering moet de
- * aanroeper erop kunnen afgaan — zie verwijderLogoObjecten() en
- * verwijderAlleLogoObjecten(), die een boolean teruggeven.
- */
-export async function verwijderLogoObject(
-  supabase: SupabaseClient,
-  logoPath: string | null
-): Promise<void> {
-  if (!logoPath) return;
-  const { error } = await supabase.storage.from(LOGO_BUCKET).remove([logoPath]);
-  if (error) console.error("Schoollogo verwijderen mislukt", error);
+  const logo = await haalLogo(supabase, huisstijl, userId);
+  if (!logo) return null;
+  return schrijfLogoNaarTemp(logo, logoPad(userId));
 }
 
 /**
  * Verwijdert de opgegeven objecten en geeft terug of dat gelukt is.
  *
  * Paden die niet bestaan zijn geen fout: storage.remove() meldt daar niets
- * over, en dat is hier precies goed — een docent met alleen een png laat de
- * jpg-naam simpelweg leeg.
+ * over, en dat is hier precies goed — een docent die nooit een logo uploadde,
+ * heeft simpelweg niets op dat pad staan.
  */
 export async function verwijderLogoObjecten(
   supabase: SupabaseClient,
@@ -160,9 +215,9 @@ async function lijstLogoObjecten(
     }
 
     const items = data ?? [];
-    // Een item zonder id is een map, geen bestand. Die kunnen hier niet
-    // voorkomen (het storage-beleid staat alleen de twee namen uit
-    // logoPaden() toe), maar remove() zou er wel op stukgaan.
+    // Een item zonder id is een map, geen bestand. Die kan hier niet
+    // voorkomen (het storage-beleid staat alleen het pad uit logoPad() toe),
+    // maar remove() zou er wel op stukgaan.
     for (const item of items) {
       if (item.id !== null) paden.push(userId + "/" + item.name);
     }
@@ -183,12 +238,13 @@ async function lijstLogoObjecten(
  * controleert daarna dat de map echt leeg is.
  *
  * Drie lagen, omdat één ervan kan tekortschieten:
- *   1. de twee namen uit logoPaden() altijd expliciet verwijderen, ook als een
- *      listing ze niet teruggeeft (eventual consistency, een lege
+ *   1. het vaste pad '<user_id>/logo' altijd expliciet verwijderen, ook als
+ *      een listing het niet teruggeeft (eventual consistency, een lege
  *      listing-respons, of een logo dat wél bestaat maar niet in de index
  *      staat);
- *   2. daarnaast de volledige, paginerende listing van de map, zodat iets wat
- *      er buiten die twee namen om toch in staat mee weggaat;
+ *   2. daarnaast de volledige, paginerende listing van de map, zodat objecten
+ *      uit de oude opzet ('<user_id>/logo.png', '<user_id>/logo.jpg') en al
+ *      het andere dat er ooit in beland is, mee weggaan;
  *   3. een hercontrole na het verwijderen: pas als de map leeg IS, mag de
  *      aanroeper verder.
  *

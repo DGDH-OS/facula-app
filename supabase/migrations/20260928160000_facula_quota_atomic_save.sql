@@ -22,11 +22,24 @@
 -- bewust niet bindend — alleen de vergrendeling hieronder is bestand tegen
 -- twee gelijktijdige aanvragen die door dezelfde laatste vrije plek willen.
 --
--- Wie de gebruiker is, komt uit auth.uid() en is géén parameter: een
--- aanroeper kan dus niet voor iemand anders opslaan of iemand anders teller
--- ophogen. Betalend of niet wordt hier ook zelf uit facula.profiles gelezen
--- in plaats van door de route meegegeven, zodat het abonnement en de
--- quotum-beslissing dezelfde transactie en dezelfde waarheid delen.
+-- Niets wat de uitkomst van de quotum-beslissing bepaalt, komt van de
+-- aanroeper. Drie dingen zijn daarvoor nodig, en alle drie worden ze hier
+-- afgeleid in plaats van meegegeven:
+--   1. WIE de gebruiker is: auth.uid(), dus je kunt niet voor iemand anders
+--      opslaan of iemand anders teller ophogen;
+--   2. HOEVEEL de gratis limiet is: de constante hieronder, niet langer een
+--      p_limit-parameter. Een limiet die de client meegeeft is geen limiet:
+--      wie de route kon omzeilen kon ook p_limit => 100000 sturen en de RPC
+--      rekende braaf mee;
+--   3. OF de docent betaalt: gelezen uit facula.profiles in dezelfde
+--      transactie, zodat het abonnement en de quotum-beslissing dezelfde
+--      waarheid delen en niemand zichzelf tot abonnee kan verklaren.
+--
+-- Daarmee heeft de functie nog maar drie parameters, en geen daarvan raakt
+-- de limiet of de abonnementsstatus. Extra of vervalste argumenten zijn niet
+-- alleen genegeerd maar onmogelijk: er bestaat maar één overload, en de oude
+-- vier-argumentversie wordt hieronder expliciet gedropt, zodat PostgREST hem
+-- ook niet meer kan vinden.
 --
 -- Security definer met een lege search_path, zoals de andere usage-RPC's:
 -- facula.usage_counters is voor authenticated read-only (zie
@@ -42,6 +55,15 @@
 -- rondslingeren zodra niets hem meer nodig heeft.
 drop function if exists facula.refund_usage(uuid, text);
 
+-- En weg met de vorige vorm van deze functie, die de limiet nog als parameter
+-- aannam. Een `create or replace` met minder parameters maakt een tweede
+-- overload in plaats van de oude te vervangen; zonder deze drop zou de
+-- omzeilbare versie naast de nieuwe blijven bestaan en gewoon aanroepbaar
+-- blijven. (Deze migratie is nooit op live toegepast, dus in productie heeft
+-- de vier-argumentversie nooit bestaan. De drop staat er voor omgevingen waar
+-- een eerdere versie van dit bestand al wél gedraaid heeft.)
+drop function if exists facula.save_with_quota(text, jsonb, jsonb, integer);
+
 -- facula.try_increment_usage blijft WEL staan: zolang de vorige versie van de
 -- app nog in productie draait, is dat de RPC die zijn quota-check doet. Hij
 -- wordt door de nieuwe code niet meer aangeroepen.
@@ -49,8 +71,7 @@ drop function if exists facula.refund_usage(uuid, text);
 create or replace function facula.save_with_quota(
   p_kind text,
   p_input jsonb,
-  p_output jsonb,
-  p_limit integer
+  p_output jsonb
 )
 returns table(
   content_id uuid,
@@ -63,6 +84,13 @@ security definer
 set search_path = ''
 as $$
 declare
+  -- Het gratis maandquotum per soort. MOET gelijk blijven aan
+  -- FREE_QUOTA_PER_MONTH in src/lib/quota.ts: die constante voedt alleen de
+  -- schermteksten en de goedkope voorcheck vóór de AI-aanroep, deze hier is
+  -- de enige die iets tegenhoudt. Lopen ze uit elkaar, dan ziet de docent een
+  -- ander getal dan de database hanteert — hinderlijk, maar niet onveilig,
+  -- want de database wint altijd.
+  c_gratis_limiet constant integer := 5;
   v_user_id uuid := auth.uid();
   v_period date := (date_trunc('month', now()))::date;
   v_rij_periode date;
@@ -77,10 +105,6 @@ begin
 
   if p_kind not in ('lessons','tests','reports') then
     raise exception 'Ongeldig usage-kind: %', p_kind;
-  end if;
-
-  if p_limit < 0 or p_limit > 10000 then
-    raise exception 'Ongeldige limiet: %', p_limit;
   end if;
 
   if p_input is null or p_output is null then
@@ -130,7 +154,7 @@ begin
   -- een exception. De route zet dit om in een 402 met een Nederlandse
   -- melding; een exception zou daar niet van een echte fout te onderscheiden
   -- zijn.
-  if not v_betaald and v_current >= p_limit then
+  if not v_betaald and v_current >= c_gratis_limiet then
     return query select null::uuid, null::timestamptz, true, v_current;
     return;
   end if;
@@ -171,14 +195,14 @@ begin
 end;
 $$;
 
-comment on function facula.save_with_quota(text, jsonb, jsonb, integer) is
-  'Slaat een les/toets/rapport op en verrekent het maandquotum in één transactie: teller-rij vergrendelen, limiet controleren, insert, dan ophogen. Gebruiker komt uit auth.uid(). Geeft quota_exceeded = true in plaats van een exception als de limiet vol is.';
+comment on function facula.save_with_quota(text, jsonb, jsonb) is
+  'Slaat een les/toets/rapport op en verrekent het maandquotum in één transactie: teller-rij vergrendelen, limiet controleren, insert, dan ophogen. Gebruiker, gratis limiet en abonnementsstatus komen alle drie uit de server (auth.uid(), een constante, facula.profiles) en niet uit de parameters. Geeft quota_exceeded = true in plaats van een exception als de limiet vol is.';
 
 -- anon heeft hier niets te zoeken (auth.uid() is dan null en de functie zou
 -- toch weigeren, maar uitvoerrecht geven wat nooit werkt is ruis).
 -- service_role ook niet: die heeft geen auth.uid(), dus deze functie is per
 -- constructie alleen bruikbaar namens een ingelogde docent.
-revoke execute on function facula.save_with_quota(text, jsonb, jsonb, integer) from public, anon;
-grant execute on function facula.save_with_quota(text, jsonb, jsonb, integer) to authenticated;
+revoke execute on function facula.save_with_quota(text, jsonb, jsonb) from public, anon;
+grant execute on function facula.save_with_quota(text, jsonb, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';

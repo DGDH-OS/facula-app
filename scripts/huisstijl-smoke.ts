@@ -12,7 +12,9 @@
  *      bestanden zijn geldige zips die een office-programma kan openen;
  *   4. een groot logo (2000x1000) wordt door normaliseerLogo teruggebracht
  *      tot hooguit 150 kB, en een les van twee delen blijft daarmee onder
- *      de 1,5 MB.
+ *      de 1,5 MB;
+ *   5. het logopad is en blijft het ene vaste pad per docent
+ *      ('<user_id>/logo'), en geen ander pad komt door de controle heen.
  *
  * Het testlogo wordt hier ter plekke gemaakt, zodat de test geen bestand van
  * buiten nodig heeft en dus overal draait.
@@ -32,9 +34,17 @@ import { bouwRapportDocument } from "../src/lib/report-docx-export";
 import {
   bestandsExtensie,
   maakLogo,
+  mimeUitBytes,
   type Logo,
   type LogoBestand,
 } from "../src/lib/huisstijl/logo";
+// logoPad heet hier verwachtLogoPad: verderop staat al een lokale logoPad
+// voor het testbestand op schijf.
+import {
+  geldigLogoPad,
+  logoMimeType,
+  logoPad as verwachtLogoPad,
+} from "../src/lib/huisstijl/server";
 import {
   LOGO_DOEL_BYTES,
   LOGO_MAX_BREEDTE,
@@ -51,6 +61,10 @@ import {
 } from "../src/lib/huisstijl/themes";
 
 const UITVOER_DIR = "/Users/r.h.wdegoededeheij/.hermes/cache/scratch/facula-huisstijl";
+
+/** Een verzonnen docent, en het enige pad dat bij hem hoort. */
+const TEST_USER_ID = "3f1a2b4c-5d6e-4f70-8192-a3b4c5d6e7f8";
+const TEST_LOGO_PAD = TEST_USER_ID + "/logo";
 
 const fouten: string[] = [];
 
@@ -198,7 +212,8 @@ function testStijlen(): { naam: string; huisstijl: Huisstijl }[] {
     huisstijl: resolveHuisstijl({
       preset: naam,
       schoolnaam: "Het Nieuwe Lyceum",
-      logo_path: "test/logo.png",
+      logo_path: TEST_LOGO_PAD,
+    logo_mime: "image/png",
       logo_standaard_aan: true,
     }),
   }));
@@ -210,7 +225,8 @@ function testStijlen(): { naam: string; huisstijl: Huisstijl }[] {
     achtergrond: "#FDFBF7",
     lettertype: "sans",
     schoolnaam: "Het Nieuwe Lyceum",
-    logo_path: "test/logo.png",
+    logo_path: TEST_LOGO_PAD,
+    logo_mime: "image/png",
     logo_standaard_aan: true,
   });
 
@@ -442,7 +458,8 @@ async function main() {
     huisstijl: resolveHuisstijl({
       preset: "facula",
       schoolnaam: "Het Nieuwe Lyceum",
-      logo_path: "test/logo.png",
+      logo_path: TEST_LOGO_PAD,
+    logo_mime: "image/png",
       logo_standaard_aan: true,
     }),
     logo: { ...verkleind, pad: verkleindPad },
@@ -454,6 +471,72 @@ async function main() {
   eis(
     zwaarPptx.length < PPTX_GRENS,
     "les van twee delen met verkleind logo is " + zwaarPptx.length + " bytes, onder " + PPTX_GRENS + " verwacht"
+  );
+
+  // Eén vast objectpad per docent. Zolang dit klopt, kan geen enkele upload
+  // een object van een ander pad verwijderen, want er is geen ander pad.
+  console.log("");
+  console.log("Logopad: een vast pad per docent");
+  eis(
+    verwachtLogoPad(TEST_USER_ID) === TEST_LOGO_PAD,
+    "logoPad() gaf " + verwachtLogoPad(TEST_USER_ID) + ", verwacht " + TEST_LOGO_PAD
+  );
+  eis(
+    geldigLogoPad(TEST_LOGO_PAD, TEST_USER_ID),
+    "het eigen logopad kwam niet door geldigLogoPad()"
+  );
+
+  const anderUserId = "9c8b7a65-4321-4fed-9876-543210abcdef";
+  const afgekeurdePaden: [string | null, string][] = [
+    [anderUserId + "/logo", "het pad van een andere docent"],
+    [TEST_USER_ID + "/logo.png", "een pad uit de oude opzet, met extensie"],
+    [TEST_USER_ID + "/logo/extra", "een dieper pad"],
+    [TEST_USER_ID + "/../" + anderUserId + "/logo", "een pad met een omweg omhoog"],
+    ["logo", "een pad zonder map"],
+    ["", "een leeg pad"],
+    [null, "geen pad"],
+  ];
+  for (const [pad, omschrijving] of afgekeurdePaden) {
+    eis(
+      !geldigLogoPad(pad, TEST_USER_ID),
+      "geldigLogoPad() liet " + omschrijving + " door: " + JSON.stringify(pad)
+    );
+  }
+
+  // Het pad draagt geen extensie meer, dus het bestandstype moet uit de kolom
+  // of uit de bestandskop komen.
+  console.log("Bestandstype van het logo zonder extensie in het pad");
+  eis(
+    mimeUitBytes(pngBytes) === "image/png",
+    "de bestandskop van het testlogo werd niet als PNG herkend"
+  );
+  eis(
+    mimeUitBytes(new Uint8Array([1, 2, 3, 4])) === null,
+    "willekeurige bytes werden toch als afbeelding herkend"
+  );
+  eis(
+    logoMimeType(pngBytes, null) === "image/png",
+    "logoMimeType() las het type niet uit de bestandskop"
+  );
+  // De bytes winnen van een verouderde kolomwaarde: anders zou een logo met
+  // een verkeerd Content-Type uitgeleverd worden.
+  eis(
+    logoMimeType(pngBytes, "image/jpeg") === "image/png",
+    "logoMimeType() volgde de kolom in plaats van de bestandskop"
+  );
+  eis(
+    logoMimeType(new Uint8Array([1, 2, 3, 4]), "image/png") === "image/png",
+    "logoMimeType() viel niet terug op de kolom bij onherkenbare bytes"
+  );
+  eis(
+    logoMimeType(new Uint8Array([1, 2, 3, 4]), null) === "",
+    "logoMimeType() verzon een type voor onherkenbare bytes"
+  );
+  // Een bestand dat zich als het verkeerde type aandient, hoort geweigerd te
+  // worden: anders belandt er een jpeg met content-type image/png in de bucket.
+  eis(
+    maakLogo(pngBytes, "image/jpeg") === null,
+    "een PNG werd geaccepteerd als JPEG"
   );
 
   if (fouten.length > 0) {

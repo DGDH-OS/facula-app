@@ -70,7 +70,7 @@ export async function GET(
   const logoGevraagd = zoek.has("logo")
     ? zoek.get("logo") === "1"
     : huisstijl.logoStandaardAan;
-  const logo = logoGevraagd ? await haalLogoBestand(supabase, huisstijl) : null;
+  const logo = logoGevraagd ? await haalLogoBestand(supabase, huisstijl, user.id) : null;
 
   try {
     const buffer = eigenHuisstijl

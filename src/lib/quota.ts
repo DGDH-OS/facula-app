@@ -1,11 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Fase B — gratis-quotum per categorie per kalendermaand. Eén genoemde
- * constante i.p.v. verspreide magic numbers, zodat een limietwijziging op
- * één plek gebeurt. Betaalde abonnees (facula.profiles.subscription_status
- * === 'active') omzeilen dit quotum volledig — zie saveWithQuota(), dat die
- * status database-side leest.
+ * Fase B — gratis-quotum per categorie per kalendermaand.
+ *
+ * Deze constante is NIET de limiet die iets tegenhoudt. Ze voedt alleen de
+ * schermteksten en de goedkope voorcheck vóór de AI-aanroep. De bindende
+ * limiet staat in facula.save_with_quota (zie
+ * 20260928160000_facula_quota_atomic_save.sql) en wordt daar afgeleid, niet
+ * meegegeven: een limiet die de client meestuurt is geen limiet.
+ *
+ * Beide moeten wel hetzelfde getal zijn, anders leest de docent een ander
+ * aantal dan de database hanteert. Wijzig je hier iets, wijzig dan
+ * c_gratis_limiet in die migratie mee (en omgekeerd).
+ *
+ * Betaalde abonnees (facula.profiles.subscription_status === 'active')
+ * omzeilen dit quotum volledig — ook die status leest de RPC zelf.
  */
 export const FREE_QUOTA_PER_MONTH = 5;
 
@@ -69,9 +78,11 @@ export interface SaveWithQuotaResult {
  * valt dus niets terug te boeken, en twee gelijktijdige aanvragen kunnen niet
  * samen door dezelfde laatste vrije plek.
  *
- * De user-id staat bewust niet in de parameters: de RPC leest auth.uid() uit
- * de sessie van de meegegeven client. Of de docent betaalt, bepaalt de RPC
- * ook zelf uit facula.profiles.
+ * Niets wat de uitkomst bepaalt, gaat hier de database in. De user-id komt
+ * uit auth.uid() op de sessie van de meegegeven client, de gratis limiet is
+ * een constante in de functie zelf, en of de docent betaalt leest de RPC uit
+ * facula.profiles. Er is dus geen parameter waarmee een aanroeper zijn eigen
+ * limiet of abonnement kan opgeven.
  */
 export async function saveWithQuota(
   supabase: SupabaseClient,
@@ -85,7 +96,6 @@ export async function saveWithQuota(
       p_kind: kind,
       p_input: input,
       p_output: output,
-      p_limit: FREE_QUOTA_PER_MONTH,
     })
     .single();
 

@@ -57,9 +57,10 @@ export async function POST(request: NextRequest) {
   // de gebruiker weg en is er niemand meer die er volgens het storage-beleid
   // bij mag.
   //
-  // verwijderAlleLogoObjecten() haalt beide toegestane namen expliciet weg,
-  // plus alles wat een paginerende listing van de map nog oplevert, en
-  // controleert daarna dat de map echt leeg is.
+  // verwijderAlleLogoObjecten() haalt het vaste pad '<user_id>/logo' expliciet
+  // weg, plus alles wat een paginerende listing van de map nog oplevert (zoals
+  // objecten met een extensie uit de vorige opzet), en controleert daarna dat
+  // de map echt leeg is.
   //
   // Lukt dat niet, dan gaat de verwijdering niet door. Een account weggooien
   // terwijl het logo blijft staan is geen verwijdering maar een onbereikbaar

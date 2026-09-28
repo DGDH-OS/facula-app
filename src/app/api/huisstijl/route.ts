@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { haalHuisstijl } from "@/lib/huisstijl/server";
+import { haalHuisstijl, HUISSTIJL_KOLOMMEN } from "@/lib/huisstijl/server";
 import {
   controleerContrast,
   normaliseerHex,
@@ -135,9 +135,7 @@ export async function PUT(request: NextRequest) {
       },
       { onConflict: "user_id" }
     )
-    .select(
-      "preset, accent, tekst, achtergrond, lettertype, schoolnaam, logo_path, logo_standaard_aan"
-    )
+    .select(HUISSTIJL_KOLOMMEN)
     .single();
 
   if (error) {

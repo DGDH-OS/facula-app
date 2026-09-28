@@ -26,8 +26,19 @@ export interface Huisstijl {
   achtergrond: string;
   lettertype: Lettertype;
   schoolnaam: string | null;
-  /** Pad in de bucket school-logos, altijd "<user_id>/<bestandsnaam>". */
+  /**
+   * Pad in de bucket school-logos: exact "<user_id>/logo", zonder extensie.
+   * Eén vast pad per docent, zodat een upload zichzelf overschrijft en nooit
+   * een ander object hoeft te verwijderen. Zie geldigLogoPad() in
+   * src/lib/huisstijl/server.ts, dat dit vóór elk gebruik nog eens toetst.
+   */
   logoPath: string | null;
+  /**
+   * Het bestandstype van dat object ("image/png" of "image/jpeg"). Los
+   * opgeslagen omdat het pad geen extensie meer draagt; null als het onbekend
+   * is, en dan leiden de lezers het uit de bestandskop af.
+   */
+  logoMime: LogoMimeType | null;
   logoStandaardAan: boolean;
 }
 
@@ -42,7 +53,16 @@ export const MIN_CONTRAST_ACCENT = 3;
 
 /** Alleen png en jpeg: zie sanitize-afweging in POST /api/huisstijl/logo. */
 export const TOEGESTANE_LOGO_TYPES = ["image/png", "image/jpeg"] as const;
+export type LogoMimeType = (typeof TOEGESTANE_LOGO_TYPES)[number];
 export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
+/** Of dit een van de twee toegestane logo-bestandstypen is. */
+export function isToegestaanLogoType(mime: unknown): mime is LogoMimeType {
+  return (
+    typeof mime === "string" &&
+    (TOEGESTANE_LOGO_TYPES as readonly string[]).includes(mime)
+  );
+}
 
 /**
  * De vier kant-en-klare stijlen. Elke combinatie hieronder is gemeten en komt
@@ -91,6 +111,7 @@ export const STANDAARD_HUISSTIJL: Huisstijl = {
   ...PRESETS.facula,
   schoolnaam: null,
   logoPath: null,
+  logoMime: null,
   logoStandaardAan: true,
 };
 
@@ -222,6 +243,7 @@ export interface HuisstijlRij {
   lettertype?: unknown;
   schoolnaam?: unknown;
   logo_path?: unknown;
+  logo_mime?: unknown;
   logo_standaard_aan?: unknown;
 }
 
@@ -257,6 +279,9 @@ export function resolveHuisstijl(rij: HuisstijlRij | null | undefined): Huisstij
       ? rij.schoolnaam.trim().slice(0, 120)
       : null;
   const logoPath = typeof rij.logo_path === "string" && rij.logo_path ? rij.logo_path : null;
+  // Een onbekend of ontbrekend type is geen fout: de lezers vallen dan terug
+  // op de bestandskop van het object zelf (zie mimeUitBytes in logo.ts).
+  const logoMime = isToegestaanLogoType(rij.logo_mime) ? rij.logo_mime : null;
   const logoStandaardAan = rij.logo_standaard_aan !== false;
 
   if (preset !== "eigen") {
@@ -265,6 +290,7 @@ export function resolveHuisstijl(rij: HuisstijlRij | null | undefined): Huisstij
       ...PRESETS[preset],
       schoolnaam,
       logoPath,
+      logoMime,
       logoStandaardAan,
     };
   }
@@ -280,8 +306,15 @@ export function resolveHuisstijl(rij: HuisstijlRij | null | undefined): Huisstij
   // opgeslagen vóór deze check bestond) wordt teruggezet op Facula in plaats
   // van onleesbaar geëxporteerd te worden.
   if (!controleerContrast(eigen).ok) {
-    return { preset: "facula", ...PRESETS.facula, schoolnaam, logoPath, logoStandaardAan };
+    return {
+      preset: "facula",
+      ...PRESETS.facula,
+      schoolnaam,
+      logoPath,
+      logoMime,
+      logoStandaardAan,
+    };
   }
 
-  return { preset, ...eigen, schoolnaam, logoPath, logoStandaardAan };
+  return { preset, ...eigen, schoolnaam, logoPath, logoMime, logoStandaardAan };
 }

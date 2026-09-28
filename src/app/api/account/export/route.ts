@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { LOGO_BUCKET } from "@/lib/huisstijl/server";
+import {
+  geldigLogoPad,
+  LOGO_BUCKET,
+  logoMimeType,
+  logoPad,
+} from "@/lib/huisstijl/server";
+import { bestandsExtensie } from "@/lib/huisstijl/logo";
 
 /**
  * GET /api/account/export
@@ -55,14 +61,20 @@ export async function GET() {
   // base64 in dezelfde JSON. Bewust geen signed URL: die verloopt, en een
   // export die na een uur de helft van zijn inhoud kwijt is, voldoet niet aan
   // het recht op dataportabiliteit.
-  const logoPath =
-    (huisstijlRes.data as { logo_path?: string | null } | null)?.logo_path ?? null;
+  const huisstijlRij = huisstijlRes.data as
+    | { logo_path?: string | null; logo_mime?: string | null }
+    | null;
+  // Het pad komt uit de database, dus het gaat eerst langs dezelfde controle
+  // als elders: alleen '<eigen user_id>/logo' wordt gedownload. Een rij met
+  // een ander pad telt als "geen logo" in plaats van als een pad dat zomaar
+  // achter een storage-aanroep geplakt wordt.
+  const heeftLogo = geldigLogoPad(huisstijlRij?.logo_path, user.id);
   let logo: { bestandsnaam: string; mimeType: string; base64: string } | null = null;
 
-  if (logoPath) {
+  if (heeftLogo) {
     const { data: bestand, error: logoFout } = await supabase.storage
       .from(LOGO_BUCKET)
-      .download(logoPath);
+      .download(logoPad(user.id));
 
     if (logoFout || !bestand) {
       // Niet stil overslaan: dan zou de docent een export krijgen die
@@ -74,12 +86,16 @@ export async function GET() {
       );
     }
 
+    const bytes = new Uint8Array(await bestand.arrayBuffer());
+    // Het opgeslagen object heet alleen "logo", zonder extensie: het type komt
+    // uit logo_mime, of anders uit de bestandskop. Voor een export die de
+    // docent op zijn eigen schijf terugzet, hoort er wel een bruikbare
+    // bestandsnaam met extensie in te staan.
+    const mimeType = logoMimeType(bytes, huisstijlRij?.logo_mime ?? null);
     logo = {
-      bestandsnaam: logoPath.split("/").pop() || "logo",
-      mimeType:
-        bestand.type ||
-        (logoPath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg"),
-      base64: Buffer.from(await bestand.arrayBuffer()).toString("base64"),
+      bestandsnaam: mimeType ? "logo." + bestandsExtensie(mimeType) : "logo",
+      mimeType,
+      base64: Buffer.from(bytes).toString("base64"),
     };
   }
 

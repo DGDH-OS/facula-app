@@ -1,4 +1,6 @@
-import { MAX_LOGO_BYTES, TOEGESTANE_LOGO_TYPES } from "./themes";
+import { isToegestaanLogoType, MAX_LOGO_BYTES, type LogoMimeType } from "./themes";
+
+export { isToegestaanLogoType, type LogoMimeType };
 
 /**
  * Het schoollogo zoals de exports het nodig hebben: de ruwe bytes plus de
@@ -27,10 +29,24 @@ export interface LogoBestand extends Logo {
   pad: string;
 }
 
-export type LogoMimeType = (typeof TOEGESTANE_LOGO_TYPES)[number];
-
-export function isToegestaanLogoType(mime: string): mime is LogoMimeType {
-  return (TOEGESTANE_LOGO_TYPES as readonly string[]).includes(mime);
+/**
+ * Het bestandstype uit de bestandskop zelf, of null als het geen png of jpeg
+ * is.
+ *
+ * Nodig sinds het logo op één vast pad zonder extensie staat
+ * ('<user_id>/logo'): het pad verraadt het type niet meer, en de content-type
+ * die storage teruggeeft is niet altijd gezet. De bytes liegen niet, dus dit
+ * is de laatste terugval als facula.huisstijl.logo_mime leeg is.
+ */
+export function mimeUitBytes(bytes: Uint8Array): LogoMimeType | null {
+  if (bytes.length >= 8) {
+    const png = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (png.every((b, i) => bytes[i] === b)) return "image/png";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  return null;
 }
 
 /** De typeaanduiding die `docx` voor een ImageRun verwacht. */
@@ -107,6 +123,7 @@ export function leesAfmetingen(
  */
 export function maakLogo(bytes: Uint8Array, mimeType: string): Logo | null {
   if (!isToegestaanLogoType(mimeType)) return null;
+  if (mimeUitBytes(bytes) !== mimeType) return null;
   if (bytes.length === 0 || bytes.length > MAX_LOGO_BYTES) return null;
   const afmeting = leesAfmetingen(bytes, mimeType);
   if (!afmeting) return null;
