@@ -10,6 +10,9 @@ import { Field, VELD_KLASSEN } from "@/components/ui/Field";
 import { FormCard } from "@/components/ui/FormCard";
 import { ProgressNotice } from "@/components/ui/ProgressNotice";
 import { Stepper } from "@/components/ui/Stepper";
+import { HuisstijlSchakelaars } from "@/components/huisstijl/HuisstijlSchakelaars";
+import { useHuisstijl, useLogoKeuze } from "@/lib/huisstijl/client";
+import { STANDAARD_HUISSTIJL, type Huisstijl } from "@/lib/huisstijl/themes";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -82,6 +85,10 @@ export default function NewTestPage() {
   const [resultaat, setResultaat] = useState<GeneratedTest | null>(null);
   const [exporteren, setExporteren] = useState(false);
   const [exportFout, setExportFout] = useState<string | null>(null);
+
+  const { huisstijl, logo } = useHuisstijl();
+  const [huisstijlAan, setHuisstijlAan] = useState(false);
+  const [logoAan, setLogoAan] = useLogoKeuze(huisstijl);
 
   /** Een concept met een eigen aantal vragen moet dat veld ook tonen. */
   const naHerstel = useCallback((hersteld: TestInput) => {
@@ -233,7 +240,10 @@ export default function NewTestPage() {
     setExporteren(true);
     setExportFout(null);
     try {
-      await downloadToetsDocx(resultaat);
+      await downloadToetsDocx(resultaat, {
+        huisstijl: huisstijlAan ? huisstijl : undefined,
+        logo: logoAan ? logo : null,
+      });
     } catch (err) {
       console.error("Word-export mislukt", err);
       setExportFout("Het downloaden lukte niet. Probeer het opnieuw.");
@@ -261,6 +271,17 @@ export default function NewTestPage() {
         exportFout={exportFout}
         onExport={exporteerNaarWord}
         onOpnieuw={opnieuwBeginnen}
+        huisstijl={huisstijlAan ? huisstijl : STANDAARD_HUISSTIJL}
+        logoUrl={logoAan && huisstijl.logoPath ? "/api/huisstijl/logo" : null}
+        schakelaars={
+          <HuisstijlSchakelaars
+            huisstijl={huisstijl}
+            huisstijlAan={huisstijlAan}
+            logoAan={logoAan}
+            onHuisstijl={setHuisstijlAan}
+            onLogo={setLogoAan}
+          />
+        }
       />
     );
   }
@@ -570,28 +591,58 @@ function ToetsResultaat({
   exportFout,
   onExport,
   onOpnieuw,
+  huisstijl,
+  logoUrl,
+  schakelaars,
 }: {
   toets: GeneratedTest;
   exporteren: boolean;
   exportFout: string | null;
   onExport: () => void;
   onOpnieuw: () => void;
+  huisstijl: Huisstijl;
+  logoUrl: string | null;
+  schakelaars: React.ReactNode;
 }) {
   return (
     <div className="stap-fade mx-auto max-w-3xl">
       <article className="space-y-8">
-        {/* `op-donker` zet de tekstkleur om én draait de focusring om, zodat
-            de kop op marine ruim boven de contrasteis blijft. */}
-        <header className="op-donker rounded-2xl border-2 border-marine bg-marine p-8">
-          <p className="text-base font-semibold uppercase tracking-[0.2em] text-op-donker-zacht">
-            {toets.input.vak} · {toets.input.niveau} {toets.input.leerjaar}
-          </p>
+        {/*
+          De kop staat in de kleuren die straks ook in het Word-bestand komen,
+          zodat de docent vóór de download ziet wat hij krijgt. Vandaar inline
+          stijlen en geen klassen: deze kleuren komen uit de database en niet
+          uit het design-systeem. `op-donker` blijft erop voor de focusring,
+          en de contrastcheck op /app/huisstijl garandeert dat de tekst hier
+          leesbaar is, ongeacht welke kleuren er gekozen zijn.
+        */}
+        <header
+          className="op-donker rounded-2xl border-2 p-8"
+          style={{ backgroundColor: huisstijl.accent, borderColor: huisstijl.accent }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-base font-semibold uppercase tracking-[0.2em] text-op-donker-zacht">
+              {toets.input.vak} · {toets.input.niveau} {toets.input.leerjaar}
+            </p>
+            {logoUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={logoUrl}
+                alt="Je schoollogo"
+                className="h-10 w-auto shrink-0 rounded bg-ivoor object-contain p-1"
+              />
+            )}
+          </div>
           <h1 className="mt-3 font-display text-3xl">{toets.titel}</h1>
           <p className="mt-3 text-base text-op-donker-zacht">
             {toets.vragen.length} vragen · {toets.totaalPunten} punten · circa{" "}
             {toets.tijdsduur} minuten
           </p>
+          {huisstijl.schoolnaam && (
+            <p className="mt-2 text-base text-op-donker-zacht">{huisstijl.schoolnaam}</p>
+          )}
         </header>
+
+        {schakelaars}
 
         <div className="flex flex-wrap gap-3">
           <Button variant="primary" onClick={onExport} disabled={exporteren}>

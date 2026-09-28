@@ -1,56 +1,104 @@
 import PptxGenJS from "pptxgenjs";
 import type { GeneratedLesson } from "./types";
 import { afdwingenSlideRegels, trimTitel } from "./slide-content-rules";
-
-// Facula kleurpalet (zie src/app/globals.css) — zonder '#' voor pptxgenjs
-const COLORS = {
-  ivoor: "FAF6EF",
-  ivoorDeep: "F2EAD9",
-  marine: "16233B",
-  marineDeep: "0D1626",
-  groen: "223C30",
-  goud: "B8935A",
-  inkt: "2A2620",
-  lijn: "E4D9C3",
-};
+import type { LogoBestand } from "./huisstijl/logo";
+import { passendeAfmeting } from "./huisstijl/logo";
+import {
+  exportFont,
+  lijnKleur,
+  STANDAARD_HUISSTIJL,
+  zachteTekstKleur,
+  zonderHekje,
+  type Huisstijl,
+} from "./huisstijl/themes";
 
 /**
- * Bouwt een PptxGenJS-presentatie op uit een GeneratedLesson.
- * Titelslide + één slide per LessonSection (met deel-context in de subtitel).
+ * De Facula-PowerPoint, opgebouwd in de huisstijl van de docent.
+ *
+ * Alle kleuren en het lettertype komen uit de meegegeven Huisstijl en niet
+ * meer uit een vaste lijst: wat de docent op /app/huisstijl kiest, is wat er
+ * uit de download komt. Zonder huisstijl valt alles terug op de standaardstijl
+ * van Facula, dus deze functie blijft bruikbaar met een enkel argument.
  */
-export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
+
+/** Grenzen voor het logo rechtsboven, in inch. */
+const LOGO_MAX_BREEDTE = 1.1;
+const LOGO_MAX_HOOGTE = 0.55;
+
+export interface LesExportOpties {
+  huisstijl?: Huisstijl;
+  /** Alleen meegeven als de docent het logo aan heeft staan. */
+  logo?: LogoBestand | null;
+}
+
+export function bouwLesPresentatie(
+  les: GeneratedLesson,
+  opties: LesExportOpties = {}
+): PptxGenJS {
+  const huisstijl = opties.huisstijl ?? STANDAARD_HUISSTIJL;
+  const logo = opties.logo ?? null;
+
+  const kleur = {
+    achtergrond: zonderHekje(huisstijl.achtergrond),
+    tekst: zonderHekje(huisstijl.tekst),
+    accent: zonderHekje(huisstijl.accent),
+    lijn: zonderHekje(lijnKleur(huisstijl)),
+    zacht: zonderHekje(zachteTekstKleur(huisstijl)),
+  };
+  const font = exportFont(huisstijl.lettertype);
+
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: "FACULA_16x9", width: 10, height: 5.63 });
   pptx.layout = "FACULA_16x9";
-  pptx.author = "Facula";
+  pptx.author = huisstijl.schoolnaam ?? "Facula";
   pptx.title = les.titel;
 
-  // ---- Titelslide ----
+  const logoMaat = logo ? passendeAfmeting(logo, LOGO_MAX_BREEDTE, LOGO_MAX_HOOGTE) : null;
+
+  /**
+   * Het logo rechtsboven op elke dia. Breedte en hoogte zijn hier al in de
+   * juiste verhouding uitgerekend, dus PowerPoint hoeft niets bij te snijden
+   * of op te rekken.
+   */
+  const plaatsLogo = (slide: PptxGenJS.Slide) => {
+    if (!logo || !logoMaat) return;
+    slide.addImage({
+      path: logo.pad,
+      x: 10 - 0.5 - logoMaat.breedte,
+      y: 0.28,
+      w: logoMaat.breedte,
+      h: logoMaat.hoogte,
+      altText: huisstijl.schoolnaam ? "Logo van " + huisstijl.schoolnaam : "Schoollogo",
+    });
+  };
+
+  /** De schoolnaam klein onderaan, als die is ingevuld. */
+  const plaatsSchoolnaam = (slide: PptxGenJS.Slide) => {
+    if (!huisstijl.schoolnaam) return;
+    slide.addText(huisstijl.schoolnaam, {
+      x: 6,
+      y: 5.35,
+      w: 3.5,
+      h: 0.25,
+      fontSize: 9,
+      color: kleur.zacht,
+      fontFace: font,
+      align: "right",
+    });
+  };
+
+  // ---- Titeldia: kleuren omgedraaid, het accent als vlak ----
   const title = pptx.addSlide();
-  title.background = { color: COLORS.marine };
+  title.background = { color: kleur.accent };
 
   title.addShape("rect", {
     x: 0,
     y: 4.9,
     w: 10,
     h: 0.08,
-    fill: { color: COLORS.goud },
+    fill: { color: kleur.achtergrond },
     line: { type: "none" },
   });
-
-  title.addText(
-    `${les.input.vak.toUpperCase()} · ${les.input.niveau.toUpperCase()} ${les.input.leerjaar} · ${les.input.aantalLessen}× ${les.input.lesduur} MIN`,
-    {
-      x: 0.6,
-      y: 0.7,
-      w: 8.8,
-      h: 0.4,
-      fontSize: 12,
-      color: COLORS.goud,
-      charSpacing: 2,
-      fontFace: "Arial",
-    }
-  );
 
   title.addText(les.titel, {
     x: 0.6,
@@ -59,9 +107,31 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
     h: 1.6,
     fontSize: 32,
     bold: true,
-    color: COLORS.ivoor,
-    fontFace: "Georgia",
+    color: kleur.achtergrond,
+    fontFace: font,
     valign: "top",
+  });
+
+  const kicker =
+    les.input.vak.toUpperCase() +
+    " \u00b7 " +
+    les.input.niveau.toUpperCase() +
+    " " +
+    les.input.leerjaar +
+    " \u00b7 " +
+    les.input.aantalLessen +
+    "\u00d7 " +
+    les.input.lesduur +
+    " MIN";
+  title.addText(kicker, {
+    x: 0.6,
+    y: 0.7,
+    w: 7.5,
+    h: 0.4,
+    fontSize: 12,
+    color: kleur.achtergrond,
+    charSpacing: 2,
+    fontFace: font,
   });
 
   if (les.kernbegrippen.length > 0) {
@@ -71,51 +141,53 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
       w: 8.8,
       h: 1.2,
       fontSize: 13,
-      color: COLORS.ivoorDeep,
-      fontFace: "Arial",
+      color: kleur.achtergrond,
+      fontFace: font,
       italic: true,
     });
   }
 
-  title.addText("Facula", {
+  title.addText(huisstijl.schoolnaam ?? "Facula", {
     x: 0.6,
     y: 5.05,
-    w: 4,
+    w: 6,
     h: 0.4,
     fontSize: 11,
-    color: COLORS.ivoor,
-    fontFace: "Arial",
+    color: kleur.achtergrond,
+    fontFace: font,
   });
+  plaatsLogo(title);
 
-  // ---- Eén slide per sectie, gegroepeerd per lesdeel ----
+  // ---- Eén dia per sectie, gegroepeerd per lesdeel ----
   for (const deel of les.onderdelen) {
     for (const sectie of deel.secties) {
       const slide = pptx.addSlide();
-      slide.background = { color: COLORS.ivoor };
+      slide.background = { color: kleur.achtergrond };
 
-      // gouden accentbalk boven
+      // accentbalk boven
       slide.addShape("rect", {
         x: 0,
         y: 0,
         w: 10,
         h: 0.12,
-        fill: { color: COLORS.goud },
+        fill: { color: kleur.accent },
         line: { type: "none" },
       });
 
-      // deel-context (kleine kicker)
-      const duurLabel = sectie.duur ? `${sectie.duur} min · ` : "";
+      // deel-context (kleine kicker). Smaller zodra er een logo staat, anders
+      // zou de regel eronderdoor lopen.
+      const duurLabel = sectie.duur ? sectie.duur + " min · " : "";
       slide.addText(
-        `${deel.titel.toUpperCase()} · ${duurLabel}${les.input.vak}`,
+        deel.titel.toUpperCase() + " · " + duurLabel + les.input.vak,
         {
           x: 0.5,
           y: 0.35,
-          w: 9,
+          w: logo ? 7.3 : 9,
           h: 0.35,
           fontSize: 11,
-          color: COLORS.goud,
+          color: kleur.zacht,
           charSpacing: 1.5,
-          fontFace: "Arial",
+          fontFace: font,
         }
       );
 
@@ -127,8 +199,8 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
         h: 0.8,
         fontSize: 26,
         bold: true,
-        color: COLORS.marine,
-        fontFace: "Georgia",
+        color: kleur.accent,
+        fontFace: font,
       });
 
       // scheidingslijn
@@ -137,10 +209,10 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
         y: 1.55,
         w: 9,
         h: 0,
-        line: { color: COLORS.lijn, width: 1 },
+        line: { color: kleur.lijn, width: 1 },
       });
 
-      // bullets — nogmaals door de content-regels gehaald zodat deze route
+      // bullets, nogmaals door de content-regels gehaald zodat deze route
       // consistent kort blijft, ongeacht wat de generator aanleverde.
       const inhoudBeperkt = afdwingenSlideRegels(sectie.inhoud);
       if (inhoudBeperkt.length > 0) {
@@ -148,10 +220,10 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
           inhoudBeperkt.map((regel) => ({
             text: regel,
             options: {
-              bullet: { code: "2014", indent: 20 },
-              color: COLORS.inkt,
+              bullet: { code: "2022", indent: 20 },
+              color: kleur.tekst,
               fontSize: 15,
-              fontFace: "Arial",
+              fontFace: font,
               breakLine: true,
               paraSpaceAfter: 10,
             },
@@ -160,38 +232,46 @@ export function bouwLesPresentatie(les: GeneratedLesson): PptxGenJS {
         );
       }
 
-      // paginanummer / footer
+      // voettekst
       slide.addText(les.titel, {
         x: 0.5,
         y: 5.35,
-        w: 6,
+        w: 5.3,
         h: 0.25,
         fontSize: 9,
-        color: COLORS.inkt,
-        fontFace: "Arial",
-        transparency: 40,
+        color: kleur.zacht,
+        fontFace: font,
       });
+      plaatsSchoolnaam(slide);
+      plaatsLogo(slide);
     }
   }
 
   return pptx;
 }
 
-/**
- * Genereert de .pptx en start een browser-download (blob), geen server-opslag.
- */
-export async function downloadLesPptx(les: GeneratedLesson): Promise<void> {
-  const pptx = bouwLesPresentatie(les);
-  const bestandsnaam = `${slugify(les.titel)}.pptx`;
-  await pptx.writeFile({ fileName: bestandsnaam });
+/** Maakt van een lestitel een veilige bestandsnaam zonder pad-onderdelen. */
+export function slugify(tekst: string): string {
+  return (
+    tekst
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "facula-export"
+  );
 }
 
-export function slugify(tekst: string): string {
-  return tekst
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "facula-export";
+/**
+ * Laat de browser de .pptx downloaden. Draait client-side; pptxgenjs maakt er
+ * een blob van en zet een download klaar in de downloadmap van de gebruiker.
+ * Er wordt niets op de server bewaard.
+ */
+export async function downloadLesPptx(
+  les: GeneratedLesson,
+  opties: LesExportOpties = {}
+): Promise<void> {
+  const pptx = bouwLesPresentatie(les, opties);
+  await pptx.writeFile({ fileName: slugify(les.titel) + ".pptx" });
 }

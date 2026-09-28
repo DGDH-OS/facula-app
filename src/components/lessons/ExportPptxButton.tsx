@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ProgressNotice } from "@/components/ui/ProgressNotice";
+import { HuisstijlSchakelaars } from "@/components/huisstijl/HuisstijlSchakelaars";
+import { useHuisstijl, useLogoKeuze } from "@/lib/huisstijl/client";
 
 /**
  * De enige hoofdknop op de lesdetailpagina: downloaden als PowerPoint.
@@ -20,6 +22,10 @@ export function ExportPptxButton({ lessonId }: { lessonId: string }) {
   const [fout, setFout] = useState<string | null>(null);
   const loopt = useRef(false);
 
+  const { huisstijl } = useHuisstijl();
+  const [huisstijlAan, setHuisstijlAan] = useState(false);
+  const [logoAan, setLogoAan] = useLogoKeuze(huisstijl);
+
   async function exporteer() {
     if (loopt.current) return;
     loopt.current = true;
@@ -28,7 +34,11 @@ export function ExportPptxButton({ lessonId }: { lessonId: string }) {
     setFout(null);
 
     try {
-      const response = await fetch("/api/lessons/" + lessonId + "/pptx");
+      const zoek = new URLSearchParams({
+        huisstijl: huisstijlAan ? "1" : "0",
+        logo: logoAan ? "1" : "0",
+      });
+      const response = await fetch("/api/lessons/" + lessonId + "/pptx?" + zoek);
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -62,6 +72,15 @@ export function ExportPptxButton({ lessonId }: { lessonId: string }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <HuisstijlSchakelaars
+        huisstijl={huisstijl}
+        huisstijlAan={huisstijlAan}
+        logoAan={logoAan}
+        onHuisstijl={setHuisstijlAan}
+        onLogo={setLogoAan}
+        huisstijlLabel="Mijn eigen kleuren gebruiken"
+      />
+
       <Button
         variant="primary"
         onClick={exporteer}

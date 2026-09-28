@@ -4,17 +4,30 @@ import {
   bouwMihiribanPptxBuffer,
   mihiribanBestandsnaam,
 } from "@/lib/pptx-export-mihiriban-style";
+import { bouwLesPresentatie, slugify } from "@/lib/pptx-export";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { haalHuisstijl, haalLogoBestand } from "@/lib/huisstijl/server";
 
 /**
  * GET /api/lessons/[id]/pptx
- * Haalt een EERDER opgeslagen les op (RLS zorgt dat dit alleen lukt als de
- * les van de ingelogde gebruiker is) en bouwt daar de Mihiriban-stijl
- * PowerPoint van — bewijst dat de export op opgeslagen data werkt, niet
- * alleen op een verse generatie.
+ *
+ * Haalt een EERDER opgeslagen les op (RLS zorgt dat dit alleen lukt als de les
+ * van de ingelogde gebruiker is) en bouwt daar een PowerPoint van. Werkt dus
+ * op opgeslagen data en niet alleen op een verse generatie.
+ *
+ * Twee varianten, gestuurd door de schakelaars op het lesscherm:
+ *   ?huisstijl=1  de eigen kleuren en het lettertype van de docent
+ *                 (src/lib/pptx-export.ts)
+ *   anders        het vaste sjabloon met eigen opmaak en afbeeldingen
+ *                 (src/lib/pptx-export-mihiriban-style.ts), het gedrag van
+ *                 vóór deze schakelaars
+ *   ?logo=0       het schoollogo weglaten, ook als het is ingesteld
+ *
+ * Het logo wordt server-side uit de private bucket gehaald. De browser krijgt
+ * dus alleen de kant-en-klare PowerPoint en nooit een URL naar de bucket.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -48,9 +61,27 @@ export async function GET(
     onderdelen: rij.output.onderdelen,
   };
 
+  const zoek = request.nextUrl.searchParams;
+  const eigenHuisstijl = zoek.get("huisstijl") === "1";
+  const huisstijl = await haalHuisstijl(supabase, user.id);
+
+  // Het logo staat aan zodra de docent er een heeft, tenzij hij het op dit
+  // scherm uitzet of in zijn huisstijl standaard uit heeft staan.
+  const logoGevraagd = zoek.has("logo")
+    ? zoek.get("logo") === "1"
+    : huisstijl.logoStandaardAan;
+  const logo = logoGevraagd ? await haalLogoBestand(supabase, huisstijl) : null;
+
   try {
-    const buffer = await bouwMihiribanPptxBuffer(les);
-    const bestandsnaam = mihiribanBestandsnaam(les);
+    const buffer = eigenHuisstijl
+      ? ((await bouwLesPresentatie(les, { huisstijl, logo }).write({
+          outputType: "nodebuffer",
+        })) as Uint8Array)
+      : await bouwMihiribanPptxBuffer(les, { logo });
+
+    const bestandsnaam = eigenHuisstijl
+      ? slugify(les.titel) + ".pptx"
+      : mihiribanBestandsnaam(les);
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
@@ -62,7 +93,7 @@ export async function GET(
       },
     });
   } catch (err) {
-    console.error("Mihiriban PowerPoint-export (opgeslagen les) mislukt", err);
+    console.error("PowerPoint-export (opgeslagen les) mislukt", err);
     return NextResponse.json(
       { error: "Er ging iets mis bij het genereren van de PowerPoint." },
       { status: 500 }

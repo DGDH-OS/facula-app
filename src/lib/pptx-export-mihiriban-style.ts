@@ -1,7 +1,8 @@
 import path from "path";
-import { Automizer, modify } from "pptx-automizer";
+import { Automizer, modify, type ISlide } from "pptx-automizer";
 import type { GeneratedLesson, LessonPart, LessonSection } from "./types";
 import { slugify } from "./pptx-export";
+import { passendeAfmeting, type LogoBestand } from "./huisstijl/logo";
 import {
   afdwingenSlideRegels,
   afdwingenVolledigeZin,
@@ -41,6 +42,26 @@ import {
 
 const TEMPLATE_FILE = "mihiriban-template.pptx";
 const TEMPLATE_DIR = path.join(process.cwd(), "src", "templates");
+
+/**
+ * De diamaat van het sjabloon, in inch (12192000 x 6858000 EMU, dus 16:9).
+ * Nodig om het logo rechtsboven te kunnen plaatsen: pptx-automizer rekent in
+ * inch en kent de maat van het sjabloon niet uit zichzelf.
+ */
+const DIA_BREEDTE_INCH = 13.333;
+const LOGO_MAX_BREEDTE = 1.1;
+const LOGO_MAX_HOOGTE = 0.55;
+const LOGO_MARGE = 0.4;
+
+export interface MihiribanExportOpties {
+  /**
+   * Alleen het logo, geen kleuren of lettertype: dit sjabloon ís al een
+   * huisstijl. De kleuren, fonts en afbeeldingen komen uit het bestand zelf en
+   * die overschrijven zou precies weghalen waarom een docent dit sjabloon
+   * gebruikt.
+   */
+  logo?: LogoBestand | null;
+}
 
 const TITEL_SHAPE = "Titel 1";
 const INHOUD_SHAPE = "Tijdelijke aanduiding voor inhoud 2";
@@ -119,12 +140,35 @@ function alsMultiTextDefinities(regels: string[]) {
   return gefilterd.map((text) => ({ paragraph: {}, text }));
 }
 
-export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buffer> {
+export async function bouwMihiribanPptxBuffer(
+  les: GeneratedLesson,
+  opties: MihiribanExportOpties = {}
+): Promise<Buffer> {
   if (les.onderdelen.length === 0) {
     throw new Error("Les bevat geen onderdelen om te exporteren.");
   }
 
   const aantalLessen = les.onderdelen.length;
+  const logo = opties.logo ?? null;
+  const logoMaat = logo ? passendeAfmeting(logo, LOGO_MAX_BREEDTE, LOGO_MAX_HOOGTE) : null;
+
+  /**
+   * Zet het schoollogo rechtsboven op een sjabloondia. `generate` laat
+   * pptx-automizer een echt pptxgenjs-element op de gekloonde dia zetten, dus
+   * het sjabloon zelf blijft ongemoeid: alleen dit ene element komt erbij.
+   */
+  const metLogo = (slide: ISlide) => {
+    if (!logo || !logoMaat) return;
+    slide.generate((gen) => {
+      gen.addImage({
+        path: logo.pad,
+        x: DIA_BREEDTE_INCH - LOGO_MARGE - logoMaat.breedte,
+        y: 0.25,
+        w: logoMaat.breedte,
+        h: logoMaat.hoogte,
+      });
+    }, "Schoollogo");
+  };
 
   // Let op: cleanup:true laat pptx-automizer "ongebruikte" media weghalen op
   // basis van slide-relaties — image1.jpeg wordt echter alleen door
@@ -189,12 +233,14 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
     pres.addSlide("tpl", 1, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText(`${les.input.vak} ${les.input.niveau} ${les.input.leerjaar}`));
       slide.modifyElement(ONDERTITEL_SHAPE, modify.setText(`${lesLabel} · ${ondertitelKort}`));
+      metLogo(slide);
     });
 
     // Slide — introductie (incl. terugblik/activering)
     pres.addSlide("tpl", 2, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Introductie"));
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(introRegels)));
+      metLogo(slide);
     });
 
     // Slide — leerdoelen
@@ -204,6 +250,7 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
         INHOUD_SHAPE,
         modify.setMultiText(alsMultiTextVolledigeZin([les.input.leerdoel]))
       );
+      metLogo(slide);
     });
 
     // Slide — kernbegrippen
@@ -213,36 +260,42 @@ export async function bouwMihiribanPptxBuffer(les: GeneratedLesson): Promise<Buf
         INHOUD_SHAPE,
         modify.setMultiText(alsMultiTextDefinities(kernbegrippenRegels))
       );
+      metLogo(slide);
     });
 
     // Slide — casus
     pres.addSlide("tpl", 5, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText(`Casus: ${les.input.vak.toLowerCase()}`));
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(casusSectie?.inhoud ?? [])));
+      metLogo(slide);
     });
 
     // Slide — voorbeeld uitgewerkt (incl. begeleide inoefening/check)
     pres.addSlide("tpl", 6, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Voorbeeld & check"));
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(voorbeeldMetInoefening)));
+      metLogo(slide);
     });
 
     // Slide — opdracht in tweetallen
     pres.addSlide("tpl", 7, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Opdracht in tweetallen"));
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(opdrachtSectie?.inhoud ?? [])));
+      metLogo(slide);
     });
 
     // Slide — bespreken
     pres.addSlide("tpl", 8, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Bespreken"));
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(besprekenSectie?.inhoud ?? [])));
+      metLogo(slide);
     });
 
     // Slide — huiswerk
     pres.addSlide("tpl", 9, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Huiswerk"));
       slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(huiswerkSectie?.inhoud ?? [])));
+      metLogo(slide);
     });
   };
 
