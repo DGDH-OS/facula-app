@@ -157,12 +157,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Een png die een jpg vervangt laat het oude object achter: dat heeft een
-  // andere extensie en wordt dus niet overschreven.
-  if (huidige.logoPath && huidige.logoPath !== pad) {
-    await verwijderLogoObject(supabase, huidige.logoPath);
-  }
-
+  // Volgorde: eerst uploaden, dan het pad in de database zetten, en pas
+  // daarna het oude object weggooien. Andersom (eerst het oude weg) zou een
+  // mislukte database-update een docent zonder logo achterlaten terwijl zijn
+  // huisstijl nog naar het verdwenen bestand wijst.
   const { data, error } = await supabase
     .schema("facula")
     .from("huisstijl")
@@ -174,10 +172,23 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error("Logopad opslaan mislukt", error);
+    // De rij verwijst niet naar dit object, dus het hoort er niet te blijven
+    // staan. Alleen als het nieuwe pad hetzelfde is als het opgeslagen pad
+    // blijft het staan: dan is het het bestand waar de huisstijl nog naar
+    // wijst, en zou opruimen juist een werkend logo slopen.
+    if (pad !== huidige.logoPath) {
+      await verwijderLogoObject(supabase, pad);
+    }
     return NextResponse.json(
-      { error: "Het logo is geüpload maar niet opgeslagen. Probeer het opnieuw." },
+      { error: "Het logo kon niet worden opgeslagen. Probeer het opnieuw." },
       { status: 500 }
     );
+  }
+
+  // Een png die een jpg vervangt laat het oude object achter: dat heeft een
+  // andere extensie en wordt dus niet overschreven.
+  if (huidige.logoPath && huidige.logoPath !== pad) {
+    await verwijderLogoObject(supabase, huidige.logoPath);
   }
 
   return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
@@ -202,8 +213,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   const huidige = await haalHuisstijl(supabase, user.id);
-  await verwijderLogoObject(supabase, huidige.logoPath);
 
+  // Zelfde volgorde-gedachte als bij de upload: eerst de database, dan pas het
+  // object. Zou het object er eerst uit gaan en de update daarna mislukken,
+  // dan wees de huisstijl naar een bestand dat niet meer bestaat.
   const { data, error } = await supabase
     .schema("facula")
     .from("huisstijl")
@@ -220,6 +233,8 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  await verwijderLogoObject(supabase, huidige.logoPath);
 
   return NextResponse.json({ huisstijl: resolveHuisstijl(data) });
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { haalHuisstijl, verwijderLogoObject } from "@/lib/huisstijl/server";
+import { verwijderAlleLogoObjecten } from "@/lib/huisstijl/server";
 import { readBodyWithLimit } from "@/lib/validation";
 
 /**
@@ -52,11 +52,25 @@ export async function POST(request: NextRequest) {
   }
 
   // Het schoollogo staat in storage en niet in een tabel, dus de
-  // ON DELETE CASCADE op auth.users ruimt het niet mee op. Het object moet er
-  // dus eerst uit, zolang de sessie nog bestaat: daarna is de gebruiker weg en
-  // is er niemand meer die er volgens het storage-beleid bij mag.
-  const huisstijl = await haalHuisstijl(supabase, user.id);
-  await verwijderLogoObject(supabase, huisstijl.logoPath);
+  // ON DELETE CASCADE op auth.users ruimt het niet mee op. De hele map van
+  // deze docent moet er dus eerst uit, zolang de sessie nog bestaat: daarna is
+  // de gebruiker weg en is er niemand meer die er volgens het storage-beleid
+  // bij mag.
+  //
+  // Lukt dat niet, dan gaat de verwijdering niet door. Een account weggooien
+  // terwijl het logo blijft staan is geen verwijdering maar een onbereikbaar
+  // restant, en dat is precies wat een docent niet vraagt als hij op
+  // "verwijder mijn account" klikt.
+  const logosWeg = await verwijderAlleLogoObjecten(supabase, user.id);
+  if (!logosWeg) {
+    return NextResponse.json(
+      {
+        error:
+          "Je schoollogo kon niet worden verwijderd, dus je account is niet verwijderd. Probeer het later opnieuw.",
+      },
+      { status: 500 }
+    );
+  }
 
   try {
     const serviceRole = createServiceRoleClient();

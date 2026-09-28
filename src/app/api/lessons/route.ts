@@ -8,6 +8,7 @@ import {
   getCurrentUsage,
   isPaidSubscriber,
   quotaLimitBoodschap,
+  refundUsage,
 } from "@/lib/quota";
 import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
@@ -96,13 +97,23 @@ export async function POST(request: NextRequest) {
     aantalLessen,
   };
 
+  // Staat aan zodra de teller daadwerkelijk is opgehoogd, zodat het foutpad
+  // hieronder weet dat er iets terug te boeken valt.
+  let quotumAfgeboekt = false;
+  const paid = await isPaidSubscriber(supabase, user.id);
+
   try {
-    // Het quotum wordt in twee stappen afgehandeld. Eerst een leescheck, nog
-    // vóór de AI-aanroep: iemand die al over de limiet is, hoort geen
-    // modelaanroep te kosten. De bindende, atomaire check-en-verhoging gebeurt
-    // pas ná een geslaagde generatie, zodat een mislukking geen les van het
-    // quotum afhaalt (de RPC heeft geen tegenboeking).
-    const paid = await isPaidSubscriber(supabase, user.id);
+    // Het quotum kost de docent pas iets als er ook echt een les uitkomt.
+    // Daarom drie stappen:
+    //   1. een leescheck vóór de AI-aanroep — wie al over de limiet is, hoort
+    //      geen modelaanroep te kosten;
+    //   2. de bindende, atomaire check-en-verhoging na een geslaagde
+    //      generatie, want alleen die is bestand tegen twee gelijktijdige
+    //      aanvragen door dezelfde laatste vrije plek;
+    //   3. een terugboeking (refundUsage) als het opslaan daarna alsnog
+    //      mislukt, zodat een mislukte insert geen les van het quotum afhaalt.
+    // Betaalde abonnees lopen door geen van de drie stappen: die hebben geen
+    // quotum.
     if (!paid) {
       const verbruik = await getCurrentUsage(supabase, user.id);
       if (verbruik.lessons >= FREE_QUOTA_PER_MONTH) {
@@ -126,6 +137,7 @@ export async function POST(request: NextRequest) {
           { status: 402 }
         );
       }
+      quotumAfgeboekt = true;
     }
 
     const output: Omit<GeneratedLesson, "input"> = {
@@ -150,6 +162,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ id: rij.id, createdAt: rij.created_at, lesson: les });
   } catch (err) {
+    // De les is er niet gekomen: dan hoort hij ook niet van het quotum af.
+    if (quotumAfgeboekt) {
+      await refundUsage(supabase, user.id, "lessons");
+    }
     console.error("Les genereren/opslaan mislukt", err);
     return NextResponse.json(
       { error: "Er ging iets mis bij het genereren van de les." },

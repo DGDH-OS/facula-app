@@ -86,6 +86,32 @@ export async function checkAndIncrementUsage(
   return { allowed: row.allowed, newCount: row.new_count };
 }
 
+/**
+ * Boekt één eenheid terug die met checkAndIncrementUsage is afgeboekt, via
+ * de facula.refund_usage-RPC. Bedoeld als compensatie: de teller gaat vóór
+ * het opslaan omhoog (anders kunnen twee gelijktijdige aanvragen door
+ * dezelfde laatste vrije plek), en als het opslaan daarna alsnog mislukt,
+ * hoort de docent die les niet kwijt te zijn.
+ *
+ * Gooit bewust niet: dit draait in het foutpad van een route die toch al een
+ * 500 teruggeeft. Een mislukte terugboeking mag die fout niet overschrijven,
+ * hij hoort wel in de log te staan.
+ */
+export async function refundUsage(
+  supabase: SupabaseClient,
+  userId: string,
+  kind: UsageKind
+): Promise<void> {
+  const { error } = await supabase
+    .schema("facula")
+    .rpc("refund_usage", { p_user_id: userId, p_kind: kind })
+    .single();
+
+  if (error) {
+    console.error("Quota-RPC refund_usage mislukt", { kind, error });
+  }
+}
+
 export interface CurrentUsage {
   lessons: number;
   tests: number;

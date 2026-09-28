@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { LOGO_BUCKET } from "@/lib/huisstijl/server";
 
 /**
  * GET /api/account/export
@@ -48,6 +49,40 @@ export async function GET() {
     );
   }
 
+  // Het schoollogo is een bestand in storage en staat dus niet in een van de
+  // tabellen hierboven. Een export met alleen logo_path is geen kopie van je
+  // gegevens maar een verwijzing ernaar, dus gaat het bestand zelf mee, als
+  // base64 in dezelfde JSON. Bewust geen signed URL: die verloopt, en een
+  // export die na een uur de helft van zijn inhoud kwijt is, voldoet niet aan
+  // het recht op dataportabiliteit.
+  const logoPath =
+    (huisstijlRes.data as { logo_path?: string | null } | null)?.logo_path ?? null;
+  let logo: { bestandsnaam: string; mimeType: string; base64: string } | null = null;
+
+  if (logoPath) {
+    const { data: bestand, error: logoFout } = await supabase.storage
+      .from(LOGO_BUCKET)
+      .download(logoPath);
+
+    if (logoFout || !bestand) {
+      // Niet stil overslaan: dan zou de docent een export krijgen die
+      // compleet lijkt en het niet is.
+      console.error("Schoollogo voor gegevens-export ophalen mislukt", logoFout);
+      return NextResponse.json(
+        { error: "Je schoollogo kon niet worden opgehaald. Probeer het later opnieuw." },
+        { status: 500 }
+      );
+    }
+
+    logo = {
+      bestandsnaam: logoPath.split("/").pop() || "logo",
+      mimeType:
+        bestand.type ||
+        (logoPath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg"),
+      base64: Buffer.from(await bestand.arrayBuffer()).toString("base64"),
+    };
+  }
+
   const exportData = {
     geexporteerdOp: new Date().toISOString(),
     account: { id: user.id, email: user.email },
@@ -57,10 +92,11 @@ export async function GET() {
     reports: reportsRes.data,
     contentVersions: versionsRes.data,
     usageCounters: usageRes.data,
-    // Alleen de rij, niet het logobestand zelf: dat is een afbeelding die de
-    // docent zelf heeft geüpload en al bezit. logo_path laat wel zien dát er
-    // een logo bewaard wordt, wat het punt is van een inzageverzoek.
     huisstijl: huisstijlRes.data,
+    // null als er geen logo is ingesteld; anders het volledige bestand,
+    // base64-gecodeerd, met de bijbehorende mimeType om het terug te kunnen
+    // decoderen.
+    schoollogo: logo,
   };
 
   const datum = new Date().toISOString().slice(0, 10);

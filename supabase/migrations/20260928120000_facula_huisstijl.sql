@@ -30,7 +30,9 @@ create table if not exists facula.huisstijl (
   achtergrond text not null default '#FAF6EF' check (achtergrond ~ '^#[0-9A-F]{6}$'),
   lettertype text not null default 'serif' check (lettertype in ('sans', 'serif')),
   schoolnaam text check (schoolnaam is null or char_length(schoolnaam) <= 120),
-  -- Pad binnen de bucket school-logos, altijd '<user_id>/<bestandsnaam>'.
+  -- Pad binnen de bucket school-logos: '<user_id>/logo.png' of
+  -- '<user_id>/logo.jpg', de enige twee namen die het storage-beleid onderaan
+  -- deze migratie toelaat.
   logo_path text check (logo_path is null or char_length(logo_path) <= 400),
   logo_standaard_aan boolean not null default true,
   updated_at timestamptz not null default now()
@@ -82,10 +84,11 @@ grant all on facula.huisstijl to service_role;
 -- Storage: bucket school-logos, privé.
 -- ---------------------------------------------------------------------------
 -- Privé (public = false), dus een logo is nooit via een raadbare URL op te
--- halen; de app levert het uit via een kortlopende signed URL of leest het
--- server-side. Grootte en bestandstype staan ook op de bucket zelf, zodat een
--- client die de API-route omzeilt en rechtstreeks naar storage schrijft nog
--- steeds tegen dezelfde grenzen aanloopt als POST /api/huisstijl/logo.
+-- halen; de app leest het server-side en levert het uit via
+-- GET /api/huisstijl/logo. Grootte en bestandstype staan ook op de bucket
+-- zelf, zodat een client die de API-route omzeilt en rechtstreeks naar
+-- storage schrijft nog steeds tegen dezelfde grenzen aanloopt als
+-- POST /api/huisstijl/logo.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'school-logos',
@@ -100,10 +103,17 @@ set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
--- Elke docent mag alleen bij objecten onder zijn eigen map '<auth.uid()>/'.
--- storage.foldername(name) geeft de padonderdelen; het eerste onderdeel moet
--- de eigen user-id zijn. Een pad zonder map (dus zonder '/') levert een lege
--- array op en valt daarmee vanzelf buiten de policy.
+-- Elke docent mag alleen bij zijn eigen logo, en het pad moet exact het pad
+-- zijn dat de app schrijft: '<auth.uid()>/logo.png' of '<auth.uid()>/logo.jpg'
+-- (zie src/app/api/huisstijl/logo/route.ts, dat user.id + '/logo.' +
+-- bestandsExtensie() gebruikt).
+--
+-- Bewust exacte namen in plaats van "de eerste map is mijn user-id": met
+-- alleen een mapcheck kan een ingelogde docent onbeperkt eigen bestanden in
+-- zijn map zetten (andere namen, diepere mappen, willekeurig veel objecten)
+-- en de bucket zo als gratis opslag gebruiken. Met deze vorm bestaan er per
+-- docent hooguit twee objecten, en weet elk opruimpad (accountverwijdering,
+-- logo vervangen) precies wat het kan aantreffen.
 drop policy if exists "school_logos_select_own" on storage.objects;
 drop policy if exists "school_logos_insert_own" on storage.objects;
 drop policy if exists "school_logos_update_own" on storage.objects;
@@ -115,7 +125,7 @@ create policy "school_logos_select_own"
   to authenticated
   using (
     bucket_id = 'school-logos'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
   );
 
 create policy "school_logos_insert_own"
@@ -124,7 +134,7 @@ create policy "school_logos_insert_own"
   to authenticated
   with check (
     bucket_id = 'school-logos'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
   );
 
 create policy "school_logos_update_own"
@@ -133,11 +143,11 @@ create policy "school_logos_update_own"
   to authenticated
   using (
     bucket_id = 'school-logos'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
   )
   with check (
     bucket_id = 'school-logos'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
   );
 
 create policy "school_logos_delete_own"
@@ -146,7 +156,7 @@ create policy "school_logos_delete_own"
   to authenticated
   using (
     bucket_id = 'school-logos'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and name in (auth.uid()::text || '/logo.png', auth.uid()::text || '/logo.jpg')
   );
 
 notify pgrst, 'reload schema';

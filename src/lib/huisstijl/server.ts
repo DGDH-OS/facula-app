@@ -93,9 +93,12 @@ export async function haalLogoBestand(
 }
 
 /**
- * Verwijdert het logo-object uit storage. Faalt bewust stil met een log: dit
- * wordt aangeroepen tijdens accountverwijdering, en een achtergebleven object
- * mag nooit de reden zijn dat een docent zijn account niet kwijt kan.
+ * Verwijdert één logo-object uit storage. Faalt stil met een log: dit wordt
+ * gebruikt om een vervangen of uitgezet logo op te ruimen, waar de rij in de
+ * database leidend is en een achtergebleven object hooguit ruimte kost.
+ *
+ * NIET gebruiken bij accountverwijdering: daar moet een mislukte verwijdering
+ * juist hard falen, zie verwijderAlleLogoObjecten().
  */
 export async function verwijderLogoObject(
   supabase: SupabaseClient,
@@ -104,4 +107,51 @@ export async function verwijderLogoObject(
   if (!logoPath) return;
   const { error } = await supabase.storage.from(LOGO_BUCKET).remove([logoPath]);
   if (error) console.error("Schoollogo verwijderen mislukt", error);
+}
+
+/**
+ * Ruimt alles op wat er onder '<user_id>/' in de bucket school-logos staat.
+ *
+ * Bewust niet op logo_path uit de huisstijl-rij vertrouwen: die kent maar één
+ * bestand, terwijl een eerdere upload (bijvoorbeeld een jpg die later door
+ * een png vervangen is) een tweede object achtergelaten kan hebben. Bij het
+ * verwijderen van een account moet de hele map leeg, niet alleen het laatst
+ * bekende pad.
+ *
+ * Geeft false terug als er ook maar iets misging. De aanroeper hoort de
+ * accountverwijdering dan af te breken: de auth-user weggooien terwijl er nog
+ * een bestand van die docent in de bucket staat, laat persoonsgegevens achter
+ * die daarna door niemand meer op te ruimen zijn.
+ */
+export async function verwijderAlleLogoObjecten(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<boolean> {
+  const { data, error } = await supabase.storage
+    .from(LOGO_BUCKET)
+    .list(userId, { limit: 100 });
+
+  if (error) {
+    console.error("Schoollogo-map uitlezen mislukt", error);
+    return false;
+  }
+
+  // Een item zonder id is een map, geen bestand. Die kunnen hier niet
+  // voorkomen (het storage-beleid staat alleen '<uid>/logo.png' en
+  // '<uid>/logo.jpg' toe), maar remove() zou er wel op stukgaan.
+  const paden = (data ?? [])
+    .filter((item) => item.id !== null)
+    .map((item) => userId + "/" + item.name);
+
+  if (paden.length === 0) return true;
+
+  const { error: verwijderFout } = await supabase.storage
+    .from(LOGO_BUCKET)
+    .remove(paden);
+
+  if (verwijderFout) {
+    console.error("Schoollogo's verwijderen mislukt", verwijderFout);
+    return false;
+  }
+  return true;
 }
