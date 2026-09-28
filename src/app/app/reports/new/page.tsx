@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import type {
   ReportInput,
@@ -8,6 +8,7 @@ import type {
   RapportOutputType,
   RapportToon,
 } from "@/lib/types";
+import { conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
@@ -47,15 +48,38 @@ const TONEN: { waarde: RapportToon; label: string }[] = [
 const MAX_LEERLING = 2000;
 const MAX_AANTEKENINGEN = 2000;
 
-/** Sleutel voor het concept; user-id is client-side niet beschikbaar. */
-const CONCEPT_SLEUTEL = "facula-draft-reports";
-
 const DEFAULT_INPUT: ReportInput = {
   leerlingLabel: "",
   aantekeningen: "",
   outputType: "rapporttekst",
   toon: "vriendelijk-direct",
 };
+
+/**
+ * Een bewaard concept komt uit sessionStorage en is dus niet te
+ * vertrouwen: elk veld langs hetzelfde type en dezelfde grenzen als de
+ * serverside route, en wat niet klopt valt terug op de default. Hier weegt
+ * dat extra: in de aantekeningen staat gevoelige tekst over een leerling,
+ * die mag nooit ongecontroleerd de state in.
+ */
+function herstelRapportInput(
+  ruw: Record<string, unknown>,
+  defaults: ReportInput
+): ReportInput {
+  return {
+    leerlingLabel: conceptTekst(ruw.leerlingLabel, MAX_LEERLING) ?? defaults.leerlingLabel,
+    aantekeningen: conceptTekst(ruw.aantekeningen, MAX_AANTEKENINGEN) ?? defaults.aantekeningen,
+    outputType:
+      conceptKeuze(
+        ruw.outputType,
+        OUTPUT_TYPES.map((t) => t.waarde)
+      ) ?? defaults.outputType,
+    toon: conceptKeuze(
+      ruw.toon,
+      TONEN.map((t) => t.waarde)
+    ) ?? defaults.toon,
+  };
+}
 
 type FoutVeld = "leerlingLabel" | "aantekeningen";
 type Fouten = Partial<Record<FoutVeld, string>>;
@@ -91,7 +115,6 @@ const TOON_LABEL: Record<RapportToon, string> = {
  */
 export default function NewReportPage() {
   const [stap, setStap] = useState<1 | 2>(1);
-  const [input, setInput] = useState<ReportInput>(DEFAULT_INPUT);
   const [instellingenOpen, setInstellingenOpen] = useState(false);
   const [fouten, setFouten] = useState<Fouten>({});
   const [resultaat, setResultaat] = useState<GeneratedReport | null>(null);
@@ -99,17 +122,32 @@ export default function NewReportPage() {
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
 
+  const {
+    waarde: input,
+    zetWaarde: setInput,
+    wisConcept,
+  } = useDraft<ReportInput>("reports", DEFAULT_INPUT, herstelRapportInput);
+
   const leerlingRef = useRef<HTMLInputElement>(null);
   const aantekeningenRef = useRef<HTMLTextAreaElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
   const toonRef = useRef<HTMLDivElement>(null);
-  const conceptGelezen = useRef(false);
+  const kopRef = useRef<HTMLHeadingElement>(null);
+  const overzichtKopRef = useRef<HTMLHeadingElement>(null);
+  const genereerKnopRef = useRef<HTMLButtonElement>(null);
+  // Houdt een tweede klik op "Schrijf het rapport" tegen: `bezig` in state
+  // komt pas ná de renderronde terug, een ref direct.
+  const bezigRef = useRef(false);
 
   /**
    * Focus naar een veld nádat React de nieuwe stap of het uitgeklapte
    * instellingenblok heeft gerenderd. Bewust in een animatieframe en niet
    * in een effect: een effect zou de focus-state weer moeten opruimen, en
    * setState in een effect veroorzaakt een extra renderronde.
+   *
+   * Bestaat het veld niet (nog niet gerenderd, of weggevallen), dan gaat de
+   * focus naar de kop van de stap: nooit naar niets, want dan valt de focus
+   * terug naar body en is de plek in het formulier kwijt.
    */
   const focusNaar = useCallback((doel: FocusDoel) => {
     requestAnimationFrame(() => {
@@ -119,38 +157,17 @@ export default function NewReportPage() {
         outputType: outputRef.current?.querySelector("input") ?? null,
         toon: toonRef.current?.querySelector("input") ?? null,
       };
-      doelen[doel]?.focus();
+      (doelen[doel] ?? kopRef.current)?.focus();
     });
   }, []);
 
-  /**
-   * Concept terugzetten: wie per ongeluk wegnavigeert verliest niets. Het
-   * lezen gebeurt in een animatieframe en niet in de effect-body, omdat
-   * sessionStorage pas op de client bestaat: de server rendert de lege
-   * defaults, en een synchrone setState hier zou een extra renderronde
-   * kosten tijdens hydratie.
-   */
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const opgeslagen = sessionStorage.getItem(CONCEPT_SLEUTEL);
-      conceptGelezen.current = true;
-      if (!opgeslagen) return;
-      try {
-        const concept = JSON.parse(opgeslagen) as Partial<ReportInput>;
-        setInput((huidig) => ({ ...huidig, ...concept }));
-      } catch {
-        sessionStorage.removeItem(CONCEPT_SLEUTEL);
-      }
+  /** Na een stapwissel zonder veld: de kop van de nieuwe stap. */
+  const focusKop = useCallback((kop: "stap1" | "overzicht") => {
+    requestAnimationFrame(() => {
+      const doel = kop === "overzicht" ? overzichtKopRef.current : kopRef.current;
+      (doel ?? kopRef.current)?.focus();
     });
-    return () => cancelAnimationFrame(frame);
   }, []);
-
-  // Pas opslaan nadat het eerder bewaarde concept gelezen is, anders
-  // overschrijft de lege beginstaat het concept nog vóór het terugkomt.
-  useEffect(() => {
-    if (!conceptGelezen.current) return;
-    sessionStorage.setItem(CONCEPT_SLEUTEL, JSON.stringify(input));
-  }, [input]);
 
   const wijzig = useCallback(
     (doel: FocusDoel) => {
@@ -192,9 +209,14 @@ export default function NewReportPage() {
       return;
     }
     setStap(2);
+    focusKop("overzicht");
   }
 
   async function genereer() {
+    // Dubbele submit: een tweede klik binnen dezelfde renderronde zou een
+    // tweede tekst genereren én een tweede keer van het quotum afhalen.
+    if (bezigRef.current) return;
+    bezigRef.current = true;
     setGekopieerd(false);
     setBezig(true);
     setFout(null);
@@ -213,13 +235,16 @@ export default function NewReportPage() {
         throw new Error(data?.error ?? "Genereren mislukt.");
       }
       const { report } = await response.json();
-      sessionStorage.removeItem(CONCEPT_SLEUTEL);
-      conceptGelezen.current = false;
+      wisConcept();
       setResultaat(report as GeneratedReport);
     } catch (err) {
       console.error("Rapport genereren mislukt", err);
       setFout(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
+      // De melding is nieuw op het scherm: breng de focus naar de knop die
+      // hem oplost, anders moet een schermlezer zelf terugzoeken.
+      requestAnimationFrame(() => genereerKnopRef.current?.focus());
     } finally {
+      bezigRef.current = false;
       setBezig(false);
     }
   }
@@ -278,7 +303,6 @@ export default function NewReportPage() {
               onClick={() => {
                 setResultaat(null);
                 setStap(1);
-                conceptGelezen.current = true;
                 focusNaar("aantekeningen");
               }}
             >
@@ -309,8 +333,16 @@ export default function NewReportPage() {
         stap={stap}
         totaal={2}
         titel={stap === 1 ? "Over wie gaat de tekst?" : "Klopt dit zo?"}
-        terug={stap === 1 ? "/app" : () => setStap(1)}
+        terug={
+          stap === 1
+            ? "/app"
+            : () => {
+                setStap(1);
+                focusKop("stap1");
+              }
+        }
         terugLabel={stap === 1 ? "Terug naar start" : "Terug naar stap 1"}
+        kopRef={kopRef}
       />
 
       <div key={stap} className="stap-fade">
@@ -433,6 +465,18 @@ export default function NewReportPage() {
           </FormCard>
         ) : (
           <div className="mt-8 space-y-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
+            {/* Focusdoel na de stapwissel. tabIndex -1 houdt de kop buiten
+                de Tab-volgorde, maar maakt hem wel programmatisch te
+                focussen, zodat een schermlezer stap 2 vanaf het begin
+                voorleest in plaats van vanaf de oude plek. */}
+            <h2
+              ref={overzichtKopRef}
+              tabIndex={-1}
+              className="font-display text-2xl text-marine"
+            >
+              Overzicht van je keuzes
+            </h2>
+
             <dl className="space-y-4">
               <OverzichtRegel
                 label="Leerling"
@@ -458,8 +502,14 @@ export default function NewReportPage() {
 
             <ProgressNotice bezig={bezig} tekst="Bezig met schrijven..." />
 
+            {/* role="alert" meldt de fout zodra hij verschijnt, zonder dat
+                de focus hoeft te verspringen; de focus gaat daarna naar de
+                knop die hem oplost. */}
             {fout && (
-              <div className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4">
+              <div
+                role="alert"
+                className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4"
+              >
                 <p className="text-base font-medium text-fout-tekst">{fout}</p>
                 <p className="mt-1 text-base text-tekst-zacht">
                   Je invoer staat er nog. Je kunt het direct opnieuw proberen.
@@ -467,7 +517,13 @@ export default function NewReportPage() {
               </div>
             )}
 
-            <Button variant="primary" volleBreedte disabled={bezig} onClick={genereer}>
+            <Button
+              ref={genereerKnopRef}
+              variant="primary"
+              volleBreedte
+              disabled={bezig}
+              onClick={genereer}
+            >
               {bezig
                 ? "Bezig met schrijven..."
                 : fout

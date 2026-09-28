@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { wisAlleConcepten } from "@/lib/useDraft";
 
 /**
  * Client-side navigatie/uitloggen-shell. De AUTH-GUARD zelf zit in
@@ -35,6 +36,9 @@ export function AppShell({
   const pathname = usePathname();
 
   async function handleLogout() {
+    // Eerst de concepten, dan pas uitloggen: na signOut is de user-id weg
+    // en blijft het halve werk van deze docent achter op deze computer.
+    wisAlleConcepten();
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");

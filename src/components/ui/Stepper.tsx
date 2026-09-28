@@ -7,6 +7,10 @@ import Link from "next/link";
  *
  * `terug` is óf een href (eerste stap: terug naar het startscherm) óf een
  * functie (verder in de flow: een stap terug binnen dezelfde pagina).
+ *
+ * De kop heeft `tabIndex={-1}` en kan via `kopRef` focus krijgen: dat is
+ * het terugvalpunt als een stapwissel geen veld heeft om naartoe te
+ * springen. Met -1 blijft hij buiten de Tab-volgorde.
  */
 export function Stepper({
   stap,
@@ -14,12 +18,14 @@ export function Stepper({
   titel,
   terug,
   terugLabel = "Terug",
+  kopRef,
 }: {
   stap: number;
   totaal: number;
   titel: string;
   terug: string | (() => void);
   terugLabel?: string;
+  kopRef?: React.Ref<HTMLHeadingElement>;
 }) {
   const percentage = Math.round((stap / totaal) * 100);
 
@@ -47,7 +53,9 @@ export function Stepper({
       <p className="mt-2 text-base font-semibold text-tekst-zacht">
         Stap {stap} van {totaal}
       </p>
-      <h1 className="mt-1 font-display text-3xl text-marine">{titel}</h1>
+      <h1 ref={kopRef} tabIndex={-1} className="mt-1 font-display text-3xl text-marine">
+        {titel}
+      </h1>
 
       <div
         className="mt-4 h-2 w-full overflow-hidden rounded-full bg-lijn"

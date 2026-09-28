@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { TestInput, GeneratedTest, Vak, Niveau } from "@/lib/types";
 import { downloadToetsDocx } from "@/lib/docx-export";
+import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
@@ -19,9 +20,8 @@ const MAX_KERNBEGRIPPEN = 2000;
 const MIN_VRAGEN = 1;
 const MAX_VRAGEN = 40;
 const VASTE_AANTALLEN = [5, 10, 15, 20];
-
-/** Sleutel voor het concept; user-id is client-side niet beschikbaar. */
-const CONCEPT_SLEUTEL = "facula-draft-tests";
+const MIN_LEERJAAR = 1;
+const MAX_LEERJAAR = 6;
 
 const DEFAULT_INPUT: TestInput = {
   vak: "Maatschappijleer",
@@ -31,6 +31,26 @@ const DEFAULT_INPUT: TestInput = {
   kernbegrippen: "",
   aantalVragen: 10,
 };
+
+/**
+ * Een bewaard concept komt uit sessionStorage en is dus niet te
+ * vertrouwen: elk veld langs hetzelfde type en dezelfde grenzen als de
+ * serverside route, en wat niet klopt valt terug op de default. Nooit
+ * blind over de state heen spreiden.
+ */
+function herstelToetsInput(
+  ruw: Record<string, unknown>,
+  defaults: TestInput
+): TestInput {
+  return {
+    vak: conceptKeuze(ruw.vak, VAKKEN) ?? defaults.vak,
+    niveau: conceptKeuze(ruw.niveau, NIVEAUS) ?? defaults.niveau,
+    leerjaar: conceptGetal(ruw.leerjaar, MIN_LEERJAAR, MAX_LEERJAAR) ?? defaults.leerjaar,
+    leerdoel: conceptTekst(ruw.leerdoel, MAX_LEERDOEL) ?? defaults.leerdoel,
+    kernbegrippen: conceptTekst(ruw.kernbegrippen, MAX_KERNBEGRIPPEN) ?? defaults.kernbegrippen,
+    aantalVragen: conceptGetal(ruw.aantalVragen, MIN_VRAGEN, MAX_VRAGEN) ?? defaults.aantalVragen,
+  };
+}
 
 type FoutVeld = "leerdoel" | "kernbegrippen" | "aantalVragen";
 type Fouten = Partial<Record<FoutVeld, string>>;
@@ -54,7 +74,6 @@ type FocusDoel = FoutVeld | "vak" | "niveau" | "leerjaar";
  */
 export default function NewTestPage() {
   const [stap, setStap] = useState<1 | 2>(1);
-  const [input, setInput] = useState<TestInput>(DEFAULT_INPUT);
   const [eigenAantal, setEigenAantal] = useState(false);
   const [instellingenOpen, setInstellingenOpen] = useState(false);
   const [fouten, setFouten] = useState<Fouten>({});
@@ -64,6 +83,20 @@ export default function NewTestPage() {
   const [exporteren, setExporteren] = useState(false);
   const [exportFout, setExportFout] = useState<string | null>(null);
 
+  /** Een concept met een eigen aantal vragen moet dat veld ook tonen. */
+  const naHerstel = useCallback((hersteld: TestInput) => {
+    if (!VASTE_AANTALLEN.includes(hersteld.aantalVragen)) {
+      setEigenAantal(true);
+      setInstellingenOpen(true);
+    }
+  }, []);
+
+  const {
+    waarde: input,
+    zetWaarde: setInput,
+    wisConcept,
+  } = useDraft<TestInput>("tests", DEFAULT_INPUT, herstelToetsInput, naHerstel);
+
   const leerdoelRef = useRef<HTMLTextAreaElement>(null);
   const kernbegrippenRef = useRef<HTMLTextAreaElement>(null);
   const aantalEigenRef = useRef<HTMLInputElement>(null);
@@ -71,13 +104,22 @@ export default function NewTestPage() {
   const leerjaarRef = useRef<HTMLDivElement>(null);
   const vakRef = useRef<HTMLSelectElement>(null);
   const niveauRef = useRef<HTMLSelectElement>(null);
-  const conceptGelezen = useRef(false);
+  const kopRef = useRef<HTMLHeadingElement>(null);
+  const overzichtKopRef = useRef<HTMLHeadingElement>(null);
+  const genereerKnopRef = useRef<HTMLButtonElement>(null);
+  // Houdt een tweede klik op "Maak de toets" tegen: `bezig` in state komt
+  // pas ná de renderronde terug, een ref direct.
+  const bezigRef = useRef(false);
 
   /**
    * Focus naar een veld nádat React de nieuwe stap of het uitgeklapte
    * instellingenblok heeft gerenderd. Bewust in een animatieframe en niet
    * in een effect: een effect zou de focus-state weer moeten opruimen, en
    * setState in een effect veroorzaakt een extra renderronde.
+   *
+   * Bestaat het veld niet (nog niet gerenderd, of weggevallen), dan gaat de
+   * focus naar de kop van de stap: nooit naar niets, want dan valt de focus
+   * terug naar body en is de plek in het formulier kwijt.
    */
   const focusNaar = useCallback((doel: FocusDoel) => {
     requestAnimationFrame(() => {
@@ -90,45 +132,17 @@ export default function NewTestPage() {
         vak: vakRef.current,
         niveau: niveauRef.current,
       };
-      doelen[doel]?.focus();
+      (doelen[doel] ?? kopRef.current)?.focus();
     });
   }, []);
 
-  /**
-   * Concept terugzetten: wie per ongeluk wegnavigeert verliest niets. Het
-   * lezen gebeurt in een animatieframe en niet in de effect-body, omdat
-   * sessionStorage pas op de client bestaat: de server rendert de lege
-   * defaults, en een synchrone setState hier zou een extra renderronde
-   * kosten tijdens hydratie.
-   */
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const opgeslagen = sessionStorage.getItem(CONCEPT_SLEUTEL);
-      conceptGelezen.current = true;
-      if (!opgeslagen) return;
-      try {
-        const concept = JSON.parse(opgeslagen) as Partial<TestInput>;
-        setInput((huidig) => ({ ...huidig, ...concept }));
-        if (
-          typeof concept.aantalVragen === "number" &&
-          !VASTE_AANTALLEN.includes(concept.aantalVragen)
-        ) {
-          setEigenAantal(true);
-          setInstellingenOpen(true);
-        }
-      } catch {
-        sessionStorage.removeItem(CONCEPT_SLEUTEL);
-      }
+  /** Na een stapwissel zonder veld: de kop van de nieuwe stap. */
+  const focusKop = useCallback((kop: "stap1" | "overzicht") => {
+    requestAnimationFrame(() => {
+      const doel = kop === "overzicht" ? overzichtKopRef.current : kopRef.current;
+      (doel ?? kopRef.current)?.focus();
     });
-    return () => cancelAnimationFrame(frame);
   }, []);
-
-  // Pas opslaan nadat het eerder bewaarde concept gelezen is, anders
-  // overschrijft de lege beginstaat het concept nog vóór het terugkomt.
-  useEffect(() => {
-    if (!conceptGelezen.current) return;
-    sessionStorage.setItem(CONCEPT_SLEUTEL, JSON.stringify(input));
-  }, [input]);
 
   const wijzig = useCallback(
     (doel: FocusDoel) => {
@@ -175,9 +189,14 @@ export default function NewTestPage() {
       return;
     }
     setStap(2);
+    focusKop("overzicht");
   }
 
   async function genereer() {
+    // Dubbele submit: een tweede klik binnen dezelfde renderronde zou een
+    // tweede toets genereren én een tweede keer van het quotum afhalen.
+    if (bezigRef.current) return;
+    bezigRef.current = true;
     setBezig(true);
     setFout(null);
     try {
@@ -195,12 +214,16 @@ export default function NewTestPage() {
         throw new Error(data?.error ?? "Genereren mislukt.");
       }
       const { test } = await response.json();
-      sessionStorage.removeItem(CONCEPT_SLEUTEL);
+      wisConcept();
       setResultaat(test as GeneratedTest);
     } catch (err) {
       console.error("Toets genereren mislukt", err);
       setFout(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
+      // De melding is nieuw op het scherm: breng de focus naar de knop die
+      // hem oplost, anders moet een schermlezer zelf terugzoeken.
+      requestAnimationFrame(() => genereerKnopRef.current?.focus());
     } finally {
+      bezigRef.current = false;
       setBezig(false);
     }
   }
@@ -252,8 +275,16 @@ export default function NewTestPage() {
         stap={stap}
         totaal={2}
         titel={stap === 1 ? "Waar gaat de toets over?" : "Klopt dit zo?"}
-        terug={stap === 1 ? "/app" : () => setStap(1)}
+        terug={
+          stap === 1
+            ? "/app"
+            : () => {
+                setStap(1);
+                focusKop("stap1");
+              }
+        }
         terugLabel={stap === 1 ? "Terug naar start" : "Terug naar stap 1"}
+        kopRef={kopRef}
       />
 
       <div key={stap} className="stap-fade">
@@ -369,6 +400,9 @@ export default function NewTestPage() {
                       onChange={(waarde) => {
                         if (waarde === "anders") {
                           setEigenAantal(true);
+                          // Het getalveld verschijnt nu pas: zonder deze
+                          // sprong moet de docent zelf gaan zoeken.
+                          focusNaar("aantalVragen");
                           return;
                         }
                         setEigenAantal(false);
@@ -426,6 +460,18 @@ export default function NewTestPage() {
 
         ) : (
           <div className="mt-8 space-y-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
+            {/* Focusdoel na de stapwissel. tabIndex -1 houdt de kop buiten
+                de Tab-volgorde, maar maakt hem wel programmatisch te
+                focussen, zodat een schermlezer stap 2 vanaf het begin
+                voorleest in plaats van vanaf de oude plek. */}
+            <h2
+              ref={overzichtKopRef}
+              tabIndex={-1}
+              className="font-display text-2xl text-marine"
+            >
+              Overzicht van je keuzes
+            </h2>
+
             <dl className="space-y-4">
               <OverzichtRegel
                 label="Leerdoel"
@@ -458,8 +504,14 @@ export default function NewTestPage() {
 
             <ProgressNotice bezig={bezig} />
 
+            {/* role="alert" meldt de fout zodra hij verschijnt, zonder dat
+                de focus hoeft te verspringen; de focus gaat daarna naar de
+                knop die hem oplost. */}
             {fout && (
-              <div className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4">
+              <div
+                role="alert"
+                className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4"
+              >
                 <p className="text-base font-medium text-fout-tekst">{fout}</p>
                 <p className="mt-1 text-base text-tekst-zacht">
                   Je invoer staat er nog. Je kunt het direct opnieuw proberen.
@@ -467,7 +519,13 @@ export default function NewTestPage() {
               </div>
             )}
 
-            <Button variant="primary" volleBreedte disabled={bezig} onClick={genereer}>
+            <Button
+              ref={genereerKnopRef}
+              variant="primary"
+              volleBreedte
+              disabled={bezig}
+              onClick={genereer}
+            >
               {bezig ? "Bezig met maken..." : fout ? "Probeer opnieuw" : "Maak de toets"}
             </Button>
           </div>

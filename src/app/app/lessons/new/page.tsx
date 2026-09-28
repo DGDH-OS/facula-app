@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LessonInput, Vak, Niveau } from "@/lib/types";
+import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
@@ -18,9 +19,9 @@ const MAX_LEERDOEL = 2000;
 const MIN_LESDUUR = 10;
 const MAX_LESDUUR = 240;
 const VASTE_LESDUREN = [45, 50, 60, 90];
-
-/** Sleutel voor het concept; user-id is client-side niet beschikbaar. */
-const CONCEPT_SLEUTEL = "facula-draft-lesson";
+const MIN_LEERJAAR = 1;
+const MAX_LEERJAAR = 6;
+const MAX_LESSEN = 6;
 
 const DEFAULT_INPUT: LessonInput = {
   vak: "Maatschappijleer",
@@ -30,6 +31,26 @@ const DEFAULT_INPUT: LessonInput = {
   lesduur: 50,
   aantalLessen: 1,
 };
+
+/**
+ * Een bewaard concept komt uit sessionStorage en is dus niet te
+ * vertrouwen: elk veld langs hetzelfde type en dezelfde grenzen als de
+ * serverside route, en wat niet klopt valt terug op de default. Nooit
+ * blind over de state heen spreiden.
+ */
+function herstelLesInput(
+  ruw: Record<string, unknown>,
+  defaults: LessonInput
+): LessonInput {
+  return {
+    vak: conceptKeuze(ruw.vak, VAKKEN) ?? defaults.vak,
+    niveau: conceptKeuze(ruw.niveau, NIVEAUS) ?? defaults.niveau,
+    leerjaar: conceptGetal(ruw.leerjaar, MIN_LEERJAAR, MAX_LEERJAAR) ?? defaults.leerjaar,
+    leerdoel: conceptTekst(ruw.leerdoel, MAX_LEERDOEL) ?? defaults.leerdoel,
+    lesduur: conceptGetal(ruw.lesduur, MIN_LESDUUR, MAX_LESDUUR) ?? defaults.lesduur,
+    aantalLessen: conceptGetal(ruw.aantalLessen, 1, MAX_LESSEN) ?? defaults.aantalLessen,
+  };
+}
 
 type FoutVeld = "leerdoel" | "lesduur" | "leerjaar";
 type Fouten = Partial<Record<FoutVeld, string>>;
@@ -52,12 +73,25 @@ type FocusDoel = FoutVeld | "vak" | "niveau" | "aantalLessen";
 export default function NewLessonPage() {
   const router = useRouter();
   const [stap, setStap] = useState<1 | 2>(1);
-  const [input, setInput] = useState<LessonInput>(DEFAULT_INPUT);
   const [eigenLesduur, setEigenLesduur] = useState(false);
   const [instellingenOpen, setInstellingenOpen] = useState(false);
   const [fouten, setFouten] = useState<Fouten>({});
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
+
+  /** Een concept met een eigen lesduur moet dat veld ook uitgeklapt tonen. */
+  const naHerstel = useCallback((hersteld: LessonInput) => {
+    if (!VASTE_LESDUREN.includes(hersteld.lesduur)) {
+      setEigenLesduur(true);
+      setInstellingenOpen(true);
+    }
+  }, []);
+
+  const {
+    waarde: input,
+    zetWaarde: setInput,
+    wisConcept,
+  } = useDraft<LessonInput>("lesson", DEFAULT_INPUT, herstelLesInput, naHerstel);
 
   const leerdoelRef = useRef<HTMLTextAreaElement>(null);
   const lesduurRef = useRef<HTMLInputElement>(null);
@@ -65,13 +99,22 @@ export default function NewLessonPage() {
   const vakRef = useRef<HTMLSelectElement>(null);
   const niveauRef = useRef<HTMLSelectElement>(null);
   const aantalRef = useRef<HTMLDivElement>(null);
-  const conceptGelezen = useRef(false);
+  const kopRef = useRef<HTMLHeadingElement>(null);
+  const overzichtKopRef = useRef<HTMLHeadingElement>(null);
+  const genereerKnopRef = useRef<HTMLButtonElement>(null);
+  // Houdt een tweede klik op "Maak de les" tegen: `bezig` in state komt pas
+  // ná de renderronde terug, een ref direct.
+  const bezigRef = useRef(false);
 
   /**
    * Focus naar een veld nádat React de nieuwe stap of het uitgeklapte
    * instellingenblok heeft gerenderd. Bewust in een animatieframe en niet
    * in een effect: een effect zou de focus-state weer moeten opruimen, en
    * setState in een effect veroorzaakt een extra renderronde.
+   *
+   * Bestaat het veld niet (nog niet gerenderd, of weggevallen), dan gaat de
+   * focus naar de kop van de stap: nooit naar niets, want dan valt de focus
+   * terug naar body en is de plek in het formulier kwijt.
    */
   const focusNaar = useCallback((doel: FocusDoel) => {
     requestAnimationFrame(() => {
@@ -83,45 +126,17 @@ export default function NewLessonPage() {
         niveau: niveauRef.current,
         aantalLessen: aantalRef.current?.querySelector("input") ?? null,
       };
-      doelen[doel]?.focus();
+      (doelen[doel] ?? kopRef.current)?.focus();
     });
   }, []);
 
-  /**
-   * Concept terugzetten: wie per ongeluk wegnavigeert verliest niets. Het
-   * lezen gebeurt in een animatieframe en niet in de effect-body, omdat
-   * sessionStorage pas op de client bestaat: de server rendert de lege
-   * defaults, en een synchrone setState hier zou een extra renderronde
-   * kosten tijdens hydratie.
-   */
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const opgeslagen = sessionStorage.getItem(CONCEPT_SLEUTEL);
-      conceptGelezen.current = true;
-      if (!opgeslagen) return;
-      try {
-        const concept = JSON.parse(opgeslagen) as Partial<LessonInput>;
-        setInput((huidig) => ({ ...huidig, ...concept }));
-        if (
-          typeof concept.lesduur === "number" &&
-          !VASTE_LESDUREN.includes(concept.lesduur)
-        ) {
-          setEigenLesduur(true);
-          setInstellingenOpen(true);
-        }
-      } catch {
-        sessionStorage.removeItem(CONCEPT_SLEUTEL);
-      }
+  /** Na een stapwissel zonder veld: de kop van de nieuwe stap. */
+  const focusKop = useCallback((kop: "stap1" | "overzicht") => {
+    requestAnimationFrame(() => {
+      const doel = kop === "overzicht" ? overzichtKopRef.current : kopRef.current;
+      (doel ?? kopRef.current)?.focus();
     });
-    return () => cancelAnimationFrame(frame);
   }, []);
-
-  // Pas opslaan nadat het eerder bewaarde concept gelezen is, anders
-  // overschrijft de lege beginstaat het concept nog vóór het terugkomt.
-  useEffect(() => {
-    if (!conceptGelezen.current) return;
-    sessionStorage.setItem(CONCEPT_SLEUTEL, JSON.stringify(input));
-  }, [input]);
 
   const wijzig = useCallback(
     (doel: FocusDoel) => {
@@ -149,8 +164,12 @@ export default function NewLessonPage() {
     ) {
       nieuw.lesduur = `Vul een lesduur tussen ${MIN_LESDUUR} en ${MAX_LESDUUR} minuten in.`;
     }
-    if (!Number.isInteger(input.leerjaar) || input.leerjaar < 1 || input.leerjaar > 6) {
-      nieuw.leerjaar = "Vul een leerjaar tussen 1 en 6 in.";
+    if (
+      !Number.isInteger(input.leerjaar) ||
+      input.leerjaar < MIN_LEERJAAR ||
+      input.leerjaar > MAX_LEERJAAR
+    ) {
+      nieuw.leerjaar = `Vul een leerjaar tussen ${MIN_LEERJAAR} en ${MAX_LEERJAAR} in.`;
     }
     return nieuw;
   }
@@ -168,9 +187,14 @@ export default function NewLessonPage() {
       return;
     }
     setStap(2);
+    focusKop("overzicht");
   }
 
   async function genereer() {
+    // Dubbele submit: een tweede klik binnen dezelfde renderronde zou een
+    // tweede les genereren én een tweede keer van het quotum afhalen.
+    if (bezigRef.current) return;
+    bezigRef.current = true;
     setBezig(true);
     setFout(null);
 
@@ -187,7 +211,9 @@ export default function NewLessonPage() {
       }
 
       const { id } = await genResponse.json();
-      sessionStorage.removeItem(CONCEPT_SLEUTEL);
+      wisConcept();
+      // Bewust geen setBezig(false): de knop blijft "bezig" tot de
+      // lespagina staat, anders lijkt er even niets te gebeuren.
       router.push("/app/lessons/" + id);
     } catch (err) {
       console.error("Les genereren mislukt", err);
@@ -197,6 +223,11 @@ export default function NewLessonPage() {
           : "Er ging iets mis. Probeer het opnieuw."
       );
       setBezig(false);
+      // De melding is nieuw op het scherm: breng de focus naar de knop die
+      // hem oplost, anders moet een schermlezer zelf terugzoeken.
+      requestAnimationFrame(() => genereerKnopRef.current?.focus());
+    } finally {
+      bezigRef.current = false;
     }
   }
 
@@ -210,8 +241,16 @@ export default function NewLessonPage() {
         stap={stap}
         totaal={2}
         titel={stap === 1 ? "Waar gaat de les over?" : "Klopt dit zo?"}
-        terug={stap === 1 ? "/app" : () => setStap(1)}
+        terug={
+          stap === 1
+            ? "/app"
+            : () => {
+                setStap(1);
+                focusKop("stap1");
+              }
+        }
         terugLabel={stap === 1 ? "Terug naar start" : "Terug naar stap 1"}
+        kopRef={kopRef}
       />
 
       <div key={stap} className="stap-fade">
@@ -307,6 +346,9 @@ export default function NewLessonPage() {
                     onChange={(waarde) => {
                       if (waarde === "anders") {
                         setEigenLesduur(true);
+                        // Het getalveld verschijnt nu pas: zonder deze
+                        // sprong moet de docent zelf gaan zoeken.
+                        focusNaar("lesduur");
                         return;
                       }
                       setEigenLesduur(false);
@@ -363,8 +405,8 @@ export default function NewLessonPage() {
                         ref={leerjaarRef}
                         type="number"
                         inputMode="numeric"
-                        min={1}
-                        max={6}
+                        min={MIN_LEERJAAR}
+                        max={MAX_LEERJAAR}
                         value={input.leerjaar}
                         onChange={(e) =>
                           setInput({ ...input, leerjaar: Number(e.target.value) })
@@ -383,6 +425,18 @@ export default function NewLessonPage() {
           </FormCard>
         ) : (
           <div className="mt-8 space-y-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
+            {/* Focusdoel na de stapwissel. tabIndex -1 houdt de kop buiten
+                de Tab-volgorde, maar maakt hem wel programmatisch te
+                focussen, zodat een schermlezer stap 2 vanaf het begin
+                voorleest in plaats van vanaf de oude plek. */}
+            <h2
+              ref={overzichtKopRef}
+              tabIndex={-1}
+              className="font-display text-2xl text-marine"
+            >
+              Overzicht van je keuzes
+            </h2>
+
             <dl className="space-y-4">
               <OverzichtRegel
                 label="Leerdoel"
@@ -415,8 +469,14 @@ export default function NewLessonPage() {
 
             <ProgressNotice bezig={bezig} />
 
+            {/* role="alert" meldt de fout zodra hij verschijnt, zonder dat
+                de focus hoeft te verspringen; de focus gaat daarna naar de
+                knop die hem oplost. */}
             {fout && (
-              <div className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4">
+              <div
+                role="alert"
+                className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4"
+              >
                 <p className="text-base font-medium text-fout-tekst">{fout}</p>
                 <p className="mt-1 text-base text-tekst-zacht">
                   Je invoer staat er nog. Je kunt het direct opnieuw proberen.
@@ -424,7 +484,13 @@ export default function NewLessonPage() {
               </div>
             )}
 
-            <Button variant="primary" volleBreedte disabled={bezig} onClick={genereer}>
+            <Button
+              ref={genereerKnopRef}
+              variant="primary"
+              volleBreedte
+              disabled={bezig}
+              onClick={genereer}
+            >
               {bezig ? "Bezig met maken..." : fout ? "Probeer opnieuw" : "Maak de les"}
             </Button>
           </div>
