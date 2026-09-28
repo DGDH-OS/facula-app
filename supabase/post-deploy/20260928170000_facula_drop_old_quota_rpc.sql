@@ -6,6 +6,11 @@
 -- voegt niets toe waar de nieuwe code van afhangt en haalt alleen weg wat
 -- alleen de oude versie nog aanroept.
 --
+-- Daarom ligt het in supabase/post-deploy/ en niet in supabase/migrations/:
+-- `supabase db push` past de migratiemap in één keer toe en laat geen ruimte
+-- om er een deploy tussen te zetten. Hier is het toepassen een aparte,
+-- handmatige stap. Zie supabase/post-deploy/README.md voor de volgorde.
+--
 -- Waarom die volgorde. De versie van de app die nu in productie draait (map
 -- facula-app) doet zijn quota-check via facula.try_increment_usage. Draait dit
 -- bestand vóór de deploy, dan faalt het opslaan daar met een fout. Dat is

@@ -56,10 +56,12 @@
 -- toegepast worden zonder dat er iets omvalt. Het intrekken en weghalen van
 -- facula.try_increment_usage, de oude en omzeilbare quota-RPC die die versie
 -- wél aanroept, staat apart in
--- 20260928170000_facula_drop_old_quota_rpc.sql — dat bestand hoort pas ná de
--- deploy te draaien. Twee bestanden dus, en de volgorde ertussen is het hele
--- punt: samen zouden ze een venster maken waarin de oude app niets meer kan
--- opslaan.
+-- supabase/post-deploy/20260928170000_facula_drop_old_quota_rpc.sql — buiten
+-- supabase/migrations/, zodat `supabase db push` het niet mee kan nemen, en
+-- pas handmatig toe te passen ná de deploy. Twee bestanden dus, en de volgorde
+-- ertussen is het hele punt: samen zouden ze een venster maken waarin de oude
+-- app niets meer kan opslaan. De volledige releasevolgorde staat in
+-- supabase/post-deploy/README.md.
 
 -- Weg met de terugboeking. Bewust een drop en geen "laat maar staan": een
 -- functie die het quotum kan verlagen is precies wat je niet wil laten

@@ -489,7 +489,7 @@ async function main() {
   const anderUserId = "9c8b7a65-4321-4fed-9876-543210abcdef";
   const afgekeurdePaden: [string | null, string][] = [
     [anderUserId + "/logo", "het pad van een andere docent"],
-    [TEST_USER_ID + "/logo.png", "een pad uit de oude opzet, met extensie"],
+    [TEST_USER_ID + "/logo.png", "een pad met een extensie erachter"],
     [TEST_USER_ID + "/logo/extra", "een dieper pad"],
     [TEST_USER_ID + "/../" + anderUserId + "/logo", "een pad met een omweg omhoog"],
     ["logo", "een pad zonder map"],
@@ -503,8 +503,8 @@ async function main() {
     );
   }
 
-  // Het pad draagt geen extensie meer, dus het bestandstype moet uit de kolom
-  // of uit de bestandskop komen.
+  // Het pad draagt geen extensie, dus het bestandstype moet uit de kolom of
+  // uit de bestandskop komen.
   console.log("Bestandstype van het logo zonder extensie in het pad");
   eis(
     mimeUitBytes(pngBytes) === "image/png",

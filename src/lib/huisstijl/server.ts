@@ -41,10 +41,9 @@ export function logoPad(userId: string): string {
 }
 
 /**
- * Alle objectnamen die van deze docent kunnen zijn. Sinds het ene vaste pad is
- * dat er precies één; de functie blijft bestaan omdat de opruimpaden met een
- * lijst werken en er in oudere installaties nog objecten met een extensie
- * kunnen liggen — die haalt de listing in verwijderAlleLogoObjecten() op.
+ * Alle objectnamen die van deze docent kunnen zijn. Dat is er precies één; de
+ * functie blijft bestaan omdat de opruimpaden met een lijst werken en die lijst
+ * daar samengevoegd wordt met de listing van de map.
  */
 export function logoPaden(userId: string): string[] {
   return [logoPad(userId)];
@@ -223,6 +222,71 @@ export async function schrijfLogoMetLease(
   return { status: "ok", rij: rijen[0] };
 }
 
+/**
+ * Ruimt een zojuist geüpload logo-object op dat door niets meer aangewezen
+ * wordt. Best effort: lukt het niet, dan blijft het object staan en gebeurt er
+ * verder niets vervelends.
+ *
+ * Nodig omdat een upload uit twee stappen bestaat die niet samen in een
+ * transactie passen: eerst het object in de bucket, dan het pad in de rij. Gaat
+ * die tweede stap mis, dan ligt er een object waar de huisstijl niet naar
+ * verwijst. Het overschrijft zichzelf bij de volgende upload en gaat mee bij
+ * accountverwijdering, dus het lekt niet — maar het is wel een bestand van een
+ * docent dat er zonder reden ligt, en dat hoort weg.
+ *
+ * Twee voorwaarden, en beide moeten kloppen voordat er iets verwijderd wordt:
+ *
+ *   1. de lease met dit token loopt nog. Is hij verlopen, dan is er een andere
+ *      aanvraag aan het werk op ditzelfde pad, en die kan net iets geüpload
+ *      hebben. Het object weghalen zou dan precies de fout maken die de lease
+ *      moet voorkomen. Er is dus geen opruiming zonder lease, alleen een
+ *      logregel;
+ *   2. de rij verwijst niet naar het object (logo_path is leeg). Staat het pad
+ *      er wél, dan is het object in gebruik — door deze aanvraag niet, maar dan
+ *      door een eerdere upload waarvan de rij nog klopt.
+ *
+ * De controle op (1) en de verwijdering zelf gebeuren niet in hetzelfde
+ * statement; dat kan niet, want het object staat buiten de database. Het is
+ * dezelfde afweging als in DELETE /api/huisstijl/logo: de controle maakt het
+ * raam zo klein als het kan worden, en wat erdoorheen komt is hooguit een
+ * object dat bij de volgende upload alsnog overschreven wordt.
+ */
+export async function ruimVerweesdLogoOp(
+  supabase: SupabaseClient,
+  token: string,
+  userId: string
+): Promise<void> {
+  if (!(await logoLeaseNogGeldig(supabase, token))) {
+    console.error("Verweesd logo-object blijft staan: de lease is verlopen", { userId });
+    return;
+  }
+
+  // Bewust niet via haalHuisstijl(): die geeft bij een leesfout de
+  // standaardstijl terug, en daar is logoPath leeg. Dat is goed voor het tonen
+  // van een huisstijl, maar hier zou het een leesfout laten lezen als "niemand
+  // gebruikt dit object" en dus tot een verwijdering leiden. Fail-closed: wat
+  // niet gelezen kan worden, wordt niet opgeruimd.
+  const { data, error } = await supabase
+    .schema("facula")
+    .from("huisstijl")
+    .select("logo_path")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Verweesd logo-object blijft staan: de rij is niet te lezen", error);
+    return;
+  }
+  if (data?.logo_path) {
+    console.error("Verweesd logo-object blijft staan: de rij verwijst ernaar", { userId });
+    return;
+  }
+
+  if (await verwijderLogoObjecten(supabase, [logoPad(userId)])) {
+    console.warn("Verweesd logo-object opgeruimd", { userId });
+  }
+}
+
 /** De kolommen die samen een Huisstijl opleveren. Eén lijst, overal dezelfde. */
 export const HUISSTIJL_KOLOMMEN =
   "preset, accent, tekst, achtergrond, lettertype, schoolnaam, logo_path, logo_mime, logo_standaard_aan";
@@ -399,9 +463,9 @@ async function lijstLogoObjecten(
  *      een listing het niet teruggeeft (eventual consistency, een lege
  *      listing-respons, of een logo dat wél bestaat maar niet in de index
  *      staat);
- *   2. daarnaast de volledige, paginerende listing van de map, zodat objecten
- *      uit de oude opzet ('<user_id>/logo.png', '<user_id>/logo.jpg') en al
- *      het andere dat er ooit in beland is, mee weggaan;
+ *   2. daarnaast de volledige, paginerende listing van de map, zodat alles wat
+ *      daar buiten het ene toegestane pad om toch in beland is (service-role,
+ *      een fout in een toekomstige versie) mee weggaat;
  *   3. een hercontrole na het verwijderen: pas als de map leeg IS, mag de
  *      aanroeper verder.
  *

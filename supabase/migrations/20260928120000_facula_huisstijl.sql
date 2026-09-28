@@ -8,8 +8,10 @@
 --
 -- In tegenstelling tot facula.profiles en facula.usage_counters mag de
 -- gebruiker hier WEL zelf schrijven: dit zijn puur eigen voorkeuren zonder
--- gevolgen voor abonnement of quotum. Vandaar volledige eigen CRUD, altijd
--- afgebakend met auth.uid() = user_id.
+-- gevolgen voor abonnement of quotum. Vandaar select, insert en update op de
+-- eigen rij, altijd afgebakend met auth.uid() = user_id. Verwijderen hoort daar
+-- niet bij: niets in de app doet dat, en de rij gaat bij accountverwijdering
+-- vanzelf mee via ON DELETE CASCADE.
 --
 -- Het logo zelf staat niet in deze tabel maar in de private storage-bucket
 -- school-logos; hier staat alleen het pad plus het bestandstype. Zo blijft de
@@ -40,6 +42,44 @@
 -- (facula.set_logo_with_lease, facula.logo_lock_held).
 --
 -- Idempotent: opnieuw draaien mag.
+
+-- Eerst een controle, en die mag hard stuklopen. Het beleid hieronder laat per
+-- docent exact één objectnaam toe ('<uuid>/logo'). Ligt er in deze bucket iets
+-- met een andere naam, dan is de aanname onder deze migratie niet waar: er is
+-- een omgeving waarin logo's anders zijn weggeschreven dan deze branch
+-- veronderstelt, en het beleid hieronder zou dat object onbereikbaar maken voor
+-- iedereen behalve service_role — inclusief de accountverwijdering, die daarmee
+-- persoonsgegevens zou achterlaten.
+--
+-- Bewust geen stille opruiming en geen stil leeghalen van de rij: een migratie
+-- hoort andermans bestanden niet weg te gooien, en een aanname die niet klopt
+-- hoort zichtbaar te zijn vóór er iets aan het beleid verandert. De melding
+-- noemt één voorbeeldnaam en het aantal, zodat degene die dit toepast kan zien
+-- waar het om gaat.
+--
+-- In een omgeving waar deze migratie nog niet gedraaid heeft, bestaat de bucket
+-- niet en is deze telling per definitie nul.
+--
+-- Staat bewust vóór de eerste wijziging in dit bestand: toegepast zonder
+-- omhullende transactie (psql, SQL-editor) zou een controle halverwege een
+-- half doorgevoerde migratie achterlaten.
+do $$
+declare
+  v_aantal bigint;
+  v_voorbeeld text;
+begin
+  select count(*), min(o.name)
+    into v_aantal, v_voorbeeld
+  from storage.objects o
+  where o.bucket_id = 'school-logos'
+    and o.name !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/logo$';
+
+  if v_aantal > 0 then
+    raise exception
+      'Bucket school-logos bevat % object(en) met een naam die niet ''<uuid>/logo'' is (eerste: %). Deze migratie maakt die objecten onbereikbaar; ruim ze eerst op of pas het beleid aan.',
+      v_aantal, v_voorbeeld;
+  end if;
+end $$;
 
 create table if not exists facula.huisstijl (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -98,15 +138,29 @@ alter table facula.huisstijl
 alter table facula.huisstijl drop constraint if exists huisstijl_logo_path_check;
 alter table facula.huisstijl drop constraint if exists huisstijl_logo_mime_check;
 
--- Paden uit de oude opzet (met extensie) zouden de nieuwe vorm breken. Ze
--- wijzen naar objecten die het storage-beleid hieronder niet meer toelaat en
--- zijn dus toch onbruikbaar: leeghalen in plaats van de migratie erop laten
--- stuklopen. De docent uploadt zijn logo opnieuw; het achtergebleven object
--- gaat mee bij accountverwijdering, die de map uitlijst.
+-- logo_mime gelijktrekken vóór de check erop komt. Alleen vormwerk: spaties
+-- eraf, kleine letters, en 'image/jpg' naar de enige spelling die deze kolom
+-- kent. Wat daarna nog buiten png/jpeg valt, zegt niets bruikbaars over het
+-- object en gaat leeg; het bestandstype is dan nog uit de bestandskop te lezen
+-- (zie logoMimeType in src/lib/huisstijl/server.ts).
+--
+-- Dit is geen upgradepad voor een vorige versie van deze tabel: die bestaat
+-- niet, deze migratie is nog nergens toegepast. Het is er zodat een omgeving
+-- waar een eerdere versie van dit bestand draaide, en de harness die dat
+-- nabootst, zonder handwerk opnieuw door deze migratie heen kan.
 update facula.huisstijl
-set logo_path = null, logo_mime = null
-where logo_path is not null
-  and logo_path !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/logo$';
+set logo_mime = lower(btrim(logo_mime))
+where logo_mime is not null
+  and logo_mime <> lower(btrim(logo_mime));
+
+update facula.huisstijl
+set logo_mime = 'image/jpeg'
+where logo_mime = 'image/jpg';
+
+update facula.huisstijl
+set logo_mime = null
+where logo_mime is not null
+  and logo_mime not in ('image/png', 'image/jpeg');
 
 alter table facula.huisstijl
   add constraint huisstijl_logo_path_check check (
@@ -151,14 +205,21 @@ create policy "huisstijl_update_own"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "huisstijl_delete_own"
-  on facula.huisstijl
-  for delete
-  to authenticated
-  using (auth.uid() = user_id);
+-- Geen delete-policy en geen delete-recht voor authenticated. Niets in de app
+-- verwijdert deze rij vanuit de client: een logo weghalen is een update
+-- (logo_path/logo_mime op null, via facula.set_logo_with_lease), en een account
+-- verwijderen gaat via de service-role die auth.users weggooit, waarna deze rij
+-- via ON DELETE CASCADE meegaat (zie src/app/api/account/delete/route.ts).
+--
+-- Een recht dat niemand gebruikt, is alleen een extra manier om iets te
+-- verliezen: een delete zou de lease-kolommen van een lopende logomutatie mee
+-- weggooien en die mutatie dwars door haar serialisatie heen laten schrijven.
+-- De revoke staat er expliciet voor omgevingen waar een eerdere versie van dit
+-- bestand het recht wél gaf.
+revoke delete on facula.huisstijl from authenticated;
 
 grant usage on schema facula to authenticated;
-grant select, insert, update, delete on facula.huisstijl to authenticated;
+grant select, insert, update on facula.huisstijl to authenticated;
 grant all on facula.huisstijl to service_role;
 
 -- ---------------------------------------------------------------------------

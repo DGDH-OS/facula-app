@@ -11,6 +11,7 @@ import {
   logoMimeType,
   logoPad,
   releaseLogoLease,
+  ruimVerweesdLogoOp,
   schrijfLogoMetLease,
   verwijderLogoObjecten,
 } from "@/lib/huisstijl/server";
@@ -247,24 +248,24 @@ export async function POST(request: NextRequest) {
       genormaliseerd.mimeType
     );
 
-    if (geschreven.status === "verlopen") {
-      // Het object staat er wel, de rij wijst er niet naar. Dat is dezelfde
-      // toestand als een mislukte rijmutatie hieronder: het object ligt op het
-      // ene bekende pad van deze docent en gaat mee met de volgende upload of
-      // met accountverwijdering.
-      console.error("Logo-lease verlopen vóór de rijmutatie", { userId: user.id });
-      return NextResponse.json(
-        { error: LOGO_LEASE_VERLOPEN_MELDING },
-        { status: 409 }
-      );
-    }
+    if (geschreven.status !== "ok") {
+      // Het object staat er, de rij wijst er niet naar. Opruimen mag, maar
+      // alleen onder voorwaarden: ruimVerweesdLogoOp() doet niets zolang de
+      // lease niet meer van deze aanvraag is (dan is er een andere bezig op
+      // ditzelfde pad) of zolang de rij wél een pad bevat (dan is het object in
+      // gebruik). Lukt het opruimen niet, dan is dat geen fout voor de docent:
+      // het object ligt op het ene bekende pad, de volgende upload
+      // overschrijft het en accountverwijdering haalt het weg.
+      await ruimVerweesdLogoOp(supabase, lease.token, user.id);
 
-    if (geschreven.status === "fout") {
-      // Het object blijft staan, en dat is hier de veilige keuze. Het ligt op
-      // het ene bekende pad van deze docent: de volgende upload overschrijft
-      // het, en accountverwijdering haalt het weg. Opruimen zou de docent geen
-      // stap verder brengen en een geslaagde upload weggooien waarvan alleen
-      // de rij nog miste.
+      if (geschreven.status === "verlopen") {
+        console.error("Logo-lease verlopen vóór de rijmutatie", { userId: user.id });
+        return NextResponse.json(
+          { error: LOGO_LEASE_VERLOPEN_MELDING },
+          { status: 409 }
+        );
+      }
+
       return NextResponse.json(
         { error: "Het logo kon niet worden opgeslagen. Probeer het opnieuw." },
         { status: 500 }
