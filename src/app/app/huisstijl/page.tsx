@@ -33,9 +33,6 @@ const PRESET_VOLGORDE: PresetNaam[] = ["facula", "mihiriban", "rustig", "contras
 
 const EIGEN_OMSCHRIJVING = "Je eigen kleuren en lettertype instellen.";
 
-/** Boven deze grootte krijgt de docent een waarschuwing, geen weigering. */
-const GROOT_LOGO_BYTES = 250 * 1024;
-
 export default function HuisstijlPage() {
   const [preset, setPreset] = useState<PresetNaam>(STANDAARD_HUISSTIJL.preset);
   const [eigen, setEigen] = useState<Kleurenset>({
@@ -51,7 +48,6 @@ export default function HuisstijlPage() {
   const [laden, setLaden] = useState(true);
   const [opslaan, setOpslaan] = useState(false);
   const [logoBezig, setLogoBezig] = useState(false);
-  const [logoWaarschuwing, setLogoWaarschuwing] = useState<string | null>(null);
   const [fout, setFout] = useState<string | null>(null);
   const [bewaard, setBewaard] = useState(false);
 
@@ -135,16 +131,9 @@ export default function HuisstijlPage() {
         throw new Error("Kies een PNG- of JPG-bestand.");
       }
 
-      // PowerPoint krijgt het logo op elke dia, en pptxgenjs schrijft het
-      // daarbij één keer per dia weg in plaats van één keer per bestand. Een
-      // logo van een halve MB levert dus al snel een presentatie van tien MB
-      // op. Geen reden om te weigeren, wel om het te zeggen.
-      setLogoWaarschuwing(
-        bestand.size > GROOT_LOGO_BYTES
-          ? "Dit logo is vrij groot. Het komt op elke dia te staan, dus je PowerPoint wordt er fors van. Een kleiner bestand werkt prettiger."
-          : null
-      );
-
+      // Geen waarschuwing meer bij een groot bestand: de server verkleint het
+      // logo bij de upload tot binnen 600x300 px, dus een foto van 2 MB
+      // levert geen zware PowerPoint meer op.
       const formulier = new FormData();
       formulier.append("logo", bestand);
       const response = await fetch("/api/huisstijl/logo", {
@@ -167,7 +156,6 @@ export default function HuisstijlPage() {
     setFout(null);
     setBewaard(false);
     try {
-      setLogoWaarschuwing(null);
       const response = await fetch("/api/huisstijl/logo", { method: "DELETE" });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error ?? "Verwijderen lukte niet.");
@@ -334,8 +322,9 @@ export default function HuisstijlPage() {
         <div className="mt-6">
           <h3 className="text-base font-semibold text-marine">Schoollogo</h3>
           <p className="mt-1 max-w-[70ch] text-base text-tekst-zacht">
-            Een PNG- of JPG-bestand van maximaal 2 MB. Alleen het logo wordt
-            bewaard, verwijder het wanneer je wilt.
+            Een PNG- of JPG-bestand van maximaal 2 MB. We verkleinen het
+            automatisch, zodat je lessen en toetsen licht blijven. Alleen het
+            logo wordt bewaard, verwijder het wanneer je wilt.
           </p>
 
           {logoUrl && (
@@ -372,12 +361,6 @@ export default function HuisstijlPage() {
               className="mt-2 block w-full min-h-14 rounded-lg border-2 border-lijn bg-ivoor px-4 py-3 text-base text-tekst"
             />
           </div>
-
-          {logoWaarschuwing && (
-            <p className="mt-3 max-w-[70ch] rounded-lg border-2 border-waarschuwing-tekst bg-waarschuwing-vlak px-4 py-3 text-base text-waarschuwing-tekst">
-              {logoWaarschuwing}
-            </p>
-          )}
 
           <ProgressNotice bezig={logoBezig} tekst="Bezig met je logo..." />
         </div>

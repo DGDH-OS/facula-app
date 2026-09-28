@@ -9,7 +9,10 @@
  *      geweigerd;
  *   2. de PowerPoint- en Word-exports draaien in elke stijl zonder fout;
  *   3. het schoollogo zit echt in de bestanden (ppt/media, word/media) en de
- *      bestanden zijn geldige zips die een office-programma kan openen.
+ *      bestanden zijn geldige zips die een office-programma kan openen;
+ *   4. een groot logo (2000x1000) wordt door normaliseerLogo teruggebracht
+ *      tot hooguit 150 kB, en een les van twee delen blijft daarmee onder
+ *      de 1,5 MB.
  *
  * Het testlogo wordt hier ter plekke gemaakt, zodat de test geen bestand van
  * buiten nodig heeft en dus overal draait.
@@ -26,9 +29,21 @@ import { genereerRapportTekst } from "../src/lib/report-generator";
 import { bouwLesPresentatie } from "../src/lib/pptx-export";
 import { bouwToetsDocument } from "../src/lib/docx-export";
 import { bouwRapportDocument } from "../src/lib/report-docx-export";
-import { maakLogo, type Logo, type LogoBestand } from "../src/lib/huisstijl/logo";
+import {
+  bestandsExtensie,
+  maakLogo,
+  type Logo,
+  type LogoBestand,
+} from "../src/lib/huisstijl/logo";
+import {
+  LOGO_DOEL_BYTES,
+  LOGO_MAX_BREEDTE,
+  LOGO_MAX_HOOGTE,
+  normaliseerLogo,
+} from "../src/lib/huisstijl/normalize-logo";
 import {
   controleerContrast,
+  MAX_LOGO_BYTES,
   PRESETS,
   resolveHuisstijl,
   type Huisstijl,
@@ -75,21 +90,46 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
   return uit;
 }
 
+/** Een deterministische ruisgenerator (xorshift32), zodat de test elke keer
+ * hetzelfde bestand oplevert. */
+function xorshift(staat: number): number {
+  let s = staat;
+  s ^= s << 13;
+  s >>>= 0;
+  s ^= s >>> 17;
+  s ^= s << 5;
+  return s >>> 0;
+}
+
 /**
  * Een echt, geldig PNG-bestand: een effen vlak van breedte bij hoogte.
  * Bewust niet vierkant in de aanroep hieronder, zodat een export die de
  * verhouding negeert zichtbaar zou worden in de afmetingen.
+ *
+ * Met `ruis` wordt het vlak gevuld met vaste pseudo-ruis in plaats van één
+ * kleur. Een effen vlak comprimeert namelijk tot een paar kB, hoe groot je
+ * het ook maakt, en dan bewijst een test over verkleinen niets.
  */
-function maakTestPng(breedte: number, hoogte: number): Uint8Array {
+function maakTestPng(breedte: number, hoogte: number, ruis = false): Uint8Array {
   const ruw = new Uint8Array(hoogte * (1 + breedte * 3));
   let p = 0;
+  let staat = 2463534242;
   for (let y = 0; y < hoogte; y += 1) {
     ruw[p] = 0; // filtertype "geen"
     p += 1;
     for (let x = 0; x < breedte; x += 1) {
-      ruw[p] = 0x16;
-      ruw[p + 1] = 0x23;
-      ruw[p + 2] = 0x3b;
+      if (ruis) {
+        staat = xorshift(staat);
+        // Vier niveaus per kanaal: genoeg om slecht te comprimeren, niet
+        // zoveel dat het testbestand boven de uploadgrens van 2 MB uitkomt.
+        ruw[p] = (staat >>> 24) & 0xc0;
+        ruw[p + 1] = (staat >>> 16) & 0xc0;
+        ruw[p + 2] = (staat >>> 8) & 0xc0;
+      } else {
+        ruw[p] = 0x16;
+        ruw[p + 1] = 0x23;
+        ruw[p + 2] = 0x3b;
+      }
       p += 3;
     }
   }
@@ -333,6 +373,87 @@ async function main() {
   eis(
     kaalToetsMedia.length === 0,
     "er zit een afbeelding in de toets terwijl het logo uit staat"
+  );
+
+  // Een groot logo, zoals een docent het zo uit een telefoon of een
+  // logobestand van de school haalt. De server verkleint dat bij de upload,
+  // zodat pptxgenjs (dat het logo per dia wegschrijft) er geen presentatie
+  // van tientallen MB's van maakt.
+  console.log("");
+  console.log("Een groot logo wordt serverside verkleind");
+
+  const grootPng = maakTestPng(2000, 1000, true);
+  eis(
+    grootPng.length < MAX_LOGO_BYTES,
+    "het grote testlogo is " + grootPng.length + " bytes en zou de uploadgrens al overschrijden"
+  );
+
+  const verkleind = await normaliseerLogo(grootPng);
+  if (!verkleind) throw new Error("Het grote testlogo kwam niet door normaliseerLogo.");
+
+  console.log(
+    "  " +
+      grootPng.length +
+      " bytes (2000x1000) wordt " +
+      verkleind.bytes.length +
+      " bytes (" +
+      verkleind.breedte +
+      "x" +
+      verkleind.hoogte +
+      ", " +
+      verkleind.mimeType +
+      ")"
+  );
+
+  eis(
+    verkleind.bytes.length <= LOGO_DOEL_BYTES,
+    "verkleind logo is " + verkleind.bytes.length + " bytes, hoogstens " + LOGO_DOEL_BYTES + " verwacht"
+  );
+  eis(
+    verkleind.breedte <= LOGO_MAX_BREEDTE && verkleind.hoogte <= LOGO_MAX_HOOGTE,
+    "verkleind logo is " +
+      verkleind.breedte +
+      "x" +
+      verkleind.hoogte +
+      ", moet binnen " +
+      LOGO_MAX_BREEDTE +
+      "x" +
+      LOGO_MAX_HOOGTE +
+      " passen"
+  );
+  // De verhouding 2:1 van het origineel hoort te blijven staan.
+  eis(
+    Math.abs(verkleind.breedte / verkleind.hoogte - 2) < 0.02,
+    "de verhouding is veranderd: " + verkleind.breedte + "x" + verkleind.hoogte
+  );
+
+  const verkleindPad = path.join(
+    UITVOER_DIR,
+    "verkleind-logo." + bestandsExtensie(verkleind.mimeType)
+  );
+  await writeFile(verkleindPad, verkleind.bytes);
+
+  eis(
+    LES.onderdelen.length === 2,
+    "de testles heeft " + LES.onderdelen.length + " delen, verwacht er 2"
+  );
+
+  const zwaarPptx = (await bouwLesPresentatie(LES, {
+    huisstijl: resolveHuisstijl({
+      preset: "facula",
+      schoolnaam: "Het Nieuwe Lyceum",
+      logo_path: "test/logo.png",
+      logo_standaard_aan: true,
+    }),
+    logo: { ...verkleind, pad: verkleindPad },
+  }).write({ outputType: "nodebuffer" })) as Uint8Array;
+  await writeFile(path.join(UITVOER_DIR, "verkleind-logo-les.pptx"), zwaarPptx);
+  await controleerBestand("verkleind-logo-les.pptx", zwaarPptx, "ppt/media/", true);
+
+  const PPTX_GRENS = 1.5 * 1024 * 1024;
+  eis(
+    zwaarPptx.length < PPTX_GRENS,
+    "les van twee delen met verkleind logo is " + zwaarPptx.length + " bytes, onder " + PPTX_GRENS + " verwacht"
   );
 
   if (fouten.length > 0) {

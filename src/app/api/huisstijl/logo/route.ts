@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { haalHuisstijl, LOGO_BUCKET, verwijderLogoObject } from "@/lib/huisstijl/server";
 import { bestandsExtensie, isToegestaanLogoType, maakLogo } from "@/lib/huisstijl/logo";
+import { normaliseerLogo } from "@/lib/huisstijl/normalize-logo";
 import { MAX_LOGO_BYTES, resolveHuisstijl } from "@/lib/huisstijl/themes";
 import { zelfdeOrigin } from "@/lib/validation";
 
@@ -9,6 +10,10 @@ import { zelfdeOrigin } from "@/lib/validation";
  * Het schoollogo. Staat in de private bucket school-logos onder
  * "<user_id>/logo.<ext>", dus één logo per docent en nooit een raadbare
  * publieke URL.
+ *
+ * Elk logo wordt bij de upload genormaliseerd (gedraaid volgens EXIF,
+ * metadata eraf, verkleind tot binnen 600x300 px): zie normalize-logo.ts.
+ * Het origineel wordt niet bewaard.
  *
  * Alleen png en jpeg. SVG is bewust geweigerd en niet "schoongemaakt": een
  * SVG is een XML-document dat scripts en externe verwijzingen kan bevatten,
@@ -123,12 +128,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Pas ná de kopcontrole door sharp: verkleind, gedraaid volgens EXIF en
+  // zonder metadata. Wat hier uitkomt is wat er bewaard wordt, het origineel
+  // wordt nooit opgeslagen.
+  const genormaliseerd = await normaliseerLogo(logo.bytes);
+  if (!genormaliseerd) {
+    return NextResponse.json(
+      { error: "Dit bestand kon niet verwerkt worden. Probeer een andere PNG of JPG." },
+      { status: 415 }
+    );
+  }
+
   const huidige = await haalHuisstijl(supabase, user.id);
-  const pad = user.id + "/logo." + bestandsExtensie(logo.mimeType);
+  const pad = user.id + "/logo." + bestandsExtensie(genormaliseerd.mimeType);
 
   const { error: uploadFout } = await supabase.storage
     .from(LOGO_BUCKET)
-    .upload(pad, logo.bytes, { contentType: logo.mimeType, upsert: true });
+    .upload(pad, genormaliseerd.bytes, {
+      contentType: genormaliseerd.mimeType,
+      upsert: true,
+    });
 
   if (uploadFout) {
     console.error("Schoollogo uploaden mislukt", uploadFout);
