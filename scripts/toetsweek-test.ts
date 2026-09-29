@@ -178,6 +178,10 @@ assert.deepEqual(
   valideerItem(onvolledig).sort(),
   ["klas-leeg", "nakijkminuten-ongeldig", "vak-leeg"],
 );
+assert.ok(
+  valideerItem(item({ datum: "2026-10-05", aantalLeerlingen: 1.5 })).includes("leerlingen-ongeldig"),
+  "aantal leerlingen moet een heel getal zijn",
+);
 const veilige = veiligeInstellingen({ ...instellingen, nakijkminutenPerDag: 0, drukGrens: 0, teDrukGrens: -1 });
 assert.equal(veilige.nakijkminutenPerDag, 90);
 assert.equal(veilige.drukGrens, 2);

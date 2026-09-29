@@ -116,6 +116,7 @@ function ToetsRij({
               {...ids}
               type="number"
               min={1}
+              step={1}
               className={VELD_KLASSEN}
               value={item.aantalLeerlingen}
               onChange={(event) =>

@@ -184,7 +184,11 @@ export function valideerItem(item: ToetsItem): ItemFout[] {
   ) {
     fouten.push("cijferdeadline-voor-datum");
   }
-  if (!Number.isFinite(item.aantalLeerlingen) || item.aantalLeerlingen <= 0) {
+  if (
+    !Number.isFinite(item.aantalLeerlingen)
+    || !Number.isInteger(item.aantalLeerlingen)
+    || item.aantalLeerlingen <= 0
+  ) {
     fouten.push("leerlingen-ongeldig");
   }
   if (!Number.isFinite(item.nakijkminuten) || item.nakijkminuten <= 0) {
