@@ -55,10 +55,13 @@ export function ExportTab(props: {
   }
 
   function exporteerAgenda() {
-    if (privacy.blokkeer) return;
-    const inhoud = genereerICS(items, nakijkplanning.dagen, icsKeuze);
-    downloadICS(inhoud);
-    setMelding("Agendabestand gedownload.");
+    try {
+      const inhoud = genereerICS(items, nakijkplanning.dagen, icsKeuze);
+      downloadICS(inhoud);
+      setMelding("Agendabestand gedownload.");
+    } catch (fout) {
+      setMelding(fout instanceof Error ? fout.message : "Agenda-export mislukt.");
+    }
   }
 
   return (

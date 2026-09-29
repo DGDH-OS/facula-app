@@ -259,6 +259,17 @@ function telwoord(aantal: number): string {
   return TELWOORDEN[aantal] ?? aantal.toString();
 }
 
+/** "de toets wiskunde" of, met naam, "de naam". */
+function beschrijfItemNatuurlijk(item: ToetsItem): string {
+  return item.naam.trim() ? `de ${item.naam.trim()}` : `de ${item.soort} ${item.vak}`;
+}
+
+/** "a en b" bij twee items, "a, b en c" bij drie of meer. */
+function opsomming(delen: string[]): string {
+  if (delen.length === 1) return delen[0];
+  return `${delen.slice(0, -1).join(", ")} en ${delen[delen.length - 1]}`;
+}
+
 /** Meldt per klas en dag expliciet wanneer er twee of meer items samenvallen. */
 function overlapSignalen(items: ToetsItem[]): ToetsweekSignaal[] {
   const perKlasDag = new Map<string, ToetsItem[]>();
@@ -273,15 +284,26 @@ function overlapSignalen(items: ToetsItem[]): ToetsweekSignaal[] {
   for (const [, lijst] of perKlasDag) {
     if (lijst.length < 2) continue;
     const [eerste] = lijst;
-    const beschrijvingen = lijst.map(beschrijfItem).join(" en ");
+    const allesZelfdeSoort = lijst.every((item) => item.soort === eerste.soort);
+    const momentWoord = allesZelfdeSoort
+      ? lijst.length === 1
+        ? "toets"
+        : "toetsen"
+      : "toetsmomenten";
+    const beschrijvingen = opsomming(lijst.map(beschrijfItemNatuurlijk));
     signalen.push({
       datum: eerste.datum,
       tekst:
         `${eerste.klas} heeft op ${dagnaam(eerste.datum)} ${telwoord(lijst.length)}`
-        + ` toetsen: ${beschrijvingen}.`,
+        + ` ${momentWoord}: ${beschrijvingen}.`,
     });
   }
   return signalen;
+}
+
+/** Nederlandse notatie: komma als decimaalteken, maximaal één decimaal. */
+export function naarNederlandsGetal(getal: number): string {
+  return getal.toLocaleString("nl-NL", { maximumFractionDigits: 1 });
 }
 
 function weekSignalen(analyses: KlasWeekAnalyse[]): ToetsweekSignaal[] {
@@ -289,7 +311,7 @@ function weekSignalen(analyses: KlasWeekAnalyse[]): ToetsweekSignaal[] {
     .filter((analyse) => analyse.status !== "rustig")
     .map((analyse) => {
       const eersteDatum = analyse.items[0].datum;
-      const belasting = Math.round(analyse.gewogenBelasting * 10) / 10;
+      const belasting = naarNederlandsGetal(Math.round(analyse.gewogenBelasting * 10) / 10);
       const aantal = analyse.items.length;
       const woord = aantal === 1 ? "toets of deadline" : "toetsen en deadlines";
       return {

@@ -44,7 +44,7 @@ export async function downloadToetsweekWoord(
 
   const overzichtAlineas = analyses.flatMap((analyse) => [
     new Paragraph({
-      text: `${analyse.klas} — ${isoWeekLabel(analyse)}: ${analyse.status}`,
+      text: `${analyse.klas}, ${isoWeekLabel(analyse)}: ${analyse.status}`,
       heading: HeadingLevel.HEADING_3,
     }),
     ...analyse.items.map(
@@ -103,11 +103,21 @@ export async function downloadToetsweekWoord(
 }
 
 function escapeICS(tekst: string): string {
-  return tekst
+  const genormaliseerd = tekst.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return genormaliseerd
     .replace(/\\/g, "\\\\")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
     .replace(/\n/g, "\\n");
+}
+
+/** UID's mogen alleen veilige tekens bevatten, ongeacht wat een docent als id meegeeft. */
+function veiligUidDeel(id: string): string {
+  return id.replace(/[^A-Za-z0-9-]/g, "");
+}
+
+function kapitaliseer(tekst: string): string {
+  return tekst.charAt(0).toUpperCase() + tekst.slice(1);
 }
 
 /**
@@ -145,15 +155,20 @@ function regelsVanEvent(regels: string[]): string {
   return regels.map(vouwRegel).join("\r\n");
 }
 
+function toetsSamenvatting(item: ToetsItem): string {
+  const basis = `${kapitaliseer(item.soort)} ${item.vak} (${item.klas})`;
+  return item.naam.trim() ? `${basis}: ${item.naam.trim()}` : basis;
+}
+
 function toetsEvent(item: ToetsItem, dtstamp: string): string {
   const start = datumCompact(item.datum);
   return regelsVanEvent([
     "BEGIN:VEVENT",
-    `UID:${item.id}@facula-toetsweek`,
+    `UID:${veiligUidDeel(item.id)}@facula-toetsweek`,
     `DTSTAMP:${dtstamp}`,
     `DTSTART;VALUE=DATE:${start}`,
     `DTEND;VALUE=DATE:${dagCompactPlusEen(start)}`,
-    `SUMMARY:${escapeICS(`${item.vak} ${item.soort} ${item.klas}`)}`,
+    `SUMMARY:${escapeICS(toetsSamenvatting(item))}`,
     "END:VEVENT",
   ]);
 }
@@ -179,11 +194,11 @@ function nakijkEvent(
   const start = datumCompact(dagDatum);
   return regelsVanEvent([
     "BEGIN:VEVENT",
-    `UID:${item.id}-nakijk-${start}@facula-toetsweek`,
+    `UID:${veiligUidDeel(item.id)}-nakijk-${start}@facula-toetsweek`,
     `DTSTAMP:${dtstamp}`,
     `DTSTART;VALUE=DATE:${start}`,
     `DTEND;VALUE=DATE:${dagCompactPlusEen(start)}`,
-    `SUMMARY:${escapeICS(`Nakijken ${item.klas} ${item.vak} (${minuten} min)`)}`,
+    `SUMMARY:${escapeICS(`Nakijken ${item.vak} ${item.klas} (${minuten} min)`)}`,
     "END:VEVENT",
   ]);
 }
@@ -196,6 +211,13 @@ export function genereerICS(
   nakijkdagen: NakijkDagPlanning[],
   keuze: IcsKeuze,
 ): string {
+  const privacy = privacyToetsweek(items);
+  if (privacy.blokkeer) {
+    throw new Error(
+      "Agenda-export geblokkeerd: verwijder " + privacy.redenen.join(" en ")
+        + " uit de toetsnaam of notitie.",
+    );
+  }
   const dtstamp = nuAlsDtstamp();
   const zoekItem = itemZoeker(items);
   const events: string[] = [];

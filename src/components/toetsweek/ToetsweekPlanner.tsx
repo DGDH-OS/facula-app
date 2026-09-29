@@ -97,6 +97,12 @@ export function ToetsweekPlanner() {
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();
       focusTab(huidigeIndex - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusTab(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusTab(TABS.length - 1);
     }
   }
 

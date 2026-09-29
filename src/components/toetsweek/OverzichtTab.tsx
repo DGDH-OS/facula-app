@@ -77,7 +77,7 @@ export function OverzichtTab({
                             {STATUS_LABEL[analyse.status]} ({analyse.items.length})
                           </span>
                         ) : (
-                          <span className="text-tekst-zacht">–</span>
+                          <span className="text-tekst-zacht">geen toetsen</span>
                         )}
                       </td>
                     );
