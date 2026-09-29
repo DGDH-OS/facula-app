@@ -131,7 +131,7 @@ const TOON_WOORDEN: Record<RapportToon, ToonWoorden> = {
     positiefIntro: "Het valt op dat",
     aandachtIntro: "Een aandachtspunt is dat",
     afsluiting:
-      "Dit is een korte, feitelijke samenvatting — fijn om samen op te pakken waar nodig.",
+      "Dit is een korte, feitelijke samenvatting, fijn om samen op te pakken waar nodig.",
   },
   warm: {
     aanhef: (label) => `Even over ${label}:`,
@@ -181,7 +181,7 @@ function bouwRapporttekst(input: ReportInput, woorden: ToonWoorden): string {
 
 function bouwOudergesprek(input: ReportInput, woorden: ToonWoorden): string {
   const kern = bouwKernParagraaf(input, woorden);
-  const kop = `Verslag oudergesprek — ${input.leerlingLabel}`;
+  const kop = `Verslag oudergesprek voor ${input.leerlingLabel}`;
   const datumregel = `Datum: ${new Date().toLocaleDateString("nl-NL")}`;
   return [
     kop,

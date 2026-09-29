@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ExportDataButton, DeleteAccountSection } from "@/components/ui/AccountActions";
 import { ButtonLink } from "@/components/ui/Button";
+import { PageHeader, Section } from "@/components/ui/PageHeader";
 
 export default async function AccountPage() {
   const supabase = await createServerSupabaseClient();
@@ -10,38 +11,30 @@ export default async function AccountPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="font-display text-3xl text-marine">Account</h1>
+      <PageHeader
+        titel="Account"
+        uitleg="Je inloggegevens, je huisstijl en wat je met je gegevens kunt doen."
+      />
 
-      <section className="mt-8 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
-        <h2 className="font-display text-lg text-marine">Je gegevens</h2>
-        <p className="mt-2 text-base text-tekst">{user?.email}</p>
-      </section>
+      <div className="mt-8 space-y-6">
+        <Section titel="Je gegevens">
+          <p className="text-base text-tekst">{user?.email}</p>
+        </Section>
 
-      <section className="mt-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
-        <h2 className="font-display text-lg text-marine">Je huisstijl</h2>
-        <p className="mt-2 max-w-[70ch] text-base text-tekst">
-          Kleuren, lettertype, schoolnaam en schoollogo voor je lessen,
-          toetsen en rapportteksten.
-        </p>
-        <div className="mt-4">
-          <ButtonLink href="/app/huisstijl">Huisstijl instellen</ButtonLink>
-        </div>
-      </section>
+        <Section
+          titel="Je huisstijl"
+          uitleg="Kleuren, lettertype, schoolnaam en schoollogo voor je lessen, toetsen en rapportteksten."
+          actie={<ButtonLink href="/app/huisstijl">Huisstijl instellen</ButtonLink>}
+        />
 
-      <section className="mt-6 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
-        <h2 className="font-display text-lg text-marine">Je gegevens downloaden</h2>
-        <p className="mt-2 text-base text-tekst">
-          Download al je lessen, toetsen, rapportteksten, versiegeschiedenis
-          en gebruiksgegevens als één JSON-bestand.
-        </p>
-        <div className="mt-4">
-          <ExportDataButton />
-        </div>
-      </section>
+        <Section
+          titel="Je gegevens downloaden"
+          uitleg="Al je lessen, toetsen, rapportteksten, versiegeschiedenis en gebruiksgegevens in een JSON-bestand."
+          actie={<ExportDataButton />}
+        />
 
-      <section className="mt-6">
         <DeleteAccountSection />
-      </section>
+      </div>
     </div>
   );
 }

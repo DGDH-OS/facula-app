@@ -1,4 +1,5 @@
-import { AlignmentType, Header, ImageRun, Paragraph, TextRun } from "docx";
+import { AlignmentType, Footer, Header, ImageRun, Paragraph, TextRun } from "docx";
+import { AI_MELDING_EXPORT } from "../ai-transparantie";
 import { docxBeeldType, passendeAfmeting, type Logo } from "./logo";
 import { exportFont, zachteTekstKleur, zonderHekje, type Huisstijl } from "./themes";
 
@@ -70,4 +71,35 @@ export function bouwHuisstijlHeader(
   }
 
   return new Header({ children: paragrafen });
+}
+
+/**
+ * De paginavoet met de AI-vermelding (AI-verordening art. 50), gedeeld door de
+ * toets-export en de rapport-export.
+ *
+ * In de voet en niet in de tekst: een toets die je uitprint hoort de
+ * mededeling te dragen zonder dat hij tussen de vragen staat. Een Word-voet
+ * herhaalt zichzelf op elke pagina, dus ook het los uitgeprinte
+ * antwoordenblad draagt hem.
+ *
+ * Anders dan de header is deze voet er altijd, ook zonder logo of schoolnaam:
+ * de vermelding is geen opmaakkeuze van de docent maar een verplichting.
+ */
+export function bouwAiVoet(huisstijl: Huisstijl): Footer {
+  return new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.LEFT,
+        children: [
+          new TextRun({
+            text: AI_MELDING_EXPORT,
+            size: 16,
+            italics: true,
+            color: zonderHekje(zachteTekstKleur(huisstijl)),
+            font: exportFont(huisstijl.lettertype),
+          }),
+        ],
+      }),
+    ],
+  });
 }

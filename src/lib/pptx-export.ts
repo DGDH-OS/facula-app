@@ -1,5 +1,6 @@
 import PptxGenJS from "pptxgenjs";
 import type { GeneratedLesson } from "./types";
+import { AI_MELDING_EXPORT } from "./ai-transparantie";
 import { afdwingenSlideRegels, trimTitel } from "./slide-content-rules";
 import type { LogoBestand } from "./huisstijl/logo";
 import { passendeAfmeting } from "./huisstijl/logo";
@@ -70,6 +71,18 @@ export function bouwLesPresentatie(
       h: logoMaat.hoogte,
       altText: huisstijl.schoolnaam ? "Logo van " + huisstijl.schoolnaam : "Schoollogo",
     });
+  };
+
+  /**
+   * De AI-vermelding in de notities van elke dia (AI-verordening art. 50).
+   *
+   * In de notities en niet op de dia zelf: het bestand moet zijn herkomst
+   * meedragen, maar een leerling die naar de beamer kijkt hoeft die regel niet
+   * negen keer te lezen. Wie de presentatie opent of afdrukt met notities
+   * komt hem wel tegen, en op de titeldia staat hij daarnaast klein in beeld.
+   */
+  const plaatsAiNotitie = (slide: PptxGenJS.Slide) => {
+    slide.addNotes(AI_MELDING_EXPORT);
   };
 
   /** De schoolnaam klein onderaan, als die is ingevuld. */
@@ -156,7 +169,22 @@ export function bouwLesPresentatie(
     color: kleur.achtergrond,
     fontFace: font,
   });
+
+  // Op de titeldia staat de AI-vermelding ook zichtbaar, klein rechtsonder.
+  // Eén keer in beeld is genoeg om te voldoen aan de mededelingsplicht; op de
+  // inhoudsdia's blijft het bij de notitie.
+  title.addText(AI_MELDING_EXPORT, {
+    x: 4.2,
+    y: 5.05,
+    w: 5.3,
+    h: 0.4,
+    fontSize: 9,
+    color: kleur.achtergrond,
+    fontFace: font,
+    align: "right",
+  });
   plaatsLogo(title);
+  plaatsAiNotitie(title);
 
   // ---- Eén dia per sectie, gegroepeerd per lesdeel ----
   for (const deel of les.onderdelen) {
@@ -244,6 +272,7 @@ export function bouwLesPresentatie(
       });
       plaatsSchoolnaam(slide);
       plaatsLogo(slide);
+      plaatsAiNotitie(slide);
     }
   }
 

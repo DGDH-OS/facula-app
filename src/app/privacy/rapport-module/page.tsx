@@ -38,7 +38,7 @@ export default function RapportModulePrivacyPage() {
                 in, kiest een output-type (rapporttekst, oudergesprek-verslag
                 of oudermail) en een toon. Facula herformuleert dat tot een
                 vloeiende, professionele tekst. Je kopieert die tekst zelf
-                over in Magister, Somtoday of je mail — er is bewust géén
+                over in Magister, Somtoday of je mail. Er is bewust géén
                 automatische koppeling met een schoolsysteem, want die
                 koppeling bestaat simpelweg niet als self-service optie bij
                 de grote Nederlandse schoolsystemen.
@@ -52,7 +52,7 @@ export default function RapportModulePrivacyPage() {
               <p className="mt-2 text-base leading-relaxed text-tekst">
                 De generator voegt nooit zelf een cijfer, beoordeling,
                 kwalificatie-oordeel of een advies over overgaan/zakken toe.
-                Dat is geen belofte in tekst alleen — het is een ingebouwde,
+                Dat is geen belofte in tekst alleen: het is een ingebouwde,
                 geteste controle in de code: als de gegenereerde tekst
                 evaluatieve of cijfermatige taal bevat die jij niet zelf hebt
                 ingevoerd, wordt dat gemeld. Jij blijft altijd de auteur en
@@ -69,7 +69,7 @@ export default function RapportModulePrivacyPage() {
                 korte omschrijving in plaats van een volledige naam. Voor een
                 goede, vloeiende tekst is een naam niet nodig. Hoe minder
                 direct herleidbare persoonsgegevens je invoert, hoe kleiner
-                het privacyrisico — dat geldt voor jou als docent en voor
+                het privacyrisico, en dat geldt voor jou als docent en voor
                 Facula als leverancier.
               </p>
             </section>

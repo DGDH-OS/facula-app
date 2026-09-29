@@ -2,6 +2,7 @@ import path from "path";
 import { Automizer, modify, type ISlide } from "pptx-automizer";
 import type { GeneratedLesson, LessonPart, LessonSection } from "./types";
 import { slugify } from "./pptx-export";
+import { AI_MELDING_EXPORT } from "./ai-transparantie";
 import { passendeAfmeting, type LogoBestand } from "./huisstijl/logo";
 import {
   afdwingenSlideRegels,
@@ -170,6 +171,32 @@ export async function bouwMihiribanPptxBuffer(
     }, "Schoollogo");
   };
 
+  /**
+   * De AI-vermelding onderaan de titeldia (AI-verordening art. 50).
+   *
+   * Langs dezelfde weg als het logo: `generate` laat pptx-automizer één
+   * pptxgenjs-element op de gekloonde dia zetten, dus het sjabloon zelf blijft
+   * ongemoeid. Bewust alleen op de titeldia en niet op alle negen: de
+   * mededeling hoort in het bestand te staan, niet negen keer op de beamer.
+   *
+   * Notities zouden hier eleganter zijn, maar pptx-automizer kan geen
+   * notitieslide toevoegen aan een gekloonde dia zonder dat het sjabloon er
+   * één heeft. Eén kleine regel in beeld is daarom de veilige weg.
+   */
+  const metAiVermelding = (slide: ISlide) => {
+    slide.generate((gen) => {
+      gen.addText(AI_MELDING_EXPORT, {
+        x: LOGO_MARGE,
+        y: 6.85,
+        w: DIA_BREEDTE_INCH - 2 * LOGO_MARGE,
+        h: 0.3,
+        fontSize: 9,
+        color: "6B5B4C",
+        align: "right",
+      });
+    }, "AI-vermelding");
+  };
+
   // Let op: cleanup:true laat pptx-automizer "ongebruikte" media weghalen op
   // basis van slide-relaties — image1.jpeg wordt echter alleen door
   // theme1.xml (achtergrond) gerefereerd en werd daardoor foutief verwijderd.
@@ -234,6 +261,7 @@ export async function bouwMihiribanPptxBuffer(
       slide.modifyElement(TITEL_SHAPE, modify.setText(`${les.input.vak} ${les.input.niveau} ${les.input.leerjaar}`));
       slide.modifyElement(ONDERTITEL_SHAPE, modify.setText(`${lesLabel} · ${ondertitelKort}`));
       metLogo(slide);
+      metAiVermelding(slide);
     });
 
     // Slide — introductie (incl. terugblik/activering)

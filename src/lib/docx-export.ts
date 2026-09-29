@@ -15,7 +15,7 @@ import {
 import type { GeneratedTest } from "./types";
 import { slugify } from "./pptx-export";
 import type { Logo } from "./huisstijl/logo";
-import { bouwHuisstijlHeader } from "./huisstijl/docx-kop";
+import { bouwAiVoet, bouwHuisstijlHeader } from "./huisstijl/docx-kop";
 import {
   exportFont,
   lijnKleur,
@@ -247,17 +247,22 @@ export function bouwToetsDocument(
   // goed bij als het vragenblad.
   const header = bouwHuisstijlHeader(huisstijl, opties.logo ?? null);
   const headers = header ? { default: header } : undefined;
+  // De AI-vermelding staat op beide secties, dus ook onder het losse
+  // antwoordenblad: dat gaat vaak apart de deur uit.
+  const footers = { default: bouwAiVoet(huisstijl) };
 
   const doc = new Document({
     sections: [
       {
         properties: {},
         headers,
+        footers,
         children: [...vraagParagrafen],
       },
       {
         properties: {},
         headers,
+        footers,
         children: [...sleutelParagrafen, sleutelTabel],
       },
     ],

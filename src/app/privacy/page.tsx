@@ -116,15 +116,15 @@ export default function PrivacyPage() {
               </h2>
               <ul className="mt-2 space-y-2 text-base leading-relaxed text-tekst">
                 <li>
-                  • <strong>Supabase</strong> — database en inlogsysteem,
+                  • <strong>Supabase</strong>: database en inlogsysteem,
                   gegevens opgeslagen in de EU (Ierland).
                 </li>
                 <li>
-                  • <strong>Vercel</strong> — hosting van de website en de
+                  • <strong>Vercel</strong>: hosting van de website en de
                   servers die de app draaiend houden.
                 </li>
                 <li>
-                  • <strong>Stripe</strong> — zodra betalen live gaat, voor
+                  • <strong>Stripe</strong>: zodra betalen live gaat, voor
                   het afhandelen van abonnementsbetalingen.
                 </li>
               </ul>

@@ -325,7 +325,7 @@ export function bouwHuiswerk(vak: Vak, begrippen: string[]): string[] {
 
 function titelVoorLes(input: LessonInput): string {
   return trimTitel(
-    `${input.vak} — ${input.niveau.toUpperCase()} ${input.leerjaar}: les over ${input.leerdoel
+    `${input.vak}, ${input.niveau.toUpperCase()} ${input.leerjaar}: les over ${input.leerdoel
       .split(" ")
       .slice(0, 6)
       .join(" ")}...`
@@ -398,7 +398,7 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
 
     return {
       nummer: idx + 1,
-      titel: `Les ${idx + 1} van ${aantalLessen}${aantalLessen > 1 ? ` — ${input.vak}` : ""}`,
+      titel: `Les ${idx + 1} van ${aantalLessen}${aantalLessen > 1 ? `, ${input.vak}` : ""}`,
       duur: input.lesduur,
       secties,
     };

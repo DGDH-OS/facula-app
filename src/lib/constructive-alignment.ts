@@ -55,8 +55,8 @@ export function controleerAfstemming(
 
   const waarschuwing =
     verschil > tolerantie
-      ? `Toetsvraag (${toetsvraagNiveau}) ligt hoger dan het leerdoel (${leerdoelNiveau}) — mogelijk te moeilijk (overshoot).`
-      : `Toetsvraag (${toetsvraagNiveau}) ligt lager dan het leerdoel (${leerdoelNiveau}) — te makkelijk, backwash-risico (undershoot).`;
+      ? `Toetsvraag (${toetsvraagNiveau}) ligt hoger dan het leerdoel (${leerdoelNiveau}): mogelijk te moeilijk (overshoot).`
+      : `Toetsvraag (${toetsvraagNiveau}) ligt lager dan het leerdoel (${leerdoelNiveau}): te makkelijk, backwash-risico (undershoot).`;
 
   return { afgestemd, leerdoelNiveau, toetsvraagNiveau, waarschuwing };
 }

@@ -68,7 +68,7 @@ function bouwMeerkeuzeVraag(
     vraag: `Welke omschrijving hoort bij het begrip "${begrip}"?`,
     punten: 1,
     opties,
-    antwoordsleutel: `${correcteLabel} — ${juisteDefinitie}`,
+    antwoordsleutel: `${correcteLabel}: ${juisteDefinitie}`,
   };
 }
 
@@ -118,7 +118,7 @@ function bouwInvulvraag(nummer: number, begrip: string): ToetsVraag {
 }
 
 function titelVoorTest(input: TestInput): string {
-  return `Toets ${input.vak} — ${input.niveau.toUpperCase()} ${input.leerjaar}`;
+  return `Toets ${input.vak}, ${input.niveau.toUpperCase()} ${input.leerjaar}`;
 }
 
 export function genereerToets(input: TestInput): GeneratedTest {

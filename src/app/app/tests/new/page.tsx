@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { TestInput, GeneratedTest, Vak, Niveau } from "@/lib/types";
 import { downloadToetsDocx } from "@/lib/docx-export";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
+import { AiMelding } from "@/components/ui/AiMelding";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
@@ -641,6 +642,10 @@ function ToetsResultaat({
             <p className="mt-2 text-base text-op-donker-zacht">{huisstijl.schoolnaam}</p>
           )}
         </header>
+
+        {/* AI-verordening art. 50, zelfde plek als op de lespagina: boven de
+            downloadknop, niet onder de vragen. */}
+        <AiMelding />
 
         {schakelaars}
 

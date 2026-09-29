@@ -9,6 +9,7 @@ import type {
   RapportToon,
 } from "@/lib/types";
 import { conceptKeuze, useDraft } from "@/lib/useDraft";
+import { AiMelding } from "@/components/ui/AiMelding";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
@@ -324,6 +325,10 @@ export default function NewReportPage() {
         <h1 className="mt-1 font-display text-3xl text-marine">De tekst is klaar</h1>
 
         <div className="mt-8 space-y-6">
+          {/* AI-verordening art. 50. Staat vóór de tekst zelf: een rapporttekst
+              gaat naar ouders, en de docent blijft degene die hem nakijkt. */}
+          <AiMelding />
+
           {!resultaat.guardrail.ok && (
             <div className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4">
               <p className="text-base font-medium text-fout-tekst">

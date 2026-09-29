@@ -16,9 +16,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Facula — Lesmateriaal dat past bij jouw kerndoelen",
+  title: "Facula, lesmateriaal en toetsen voor docenten en scholen",
   description:
-    "Facula is de premium les- en toetssuite voor Nederlandse docenten: genereer complete lessen en toetsen die 1-op-1 aansluiten op de kerndoelen, in minuten.",
+    "Facula maakt complete lessen, toetsen en rapportteksten die aansluiten op je eigen leerdoel. Voor losse docenten en voor scholen, met data in de EU en zonder leerlingaccounts.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -9,7 +9,7 @@ import {
 import type { GeneratedReport, RapportOutputType } from "./types";
 import { slugify } from "./pptx-export";
 import type { Logo } from "./huisstijl/logo";
-import { bouwHuisstijlHeader } from "./huisstijl/docx-kop";
+import { bouwAiVoet, bouwHuisstijlHeader } from "./huisstijl/docx-kop";
 import {
   exportFont,
   STANDAARD_HUISSTIJL,
@@ -97,6 +97,9 @@ export function bouwRapportDocument(
       {
         properties: {},
         headers: header ? { default: header } : undefined,
+        // De AI-vermelding hoort ook op een oudermail-concept: die gaat als
+        // bestand de deur uit en draagt dan zijn eigen herkomst mee.
+        footers: { default: bouwAiVoet(huisstijl) },
         children: [kop, meta, ...alineas],
       },
     ],

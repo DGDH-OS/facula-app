@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ExportPptxButton } from "@/components/lessons/ExportPptxButton";
 import { LessonSections } from "@/components/lessons/LessonSections";
 import { VersionHistory } from "@/components/lessons/VersionHistory";
+import { AiMelding } from "@/components/ui/AiMelding";
 import { ButtonLink } from "@/components/ui/Button";
 import type { GeneratedLesson } from "@/lib/types";
 
@@ -71,6 +72,13 @@ export default async function LessonDetailPage({
             ))}
           </div>
         )}
+
+        {/* AI-verordening art. 50: wie dit resultaat ziet, hoort te weten dat
+            het met AI is gemaakt en dat de docent het nakijkt. Boven de
+            downloadknop, want na de download is die mededeling te laat. */}
+        <div className="mt-6">
+          <AiMelding />
+        </div>
 
         <div className="mt-6 flex flex-col gap-3 border-t-2 border-lijn pt-6 sm:flex-row sm:flex-wrap sm:items-start">
           <ExportPptxButton lessonId={rij.id} />
