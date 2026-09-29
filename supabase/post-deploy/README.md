@@ -14,7 +14,44 @@ Bestanden hier worden handmatig toegepast, niet door een tool, en ze staan niet
 in de migratiegeschiedenis van Supabase. Elk bestand is idempotent: opnieuw
 draaien mag.
 
-## Releasevolgorde
+## Releasevolgorde branch `school-v1`
+
+Deze branch voegt het schoolmodel toe. Zelfde patroon als bij `les-v2`: eerst de
+migraties (additief, de draaiende versie blijft werken), dan de deploy, dan het
+post-deploy-bestand.
+
+1. **Migraties toepassen**: `20260929120000_facula_school_aanvragen.sql` en
+   `20260929130000_facula_school.sql`. Beide zijn additief. De tweede laat
+   `facula.save_with_quota` onaangeroerd staan en zet
+   `facula.save_with_quota_v2` ernaast, zodat de versie die op dat moment in
+   productie draait blijft werken.
+2. **Een school inrichten** (met `service_role`, bijvoorbeeld via de
+   SQL-editor): een rij in `facula.schools` met naam, `domains`, `plan`,
+   `seat_limit` en `quota_mode`, en de eerste beheerder als rij in
+   `facula.school_members` met rol `beheerder` en status `active`. Dit kan de
+   klant niet zelf: de contractvelden zijn met opzet alleen voor service_role,
+   en lid worden loopt normaal via een uitnodiging.
+3. **App deployen**: de `school-v1`-versie live zetten. Vanaf dat moment loopt
+   het opslaan via `facula.save_with_quota_v2`.
+4. **Smoke-test op opslaan**: als ingelogde docent één les opslaan op de nieuwe
+   deploy en controleren dat de teller meeloopt (persoonlijk zonder school, op
+   `facula.school_usage_counters` met school). Slaagt dit niet, dan stap 5 niet
+   doen: de oude functie is dan nog de terugvalweg.
+5. **Post-deploy-bestand handmatig toepassen**:
+   `20260929140000_facula_drop_save_with_quota_v1.sql`. Dit haalt
+   `facula.save_with_quota` weg. Zolang die bestaat, kan een docent van een
+   school met een pool hem rechtstreeks aanroepen en zo langs de poollimiet.
+
+Na stap 5 hoort deze query nul rijen te geven:
+
+```sql
+select p.oid::regprocedure::text
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'facula' and p.proname = 'save_with_quota';
+```
+
+## Releasevolgorde branch `les-v2` (afgerond)
 
 Voor de branch `les-v2`, in deze volgorde:
 
