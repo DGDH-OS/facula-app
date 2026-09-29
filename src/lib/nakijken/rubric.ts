@@ -324,6 +324,10 @@ export function valideerRubric(rubric: Rubric): string[] {
   if (!rubric.titel.trim()) fouten.push("Vul een opdracht in.");
   if (rubric.criteria.length < 2 || rubric.criteria.length > 6)
     fouten.push("Gebruik 2 tot 6 criteria.");
+  if (!Number.isFinite(rubric.maxPunten) || rubric.maxPunten <= 0)
+    fouten.push("Het maximum aantal punten moet groter zijn dan 0.");
+  if (rubric.cesuur !== null && (!Number.isFinite(rubric.cesuur) || rubric.cesuur <= 1 || rubric.cesuur >= 99))
+    fouten.push("De cesuur moet strikt tussen 1 en 99 procent liggen.");
   rubric.criteria.forEach((criterium) => {
     if (!criterium.naam.trim()) fouten.push("Geef elk criterium een naam.");
     if (criterium.niveaus.length < 3 || criterium.niveaus.length > 4)
@@ -336,12 +340,22 @@ export function puntenVoor(criterium: Criterium, niveau: Niveau) {
   return criterium.niveaus[niveau - 1]?.punten ?? 0;
 }
 
+export function valideerInitialen(waarde: string) {
+  const tekst = waarde.trim();
+  return Boolean(
+    tekst &&
+      /^(?=.*[A-Za-zÀ-ÖØ-öø-ÿ])[A-Za-zÀ-ÖØ-öø-ÿ. -]{1,6}$/.test(tekst) &&
+      !/\b[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\s+[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\b/.test(tekst),
+  );
+}
+
 export function berekenCijfer(
   punten: number,
   maxPunten: number,
   cesuur: number,
 ) {
-  if (maxPunten <= 0) return 0;
+  if (!Number.isFinite(punten) || !Number.isFinite(maxPunten) || maxPunten <= 0 || !Number.isFinite(cesuur) || cesuur <= 1 || cesuur >= 99)
+    return null;
   const cesuurPunten = maxPunten * (cesuur / 100);
   const cijfer =
     punten <= cesuurPunten

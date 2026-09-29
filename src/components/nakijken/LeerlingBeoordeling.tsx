@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
-import { berekenCijfer } from "@/lib/nakijken/rubric";
+import { berekenCijfer, valideerInitialen } from "@/lib/nakijken/rubric";
 import { maakFeedback, totaalPunten } from "@/lib/nakijken/feedback";
 import type { Leerling, Niveau, Rubric } from "@/lib/nakijken";
 
@@ -23,9 +23,12 @@ export function LeerlingBeoordeling({
   kopieer: (tekst: string) => Promise<void>;
   naarOverzicht: () => void;
 }) {
+  const initialenFout = initialen.trim() && !valideerInitialen(initialen)
+    ? "Gebruik alleen initialen, bijvoorbeeld L.J."
+    : "";
   function voegLeerlingToe() {
     const waarde = initialen.trim();
-    if (!waarde) return;
+    if (!waarde || initialenFout) return;
     setLeerlingen((current) => [
       ...current,
       { id: `${Date.now()}`, initialen: waarde, keuzes: {}, notitie: "" },
@@ -65,6 +68,7 @@ export function LeerlingBeoordeling({
             />
           )}
         </Field>
+        {initialenFout && <p className="mt-2 text-base text-fout" role="alert">{initialenFout}</p>}
         <Button className="mt-3" onClick={voegLeerlingToe}>
           Leerling toevoegen
         </Button>
@@ -115,7 +119,7 @@ export function LeerlingBeoordeling({
               <p className="mt-2 text-base text-tekst-zacht">
                 {leerling.keuzes[criterium.id]
                   ? criterium.niveaus[leerling.keuzes[criterium.id] - 1]
-                      .descriptor
+                      ?.descriptor ?? "Kies een niveau."
                   : "Kies een niveau."}
               </p>
             </fieldset>
@@ -143,8 +147,10 @@ export function LeerlingBeoordeling({
           />
           <p className="mt-3 text-base font-semibold text-marine">
             Punten: {totaalPunten(rubric, leerling)} / {rubric.maxPunten}
-            {rubric.cesuur
-              ? ` · cijfer ${berekenCijfer(totaalPunten(rubric, leerling), rubric.maxPunten, rubric.cesuur)} (berekend uit jouw punten)`
+            {rubric.cesuur !== null
+              ? berekenCijfer(totaalPunten(rubric, leerling), rubric.maxPunten, rubric.cesuur) === null
+                ? " · cijfer niet beschikbaar: controleer maxpunten en cesuur"
+                : ` · cijfer ${berekenCijfer(totaalPunten(rubric, leerling), rubric.maxPunten, rubric.cesuur)} (berekend uit jouw punten)`
               : ""}
           </p>
           <Button

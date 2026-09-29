@@ -8,6 +8,7 @@ export function KlasOverzicht({
   signalen,
   exporteer,
   exporteerWord,
+  wordExportBlokkade,
   wisAlles,
 }: {
   rubric: Rubric;
@@ -15,6 +16,7 @@ export function KlasOverzicht({
   signalen: ReturnType<typeof klasSignalen>;
   exporteer: () => Promise<void>;
   exporteerWord: () => Promise<void>;
+  wordExportBlokkade: string | null;
   wisAlles: () => void;
 }) {
   return (
@@ -67,11 +69,12 @@ export function KlasOverzicht({
       </div>
       <div className="flex flex-wrap gap-3">
         <Button onClick={exporteer}>Kopieer alles</Button>
-        <Button onClick={exporteerWord} disabled={!leerlingen.length}>
+        <Button onClick={exporteerWord} disabled={!leerlingen.length || Boolean(wordExportBlokkade)}>
           Download als Word
         </Button>
         <Button onClick={wisAlles}>Wis alles</Button>
       </div>
+      {wordExportBlokkade && <p className="text-base text-fout" role="alert" aria-live="polite">{wordExportBlokkade}</p>}
     </section>
   );
 }

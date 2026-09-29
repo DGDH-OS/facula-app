@@ -8,7 +8,7 @@ import type { Leerling, Rubric } from "@/lib/nakijken";
 import { RubricBouwer } from "@/components/nakijken/RubricBouwer";
 import { LeerlingBeoordeling } from "@/components/nakijken/LeerlingBeoordeling";
 import { KlasOverzicht } from "@/components/nakijken/KlasOverzicht";
-import { exporteerWordDocument } from "@/components/nakijken/NakijkExport";
+import { exporteerWordDocument, tekstVoorWordExport } from "@/components/nakijken/NakijkExport";
 
 const basis: Rubric = {
   titel: "",
@@ -24,10 +24,15 @@ export default function NakijkenPage() {
   const [initialen, setInitialen] = useState("");
   const [tab, setTab] = useState<Tab>("rubric");
   const [melding, setMelding] = useState("");
-  const signalen = useMemo(
-    () => klasSignalen(rubric, leerlingen),
-    [rubric, leerlingen],
-  );
+  const actueleLeerlingen = useMemo(() => leerlingen.map((leerling) => ({
+      ...leerling,
+      keuzes: Object.fromEntries(Object.entries(leerling.keuzes).filter(([id, niveau]) => {
+        const criterium = rubric.criteria.find((item) => item.id === id);
+        return Boolean(criterium?.niveaus[niveau - 1]);
+      })) as Leerling["keuzes"],
+    })), [rubric, leerlingen]);
+  const signalen = useMemo(() => klasSignalen(rubric, actueleLeerlingen), [rubric, actueleLeerlingen]);
+  const wordPrivacy = controleerNakijkenPrivacy(tekstVoorWordExport(rubric, actueleLeerlingen));
 
   async function kopieer(tekst: string) {
     const privacy = controleerNakijkenPrivacy(tekst);
@@ -100,7 +105,7 @@ export default function NakijkenPage() {
       {tab === "nakijken" && (
         <LeerlingBeoordeling
           rubric={rubric}
-          leerlingen={leerlingen}
+          leerlingen={actueleLeerlingen}
           setLeerlingen={setLeerlingen}
           initialen={initialen}
           setInitialen={setInitialen}
@@ -111,13 +116,14 @@ export default function NakijkenPage() {
       {tab === "overzicht" && (
         <KlasOverzicht
           rubric={rubric}
-          leerlingen={leerlingen}
+          leerlingen={actueleLeerlingen}
           signalen={signalen}
           exporteer={exporteer}
           exporteerWord={async () => {
-            await exporteerWordDocument(rubric, leerlingen);
-            setMelding("Word-bestand gedownload.");
+            const privacy = await exporteerWordDocument(rubric, actueleLeerlingen);
+            setMelding(privacy.blokkeer ? `Word-export geblokkeerd: verwijder ${privacy.redenen.join(" en ")}.` : "Word-bestand gedownload.");
           }}
+          wordExportBlokkade={wordPrivacy.blokkeer ? `Word-export geblokkeerd: verwijder ${wordPrivacy.redenen.join(" en ")}.` : null}
           wisAlles={() => setLeerlingen([])}
         />
       )}

@@ -5,7 +5,7 @@ export interface ReportQualityCheck { kind: ReportQualityKind; niveau: "blokkade
 export interface ReportQualityResult { ok: boolean; checks: ReportQualityCheck[]; }
 
 const LABELS: Record<string, string> = { lui: "heeft soms een zetje nodig", dom: "kan dit nog oefenen", slecht: "kan hierin groeien", ongemotiveerd: "heeft hulp nodig om te starten" };
-export const MEDISCH = /\b(adhd|add|dyslexie|dyscalculie|autisme|autistisch|hoogbegaafd|depressie|diagnose|medicatie)\b/gi;
+const MEDISCH = /\b(adhd|add|dyslexie|dyscalculie|autisme|autistisch|hoogbegaafd|depressie|diagnose|medicatie)\b/i;
 const POSITIEF = /\b(goed|sterk|groei|vooruitgang|zelfstandig|actief|helpt|werkt|kan|talent|succes|fijn|betrokken|nieuwsgierig|samenwerken)\b/i;
 const GROEI = /\b(kan oefenen|volgende stap|gaat oefenen|blijven oefenen|probeer|helpt om|werkpunt|groeien|ontwikkelen)\b/i;
 const VOORBEELD = /\b(bijvoorbeeld|zoals|tijdens|opdracht|werkstuk|presentatie|toets|laat zien|waargenomen|bewijs)\b/i;
@@ -17,7 +17,7 @@ export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aan
   Object.entries(LABELS).forEach(([woord, alternatief]) => {
     if (new RegExp(`\\b${woord}\\b`, "i").test(tekst)) checks.push({ kind: "label", niveau: "waarschuwing", melding: `Vermijd '${woord}'. Suggestie: ${alternatief}.` });
   });
-  const medische = [...new Set(tekst.toLowerCase().match(MEDISCH) ?? [])];
+  const medische = [...new Set(tekst.toLowerCase().match(new RegExp(MEDISCH.source, "gi")) ?? [])];
   if (medische.length) checks.push({ kind: "privacy", niveau: "blokkade", melding: `Let op: ${medische.join(", ")} zijn bijzondere persoonsgegevens. Laat deze termen weg.` });
   if (!POSITIEF.test(tekst)) checks.push({ kind: "strength", niveau: "waarschuwing", melding: "Voeg minstens één concrete kracht toe." });
   if (!VOORBEELD.test(tekst)) checks.push({ kind: "example", niveau: "waarschuwing", melding: "Voeg minstens één concreet voorbeeld of bewijs toe." });
@@ -41,9 +41,7 @@ export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aan
 export function controleerNakijkenPrivacy(tekst: string) {
   const redenen: string[] = [];
   if (MEDISCH.test(tekst)) redenen.push("medische termen");
-  MEDISCH.lastIndex = 0;
   if (PII.test(tekst)) redenen.push("e-mailadres of telefoonnummer");
-  PII.lastIndex = 0;
   const waarschuwingVolledigeNaam = /\b[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\s+[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\b/.test(tekst);
   return { blokkeer: redenen.length > 0, waarschuwingVolledigeNaam, redenen };
 }

@@ -4,7 +4,7 @@ export function maakFeedback(rubric: Rubric, leerling: Leerling): string {
   const gekozen = rubric.criteria
     .map((criterium) => ({ criterium, niveau: leerling.keuzes[criterium.id] }))
     .filter((item): item is { criterium: Criterium; niveau: Niveau } =>
-      Boolean(item.niveau),
+      Boolean(item.niveau && item.criterium.niveaus[item.niveau - 1]),
     );
   const goed = gekozen.filter(({ niveau }) => niveau >= 3);
   const beter = gekozen.filter(({ niveau }) => niveau <= 2);
