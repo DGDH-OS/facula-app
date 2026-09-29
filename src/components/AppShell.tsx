@@ -54,6 +54,7 @@ function navItems(heeftSchool: boolean, isBeheerder: boolean) {
 
   items.push({ href: "/app/huisstijl", label: "Huisstijl", actiefOp: "/app/huisstijl" });
   items.push({ href: "/app/coach", label: "Coach", actiefOp: "/app/coach" });
+  items.push({ href: "/app/nakijken", label: "Nakijken", actiefOp: "/app/nakijken" });
 
   if (isBeheerder) {
     items.push({ href: "/app/school", label: "School", actiefOp: "/app/school" });

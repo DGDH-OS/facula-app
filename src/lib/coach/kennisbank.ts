@@ -89,7 +89,7 @@ const data: Array<[string, string[], string[], string, CoachActie[]?]> = [
     ["Hoe maak ik een toets", "toets opstellen"],
     ["toets", "maken", "opstellen"],
     "Schrijf eerst de leerdoelen op. Kies daarna per doel een vraagtype en bepaal de punten. Maak de instructie kort, controleer of elke vraag één vaardigheid toetst en lees de toets één keer als leerling.",
-    acties("/app/tests/new", "Maak een toets"),
+    acties("/app/nakijken", "Open Nakijkhulp"),
   ],
   [
     "toetsmatrijs",

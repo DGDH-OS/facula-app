@@ -5,11 +5,11 @@ export interface ReportQualityCheck { kind: ReportQualityKind; niveau: "blokkade
 export interface ReportQualityResult { ok: boolean; checks: ReportQualityCheck[]; }
 
 const LABELS: Record<string, string> = { lui: "heeft soms een zetje nodig", dom: "kan dit nog oefenen", slecht: "kan hierin groeien", ongemotiveerd: "heeft hulp nodig om te starten" };
-const MEDISCH = /\b(adhd|add|dyslexie|dyscalculie|autisme|autistisch|hoogbegaafd|depressie|diagnose|medicatie)\b/gi;
+export const MEDISCH = /\b(adhd|add|dyslexie|dyscalculie|autisme|autistisch|hoogbegaafd|depressie|diagnose|medicatie)\b/gi;
 const POSITIEF = /\b(goed|sterk|groei|vooruitgang|zelfstandig|actief|helpt|werkt|kan|talent|succes|fijn|betrokken|nieuwsgierig|samenwerken)\b/i;
 const GROEI = /\b(kan oefenen|volgende stap|gaat oefenen|blijven oefenen|probeer|helpt om|werkpunt|groeien|ontwikkelen)\b/i;
 const VOORBEELD = /\b(bijvoorbeeld|zoals|tijdens|opdracht|werkstuk|presentatie|toets|laat zien|waargenomen|bewijs)\b/i;
-const PII = /(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?:\+31|0)\s*\d(?:[\s-]*\d){8,})/i;
+export const PII = /(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?:\+31|0)\s*\d(?:[\s-]*\d){8,})/i;
 const CIJFER = /\b(?:10|[1-9])(?:[.,][0-9])?\b/;
 
 export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aantekeningen): ReportQualityResult {
@@ -36,6 +36,16 @@ export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aan
   const max = lengte === "kort" ? 700 : lengte === "uitgebreid" ? 1800 : 1200;
   if (tekst.length < min || tekst.length > max) checks.push({ kind: "length", niveau: "tip", melding: `De tekst past niet goed bij de gekozen lengte (${min}-${max} tekens).` });
   return { ok: checks.every((check) => check.niveau === "tip"), checks };
+}
+
+export function controleerNakijkenPrivacy(tekst: string) {
+  const redenen: string[] = [];
+  if (MEDISCH.test(tekst)) redenen.push("medische termen");
+  MEDISCH.lastIndex = 0;
+  if (PII.test(tekst)) redenen.push("e-mailadres of telefoonnummer");
+  PII.lastIndex = 0;
+  const waarschuwingVolledigeNaam = /\b[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\s+[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\b/.test(tekst);
+  return { blokkeer: redenen.length > 0, waarschuwingVolledigeNaam, redenen };
 }
 
 export const RAPPORT_ZINNENBANK: Record<string, string[]> = {
