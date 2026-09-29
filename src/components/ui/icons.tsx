@@ -48,7 +48,7 @@ export function ToetsIcon() {
   );
 }
 
-/** Klok — de Assistent als routeerhulp, geen chat. */
+/** Klok: de Assistent als routeerhulp, geen chat. */
 export function AssistentIcon() {
   return (
     <IconFrame>
