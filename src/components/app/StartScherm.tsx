@@ -52,7 +52,7 @@ export function StartScherm({
       />
 
       <h2 className="mt-10 font-display text-2xl text-marine">Wat wil je maken?</h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+      <div className="mt-4 grid gap-6 sm:grid-cols-3 sm:gap-4">
         <Tile
           href="/app/lessons/new"
           icoon={<LesIcon />}

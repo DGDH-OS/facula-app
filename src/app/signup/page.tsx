@@ -47,7 +47,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ivoor px-6 py-16">
+    <main className="flex min-h-dvh items-center justify-center bg-ivoor px-6 py-16">
       <div className="w-full max-w-md">
         {/* Zie /login: het logo is een link en moet zelf 44px hoog zijn. */}
         <Link href="/" className="inline-flex min-h-14 items-center font-display text-2xl text-marine">

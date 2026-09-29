@@ -86,9 +86,9 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-ivoor">
+    <div className="min-h-dvh bg-ivoor">
       <header className="app-balk z-20 border-b border-lijn bg-ivoor-deep">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 sm:gap-x-6 sm:gap-y-3 sm:px-6 sm:py-3">
           {/* min-h-12 en min-w-12: een klikvlak van minstens 48x48px, ook
               als de merknaam ooit korter wordt (WCAG 2.5.8). */}
           <Link
@@ -97,7 +97,10 @@ export function AppShell({
           >
             Facula
           </Link>
-          <nav aria-label="Hoofdnavigatie" className="flex flex-wrap items-center gap-2">
+          <nav
+            aria-label="Hoofdnavigatie"
+            className="order-3 flex w-full flex-nowrap items-center gap-1 overflow-x-auto sm:order-none sm:w-auto sm:flex-wrap sm:gap-2"
+          >
             {navItems(heeftSchool, isBeheerder).map(({ href, label, actiefOp }) => {
               const actief = actiefOp !== undefined && pathname === actiefOp;
               return (
@@ -105,7 +108,7 @@ export function AppShell({
                   key={label}
                   href={href}
                   aria-current={actief ? "page" : undefined}
-                  className={`flex min-h-12 items-center rounded-lg px-4 text-base font-semibold transition-colors duration-200 ${
+                  className={`flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold transition-colors duration-200 sm:min-h-12 sm:px-4 sm:text-base ${
                     actief
                       ? "bg-marine text-op-donker"
                       : "text-tekst hover:bg-neutraal-vlak"
@@ -120,7 +123,7 @@ export function AppShell({
             <span className="hidden text-sm text-tekst-zacht sm:inline">{email}</span>
             <button
               onClick={handleLogout}
-              className="flex min-h-12 items-center rounded-lg px-3 text-base text-tekst underline underline-offset-4 transition-colors duration-200 hover:bg-neutraal-vlak hover:no-underline"
+              className="flex min-h-11 items-center rounded-lg px-3 text-sm text-tekst underline underline-offset-4 transition-colors duration-200 hover:bg-neutraal-vlak hover:no-underline sm:min-h-12 sm:text-base"
             >
               Uitloggen
             </button>

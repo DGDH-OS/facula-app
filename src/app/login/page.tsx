@@ -61,7 +61,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ivoor px-6 py-16">
+    <main className="flex min-h-dvh items-center justify-center bg-ivoor px-6 py-16">
       <div className="w-full max-w-md">
         {/*
           Het logo is ook een link naar de homepage en moet daarom zelf het
