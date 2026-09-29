@@ -5,6 +5,7 @@ import type {
   GeneratedReport,
 } from "./types";
 import { controleerOutputTegenInvoer } from "./avg-guardrails";
+import { controleerRapportKwaliteit } from "./report-quality";
 
 /* ------------------------------------------------------------------ */
 /* Rapport- & oudercommunicatie-generator                               */
@@ -174,7 +175,12 @@ function bouwKernParagraaf(input: ReportInput, woorden: ToonWoorden): string {
 
 function bouwRapporttekst(input: ReportInput, woorden: ToonWoorden): string {
   const kern = bouwKernParagraaf(input, woorden);
-  return [woorden.aanhef(input.leerlingLabel), kern, woorden.afsluiting].join(
+  const positief = deelIn(input.aantekeningen).positief;
+  const opening = input.aanspreekvorm === "aan-leerling"
+    ? `Je hebt deze periode laten zien dat ${opsomming(positief) || "je inzet toont"}.`
+    : `${input.leerlingLabel} heeft deze periode laten zien dat ${opsomming(positief) || "er inzet is"}.`;
+  const afsluiting = input.aanspreekvorm === "aan-leerling" ? "Blijf deze aanpak gebruiken; zo zet je een mooie volgende stap." : `${input.leerlingLabel} kan deze ontwikkeling de komende periode verder voortzetten.`;
+  return [woorden.aanhef(input.leerlingLabel), opening, kern, afsluiting].join(
     "\n\n"
   );
 }
@@ -250,5 +256,6 @@ export function genereerRapportTekst(input: ReportInput): GeneratedReport {
     input,
     tekst,
     guardrail,
+    kwaliteit: controleerRapportKwaliteit(input, tekst),
   };
 }

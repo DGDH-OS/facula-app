@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { ReportInput, RapportOutputType, RapportToon } from "@/lib/types";
+import type { ReportInput, RapportOutputType, RapportToon, RapportPeriode, RapportNiveau, RapportAanspreekvorm, RapportLengte } from "@/lib/types";
 import { genereerRapportTekst } from "@/lib/report-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { quotaBoodschap, saveWithQuota } from "@/lib/quota";
@@ -7,6 +7,10 @@ import { limitString, readBodyWithLimit } from "@/lib/validation";
 
 const OUTPUT_TYPES: RapportOutputType[] = ["rapporttekst", "oudergesprek", "oudermail"];
 const TONEN: RapportToon[] = ["formeel", "vriendelijk-direct", "warm"];
+const PERIODES: RapportPeriode[] = ["rapport-1", "rapport-2", "rapport-3", "eindrapport"];
+const NIVEAUS: RapportNiveau[] = ["po", "vmbo", "havo", "vwo"];
+const AANSPREEKVORMEN: RapportAanspreekvorm[] = ["over-leerling", "aan-leerling"];
+const LENGTES: RapportLengte[] = ["kort", "normaal", "uitgebreid"];
 
 function isOutputType(v: unknown): v is RapportOutputType {
   return typeof v === "string" && (OUTPUT_TYPES as string[]).includes(v);
@@ -59,6 +63,10 @@ export async function POST(request: NextRequest) {
     aantekeningen,
     outputType: isOutputType(body.outputType) ? body.outputType : "rapporttekst",
     toon: isToon(body.toon) ? body.toon : "vriendelijk-direct",
+    periode: PERIODES.includes(body.periode as RapportPeriode) ? body.periode as RapportPeriode : "rapport-1",
+    niveau: NIVEAUS.includes(body.niveau as RapportNiveau) ? body.niveau as RapportNiveau : "po",
+    aanspreekvorm: AANSPREEKVORMEN.includes(body.aanspreekvorm as RapportAanspreekvorm) ? body.aanspreekvorm as RapportAanspreekvorm : "over-leerling",
+    lengte: LENGTES.includes(body.lengte as RapportLengte) ? body.lengte as RapportLengte : "normaal",
   };
 
   try {

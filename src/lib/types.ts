@@ -129,6 +129,10 @@ export interface GeneratedTest {
 export type RapportOutputType = "rapporttekst" | "oudergesprek" | "oudermail";
 
 export type RapportToon = "formeel" | "vriendelijk-direct" | "warm";
+export type RapportPeriode = "rapport-1" | "rapport-2" | "rapport-3" | "eindrapport";
+export type RapportNiveau = "po" | "vmbo" | "havo" | "vwo";
+export type RapportAanspreekvorm = "over-leerling" | "aan-leerling";
+export type RapportLengte = "kort" | "normaal" | "uitgebreid";
 
 export interface ReportInput {
   /** Bij voorkeur gepseudonimiseerd, bijv. "L.J." i.p.v. een volledige naam. */
@@ -136,6 +140,10 @@ export interface ReportInput {
   aantekeningen: string;
   outputType: RapportOutputType;
   toon: RapportToon;
+  periode?: RapportPeriode;
+  niveau?: RapportNiveau;
+  aanspreekvorm?: RapportAanspreekvorm;
+  lengte?: RapportLengte;
 }
 
 export interface ReportGuardrailResultaat {
@@ -149,4 +157,5 @@ export interface GeneratedReport {
   input: ReportInput;
   tekst: string;
   guardrail: ReportGuardrailResultaat;
+  kwaliteit?: import("./report-quality").ReportQualityResult;
 }

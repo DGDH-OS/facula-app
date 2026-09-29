@@ -3,7 +3,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { ReportInput, RapportOutputType, RapportToon } from "@/lib/types";
+import type { ReportInput, RapportOutputType, RapportToon, RapportPeriode, RapportNiveau, RapportAanspreekvorm, RapportLengte } from "@/lib/types";
+import { controleerRapportKwaliteit, RAPPORT_ZINNENBANK } from "@/lib/report-quality";
 import { conceptKeuze, useDraft } from "@/lib/useDraft";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
@@ -39,6 +40,9 @@ const TONEN: { waarde: RapportToon; label: string }[] = [
   { waarde: "vriendelijk-direct", label: "Vriendelijk-direct" },
   { waarde: "warm", label: "Warm" },
 ];
+const PERIODES: { waarde: RapportPeriode; label: string }[] = [{ waarde: "rapport-1", label: "Rapport 1" }, { waarde: "rapport-2", label: "Rapport 2" }, { waarde: "rapport-3", label: "Rapport 3" }, { waarde: "eindrapport", label: "Eindrapport" }];
+const NIVEAUS: { waarde: RapportNiveau; label: string }[] = [{ waarde: "po", label: "PO groep 1-8" }, { waarde: "vmbo", label: "VO vmbo" }, { waarde: "havo", label: "VO havo" }, { waarde: "vwo", label: "VO vwo" }];
+const LENGTES: { waarde: RapportLengte; label: string }[] = [{ waarde: "kort", label: "Kort" }, { waarde: "normaal", label: "Normaal" }, { waarde: "uitgebreid", label: "Uitgebreid" }];
 
 /** Zelfde grenzen als de serverside validatie in /api/reports (limitString). */
 const MAX_LEERLING = 2000;
@@ -53,12 +57,16 @@ const MAX_AANTEKENINGEN = 2000;
  * docent. Alleen de onpersoonlijke instellingen (soort tekst en toon)
  * worden als concept bewaard; die zeggen niets over een leerling.
  */
-type RapportInstellingen = Pick<ReportInput, "outputType" | "toon">;
+type RapportInstellingen = Pick<ReportInput, "outputType" | "toon" | "periode" | "niveau" | "aanspreekvorm" | "lengte">;
 type RapportPersoonlijk = Pick<ReportInput, "leerlingLabel" | "aantekeningen">;
 
 const DEFAULT_INSTELLINGEN: RapportInstellingen = {
   outputType: "rapporttekst",
   toon: "vriendelijk-direct",
+  periode: "rapport-1",
+  niveau: "po",
+  aanspreekvorm: "over-leerling",
+  lengte: "normaal",
 };
 
 const LEEG_PERSOONLIJK: RapportPersoonlijk = {
@@ -143,6 +151,7 @@ export default function NewReportPage() {
   );
 
   const input: ReportInput = { ...persoonlijk, ...instellingen };
+  const kwaliteit = controleerRapportKwaliteit(input);
 
   const leerlingRef = useRef<HTMLInputElement>(null);
   const aantekeningenRef = useRef<HTMLTextAreaElement>(null);
@@ -325,6 +334,27 @@ export default function NewReportPage() {
                 />
               )}
             </Field>
+
+            <div className="space-y-6 rounded-xl border-2 border-lijn bg-ivoor p-4">
+              <ChoiceCards legend="Rapportperiode" keuzes={PERIODES} waarde={input.periode ?? "rapport-1"} onChange={(waarde) => setInstellingen({ ...instellingen, periode: waarde })} />
+              <ChoiceCards legend="Niveau" keuzes={NIVEAUS} waarde={input.niveau ?? "po"} onChange={(waarde) => setInstellingen({ ...instellingen, niveau: waarde })} />
+              <ChoiceCards legend="Aanspreekvorm" keuzes={[{ waarde: "over-leerling" as RapportAanspreekvorm, label: "Over de leerling" }, { waarde: "aan-leerling" as RapportAanspreekvorm, label: "Aan de leerling" }]} waarde={input.aanspreekvorm ?? "over-leerling"} onChange={(waarde) => setInstellingen({ ...instellingen, aanspreekvorm: waarde })} />
+              <ChoiceCards legend="Lengte" keuzes={LENGTES} waarde={input.lengte ?? "normaal"} onChange={(waarde) => setInstellingen({ ...instellingen, lengte: waarde })} kolommen={3} />
+            </div>
+
+            <div className="rounded-xl border-2 border-lijn bg-ivoor p-4" aria-live="polite">
+              <h2 className="text-base font-semibold text-marine">Zinnenbank</h2>
+              <p className="mt-1 text-base text-tekst-zacht">Klik op een zin om hem aan je aantekeningen toe te voegen.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {Object.values(RAPPORT_ZINNENBANK).flat().map((zin) => <button type="button" key={zin} className="min-h-11 rounded-lg border-2 border-lijn bg-ivoor-deep px-3 py-2 text-left text-base text-tekst hover:border-marine focus:outline-none focus:ring-2 focus:ring-marine" onClick={() => setPersoonlijk({ ...persoonlijk, aantekeningen: persoonlijk.aantekeningen ? `${persoonlijk.aantekeningen}; ${zin}` : zin })}>{zin}</button>)}
+              </div>
+            </div>
+
+            <div className="rounded-xl border-2 border-lijn bg-ivoor p-4" aria-live="polite">
+              <p className="text-base font-semibold text-marine">Controle voor opslaan</p>
+              <p className="mt-1 text-base text-tekst">{kwaliteit.ok ? "De basiscontroles zijn in orde." : "Kijk deze punten na voordat je opslaat."}</p>
+              {kwaliteit.checks.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5 text-base text-tekst">{kwaliteit.checks.map((check) => <li key={`${check.kind}-${check.melding}`}>{check.melding}</li>)}</ul>}
+            </div>
 
             <Field
               label="Aantekeningen"

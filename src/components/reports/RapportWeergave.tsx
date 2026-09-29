@@ -9,6 +9,7 @@ import { HuisstijlSchakelaars } from "@/components/huisstijl/HuisstijlSchakelaar
 import { AiMelding } from "@/components/ui/AiMelding";
 import { Button } from "@/components/ui/Button";
 import { ErrorNotice } from "@/components/ui/Notice";
+import { controleerRapportKwaliteit } from "@/lib/report-quality";
 
 const OUTPUT_LABEL: Record<RapportOutputType, string> = {
   rapporttekst: "Rapporttekst",
@@ -40,10 +41,12 @@ export function RapportWeergave({
   const [gekopieerd, setGekopieerd] = useState(false);
   const [exporteren, setExporteren] = useState(false);
   const [exportFout, setExportFout] = useState<string | null>(null);
+  const [tekst, setTekst] = useState(rapport.tekst);
+  const kwaliteit = controleerRapportKwaliteit(rapport.input, tekst);
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(rapport.tekst);
+      await navigator.clipboard.writeText(tekst);
       setGekopieerd(true);
       window.setTimeout(() => setGekopieerd(false), 4000);
     } catch {
@@ -57,7 +60,7 @@ export function RapportWeergave({
     setExporteren(true);
     setExportFout(null);
     try {
-      await downloadRapportDocx(rapport, {
+      await downloadRapportDocx({ ...rapport, tekst }, {
         huisstijl: huisstijlAan ? huisstijl : undefined,
         logo: logoAan ? logo : null,
       });
@@ -121,10 +124,14 @@ export function RapportWeergave({
         {huisstijlAan && huisstijl.schoolnaam && (
           <p className="mt-1 text-base text-tekst-zacht">{huisstijl.schoolnaam}</p>
         )}
-        <pre className="mt-4 whitespace-pre-wrap font-sans text-base leading-relaxed text-tekst">
-          {rapport.tekst}
-        </pre>
+        <textarea aria-label="Rapporttekst bewerken" value={tekst} onChange={(event) => setTekst(event.target.value)} rows={12} className="mt-4 min-h-64 w-full rounded-lg border-2 border-lijn bg-ivoor px-4 py-3 font-sans text-base leading-relaxed text-tekst focus:border-marine focus:outline-none focus:ring-2 focus:ring-marine" />
       </article>
+
+      <div className="rounded-xl border-2 border-lijn bg-ivoor px-5 py-4" aria-live="polite">
+        <p className="text-base font-semibold text-marine">Controle voor gebruik</p>
+        <p className="mt-1 text-base text-tekst">{kwaliteit.ok ? "De belangrijkste controles zijn in orde." : "Kijk deze punten na voordat je de tekst gebruikt."}</p>
+        {kwaliteit.checks.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5 text-base text-tekst">{kwaliteit.checks.map((check) => <li key={`${check.kind}-${check.melding}`}>{check.melding}</li>)}</ul>}
+      </div>
 
       {exportFout && <ErrorNotice melding={exportFout} />}
 
