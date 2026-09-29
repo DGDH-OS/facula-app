@@ -1,24 +1,16 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type {
-  ReportInput,
-  GeneratedReport,
-  RapportOutputType,
-  RapportToon,
-} from "@/lib/types";
+import type { ReportInput, RapportOutputType, RapportToon } from "@/lib/types";
 import { conceptKeuze, useDraft } from "@/lib/useDraft";
-import { AiMelding } from "@/components/ui/AiMelding";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
 import { FormCard } from "@/components/ui/FormCard";
 import { ProgressNotice } from "@/components/ui/ProgressNotice";
 import { Stepper } from "@/components/ui/Stepper";
-import { HuisstijlSchakelaars } from "@/components/huisstijl/HuisstijlSchakelaars";
-import { downloadRapportDocx } from "@/lib/report-docx-export";
-import { useHuisstijl, useLogoKeuze } from "@/lib/huisstijl/client";
 
 const OUTPUT_TYPES: {
   waarde: RapportOutputType;
@@ -125,23 +117,17 @@ const TOON_LABEL: Record<RapportToon, string> = {
  *           één primaire knop die de tekst schrijft.
  *
  * Endpoint en request-body zijn ongewijzigd: dezelfde ReportInput naar
- * POST /api/reports. Bij een fout blijft de invoer staan en kan het op
- * hetzelfde scherm direct opnieuw.
+ * POST /api/reports. Daarna gaat de docent naar /app/reports/[id], waar de
+ * tekst staat met de kopieer- en downloadknop. Bij een fout blijft de invoer
+ * staan en kan het op hetzelfde scherm direct opnieuw.
  */
 export default function NewReportPage() {
+  const router = useRouter();
   const [stap, setStap] = useState<1 | 2>(1);
   const [instellingenOpen, setInstellingenOpen] = useState(false);
   const [fouten, setFouten] = useState<Fouten>({});
-  const [resultaat, setResultaat] = useState<GeneratedReport | null>(null);
-  const [gekopieerd, setGekopieerd] = useState(false);
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
-  const [exporteren, setExporteren] = useState(false);
-  const [exportFout, setExportFout] = useState<string | null>(null);
-
-  const { huisstijl, logo } = useHuisstijl();
-  const [huisstijlAan, setHuisstijlAan] = useState(false);
-  const [logoAan, setLogoAan] = useLogoKeuze(huisstijl);
 
   // Persoonlijke velden blijven in gewone component-state: die verdwijnen
   // bij het verlaten van de pagina, en komen nergens in opslag terecht.
@@ -247,7 +233,6 @@ export default function NewReportPage() {
     // tweede tekst genereren én een tweede keer van het quotum afhalen.
     if (bezigRef.current) return;
     bezigRef.current = true;
-    setGekopieerd(false);
     setBezig(true);
     setFout(null);
     try {
@@ -264,164 +249,23 @@ export default function NewReportPage() {
         const data = await response.json().catch(() => null);
         throw new Error(data?.error ?? "Genereren mislukt.");
       }
-      const { report } = await response.json();
+      const { id } = await response.json();
       wisConcept();
-      setResultaat(report as GeneratedReport);
+      // Bewust geen setBezig(false): de knop blijft "bezig" tot de
+      // tekstpagina staat. Zelfde gedrag als de les- en toets-wizard.
+      router.push("/app/reports/" + id);
     } catch (err) {
       console.error("Rapport genereren mislukt", err);
       setFout(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
+      setBezig(false);
       // De melding is nieuw op het scherm: breng de focus naar de knop die
       // hem oplost, anders moet een schermlezer zelf terugzoeken.
       requestAnimationFrame(() => genereerKnopRef.current?.focus());
     } finally {
       bezigRef.current = false;
-      setBezig(false);
     }
   }
 
-  async function handleCopy() {
-    if (!resultaat) return;
-    try {
-      await navigator.clipboard.writeText(resultaat.tekst);
-      setGekopieerd(true);
-      setTimeout(() => setGekopieerd(false), 2500);
-    } catch (err) {
-      console.error("Kopiëren mislukt", err);
-    }
-  }
-
-  /**
-   * Downloaden als Word. Staat naast de kopieerknop en vervangt hem niet:
-   * plakken in Magister blijft de snelste weg, een document is handiger als
-   * de tekst mee moet naar een gesprek op papier.
-   */
-  async function exporteerNaarWord() {
-    if (!resultaat || exporteren) return;
-    setExporteren(true);
-    setExportFout(null);
-    try {
-      await downloadRapportDocx(resultaat, {
-        huisstijl: huisstijlAan ? huisstijl : undefined,
-        logo: logoAan ? logo : null,
-      });
-    } catch (err) {
-      console.error("Word-export mislukt", err);
-      setExportFout("Het downloaden lukte niet. Probeer het opnieuw.");
-    } finally {
-      setExporteren(false);
-    }
-  }
-
-  if (resultaat) {
-    return (
-      <div className="mx-auto max-w-2xl">
-        <Link
-          href="/app"
-          className="inline-flex min-h-14 items-center gap-2 text-base font-medium text-marine underline underline-offset-4"
-        >
-          <span aria-hidden>←</span>
-          Terug naar start
-        </Link>
-        <h1 className="mt-1 font-display text-3xl text-marine">De tekst is klaar</h1>
-
-        <div className="mt-8 space-y-6">
-          {/* AI-verordening art. 50. Staat vóór de tekst zelf: een rapporttekst
-              gaat naar ouders, en de docent blijft degene die hem nakijkt. */}
-          <AiMelding />
-
-          {!resultaat.guardrail.ok && (
-            <div className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4">
-              <p className="text-base font-medium text-fout-tekst">
-                Let op: hier staat mogelijk cijfer- of oordeel-taal die niet uit je
-                aantekeningen kwam ({resultaat.guardrail.gevondenWoorden.join(", ")}).
-              </p>
-              <p className="mt-1 text-base text-tekst-zacht">
-                Lees de tekst na voordat je hem gebruikt.
-              </p>
-            </div>
-          )}
-
-          <HuisstijlSchakelaars
-            huisstijl={huisstijl}
-            huisstijlAan={huisstijlAan}
-            logoAan={logoAan}
-            onHuisstijl={setHuisstijlAan}
-            onLogo={setLogoAan}
-          />
-
-          {/*
-            De voorvertoning draagt de kleuren die straks ook in het
-            Word-bestand komen. Inline stijlen, want deze kleuren komen uit de
-            database en niet uit het design-systeem; de contrastcheck op
-            /app/huisstijl garandeert dat ze leesbaar zijn.
-          */}
-          <article className="rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
-            <div className="flex items-start justify-between gap-4">
-              <h2
-                className="font-display text-xl"
-                style={{ color: huisstijlAan ? huisstijl.accent : undefined }}
-              >
-                {OUTPUT_LABEL[resultaat.input.outputType]} voor{" "}
-                {resultaat.input.leerlingLabel}
-              </h2>
-              {logoAan && huisstijl.logoPath && (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src="/api/huisstijl/logo"
-                  alt="Je schoollogo"
-                  className="h-10 w-auto shrink-0 object-contain"
-                />
-              )}
-            </div>
-            {huisstijlAan && huisstijl.schoolnaam && (
-              <p className="mt-1 text-base text-tekst-zacht">{huisstijl.schoolnaam}</p>
-            )}
-            <pre className="mt-4 whitespace-pre-wrap font-sans text-base leading-relaxed text-tekst">
-              {resultaat.tekst}
-            </pre>
-          </article>
-
-          {exportFout && (
-            <div
-              role="alert"
-              className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4"
-            >
-              <p className="text-base font-medium text-fout-tekst">{exportFout}</p>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3">
-            <Button variant="primary" onClick={handleCopy}>
-              {gekopieerd ? "Gekopieerd ✓" : "Kopieer de tekst"}
-            </Button>
-            <Button onClick={exporteerNaarWord} disabled={exporteren} aria-busy={exporteren}>
-              {exporteren ? "Bezig met downloaden..." : "Download als Word"}
-            </Button>
-            <Button
-              onClick={() => {
-                setResultaat(null);
-                setStap(1);
-                focusNaar("aantekeningen");
-              }}
-            >
-              Nog een tekst schrijven
-            </Button>
-          </div>
-
-          <p className="text-base text-tekst-zacht">
-            Geen automatische koppeling met Magister of Somtoday.{" "}
-            <Link
-              href="/privacy/rapport-module"
-              className="font-semibold text-marine underline underline-offset-4"
-            >
-              privacy-uitleg
-            </Link>
-            .
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   const samenvatting = `Een ${TOON_LABEL[input.toon]} ${OUTPUT_LABEL[input.outputType]}`;
 

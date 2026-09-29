@@ -1,19 +1,15 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { TestInput, GeneratedTest, Vak, Niveau } from "@/lib/types";
-import { downloadToetsDocx } from "@/lib/docx-export";
+import { useRouter } from "next/navigation";
+import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
-import { AiMelding } from "@/components/ui/AiMelding";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
 import { FormCard } from "@/components/ui/FormCard";
 import { ProgressNotice } from "@/components/ui/ProgressNotice";
 import { Stepper } from "@/components/ui/Stepper";
-import { HuisstijlSchakelaars } from "@/components/huisstijl/HuisstijlSchakelaars";
-import { useHuisstijl, useLogoKeuze } from "@/lib/huisstijl/client";
-import { STANDAARD_HUISSTIJL, type Huisstijl } from "@/lib/huisstijl/themes";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
@@ -72,24 +68,19 @@ type FocusDoel = FoutVeld | "vak" | "niveau" | "leerjaar";
  *           één primaire knop die genereert.
  *
  * Endpoint en request-body blijven ongewijzigd: dezelfde TestInput naar
- * POST /api/tests. Er is nog geen /app/tests/[id]-pagina, dus het
- * resultaat blijft op dit scherm staan, net als voorheen. Bij een fout
- * blijft de invoer staan en kan er direct opnieuw geprobeerd worden.
+ * POST /api/tests. Daarna gaat de docent naar /app/tests/[id], dezelfde weg
+ * als bij een les: het resultaat staat op een eigen pagina en is dus ook
+ * morgen nog terug te vinden. Bij een fout blijft de invoer staan en kan er
+ * direct opnieuw geprobeerd worden.
  */
 export default function NewTestPage() {
+  const router = useRouter();
   const [stap, setStap] = useState<1 | 2>(1);
   const [eigenAantal, setEigenAantal] = useState(false);
   const [instellingenOpen, setInstellingenOpen] = useState(false);
   const [fouten, setFouten] = useState<Fouten>({});
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState<string | null>(null);
-  const [resultaat, setResultaat] = useState<GeneratedTest | null>(null);
-  const [exporteren, setExporteren] = useState(false);
-  const [exportFout, setExportFout] = useState<string | null>(null);
-
-  const { huisstijl, logo } = useHuisstijl();
-  const [huisstijlAan, setHuisstijlAan] = useState(false);
-  const [logoAan, setLogoAan] = useLogoKeuze(huisstijl);
 
   /** Een concept met een eigen aantal vragen moet dat veld ook tonen. */
   const naHerstel = useCallback((hersteld: TestInput) => {
@@ -221,70 +212,22 @@ export default function NewTestPage() {
         const data = await response.json().catch(() => null);
         throw new Error(data?.error ?? "Genereren mislukt.");
       }
-      const { test } = await response.json();
+      const { id } = await response.json();
       wisConcept();
-      setResultaat(test as GeneratedTest);
+      // Bewust geen setBezig(false): de knop blijft "bezig" tot de
+      // toetspagina staat, anders lijkt er even niets te gebeuren. Zelfde
+      // gedrag als de les-wizard.
+      router.push("/app/tests/" + id);
     } catch (err) {
       console.error("Toets genereren mislukt", err);
       setFout(err instanceof Error ? err.message : "Er ging iets mis. Probeer het opnieuw.");
+      setBezig(false);
       // De melding is nieuw op het scherm: breng de focus naar de knop die
       // hem oplost, anders moet een schermlezer zelf terugzoeken.
       requestAnimationFrame(() => genereerKnopRef.current?.focus());
     } finally {
       bezigRef.current = false;
-      setBezig(false);
     }
-  }
-
-  async function exporteerNaarWord() {
-    if (!resultaat) return;
-    setExporteren(true);
-    setExportFout(null);
-    try {
-      await downloadToetsDocx(resultaat, {
-        huisstijl: huisstijlAan ? huisstijl : undefined,
-        logo: logoAan ? logo : null,
-      });
-    } catch (err) {
-      console.error("Word-export mislukt", err);
-      setExportFout("Het downloaden lukte niet. Probeer het opnieuw.");
-    } finally {
-      setExporteren(false);
-    }
-  }
-
-  /** Terug naar een leeg formulier voor een volgende toets. */
-  function opnieuwBeginnen() {
-    setResultaat(null);
-    setExportFout(null);
-    setInput(DEFAULT_INPUT);
-    setEigenAantal(false);
-    setInstellingenOpen(false);
-    setFouten({});
-    setStap(1);
-  }
-
-  if (resultaat) {
-    return (
-      <ToetsResultaat
-        toets={resultaat}
-        exporteren={exporteren}
-        exportFout={exportFout}
-        onExport={exporteerNaarWord}
-        onOpnieuw={opnieuwBeginnen}
-        huisstijl={huisstijlAan ? huisstijl : STANDAARD_HUISSTIJL}
-        logoUrl={logoAan && huisstijl.logoPath ? "/api/huisstijl/logo" : null}
-        schakelaars={
-          <HuisstijlSchakelaars
-            huisstijl={huisstijl}
-            huisstijlAan={huisstijlAan}
-            logoAan={logoAan}
-            onHuisstijl={setHuisstijlAan}
-            onLogo={setLogoAan}
-          />
-        }
-      />
-    );
   }
 
   const samenvatting = `${input.aantalVragen} ${
@@ -577,137 +520,6 @@ function OverzichtRegel({
         Wijzig
         <span className="sr-only"> {label}</span>
       </Button>
-    </div>
-  );
-}
-
-/**
- * De gemaakte toets. Er is nog geen /app/tests/[id]-pagina, dus het
- * resultaat blijft hier staan: de vragen, de antwoorden eronder, en één
- * primaire actie (downloaden).
- */
-function ToetsResultaat({
-  toets,
-  exporteren,
-  exportFout,
-  onExport,
-  onOpnieuw,
-  huisstijl,
-  logoUrl,
-  schakelaars,
-}: {
-  toets: GeneratedTest;
-  exporteren: boolean;
-  exportFout: string | null;
-  onExport: () => void;
-  onOpnieuw: () => void;
-  huisstijl: Huisstijl;
-  logoUrl: string | null;
-  schakelaars: React.ReactNode;
-}) {
-  return (
-    <div className="stap-fade mx-auto max-w-3xl">
-      <article className="space-y-8">
-        {/*
-          De kop staat in de kleuren die straks ook in het Word-bestand komen,
-          zodat de docent vóór de download ziet wat hij krijgt. Vandaar inline
-          stijlen en geen klassen: deze kleuren komen uit de database en niet
-          uit het design-systeem. `op-donker` blijft erop voor de focusring,
-          en de contrastcheck op /app/huisstijl garandeert dat de tekst hier
-          leesbaar is, ongeacht welke kleuren er gekozen zijn.
-        */}
-        <header
-          className="op-donker rounded-2xl border-2 p-8"
-          style={{ backgroundColor: huisstijl.accent, borderColor: huisstijl.accent }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <p className="text-base font-semibold uppercase tracking-[0.2em] text-op-donker-zacht">
-              {toets.input.vak} · {toets.input.niveau} {toets.input.leerjaar}
-            </p>
-            {logoUrl && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={logoUrl}
-                alt="Je schoollogo"
-                className="h-10 w-auto shrink-0 rounded bg-ivoor object-contain p-1"
-              />
-            )}
-          </div>
-          <h1 className="mt-3 font-display text-3xl">{toets.titel}</h1>
-          <p className="mt-3 text-base text-op-donker-zacht">
-            {toets.vragen.length} vragen · {toets.totaalPunten} punten · circa{" "}
-            {toets.tijdsduur} minuten
-          </p>
-          {huisstijl.schoolnaam && (
-            <p className="mt-2 text-base text-op-donker-zacht">{huisstijl.schoolnaam}</p>
-          )}
-        </header>
-
-        {/* AI-verordening art. 50, zelfde plek als op de lespagina: boven de
-            downloadknop, niet onder de vragen. */}
-        <AiMelding />
-
-        {schakelaars}
-
-        <div className="flex flex-wrap gap-3">
-          <Button variant="primary" onClick={onExport} disabled={exporteren}>
-            {exporteren ? "Bezig met downloaden..." : "Download als Word"}
-          </Button>
-          <Button variant="secondary" onClick={onOpnieuw}>
-            Nog een toets maken
-          </Button>
-        </div>
-
-        {exportFout && (
-          <div className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4">
-            <p className="text-base font-medium text-fout-tekst">{exportFout}</p>
-          </div>
-        )}
-
-        <div className="rounded-2xl border-2 border-lijn bg-ivoor p-8">
-          <h2 className="font-display text-2xl text-marine">De vragen</h2>
-          <ol className="mt-6 space-y-8">
-            {toets.vragen.map((v) => (
-              <li key={v.nummer}>
-                <div className="flex flex-wrap items-baseline justify-between gap-4">
-                  <p className="text-base font-medium text-tekst">
-                    {v.nummer}. {v.vraag}
-                  </p>
-                  <span className="shrink-0 text-base text-tekst-zacht">
-                    {v.punten} {v.punten === 1 ? "punt" : "punten"} ·{" "}
-                    {v.type === "meerkeuze"
-                      ? "meerkeuze"
-                      : v.type === "open"
-                        ? "open vraag"
-                        : "invulvraag"}
-                  </span>
-                </div>
-                {v.opties && (
-                  <ul className="mt-2 space-y-1 pl-4 text-base text-tekst">
-                    {v.opties.map((o) => (
-                      <li key={o.label}>
-                        {o.label}. {o.tekst}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        <div className="rounded-2xl border-2 border-lijn bg-ivoor-deep p-8">
-          <h2 className="font-display text-2xl text-marine">De antwoorden</h2>
-          <ol className="mt-6 space-y-3">
-            {toets.vragen.map((v) => (
-              <li key={v.nummer} className="text-base text-tekst">
-                <span className="font-semibold text-succes-tekst">{v.nummer}.</span>{" "}
-                {v.antwoordsleutel}
-              </li>
-            ))}
-          </ol>
-        </div>
-      </article>
     </div>
   );
 }

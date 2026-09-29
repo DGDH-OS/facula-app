@@ -1,22 +1,23 @@
-import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { UpgradeButton } from "@/components/ui/UpgradeButton";
 import { Tile } from "@/components/ui/Tile";
+import { EmptyState, PageHeader, Section } from "@/components/ui/PageHeader";
+import { UsageMeter } from "@/components/ui/UsageMeter";
+import { ButtonLink } from "@/components/ui/Button";
 import { LesIcon, ToetsIcon, RapportIcon } from "@/components/ui/icons";
+import { RecenteLijst, type RecentItem } from "@/components/app/RecenteLijst";
 import { getCurrentUsage, isPaidSubscriber, FREE_QUOTA_PER_MONTH } from "@/lib/quota";
-import type { GeneratedLesson } from "@/lib/types";
+import type { GeneratedLesson, GeneratedTest, ReportInput } from "@/lib/types";
 
-function tijdGeleden(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const dagen = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (dagen <= 0) return "vandaag";
-  if (dagen === 1) return "gisteren";
-  if (dagen < 7) return `${dagen} dagen geleden`;
-  const weken = Math.floor(dagen / 7);
-  if (weken === 1) return "vorige week";
-  return `${weken} weken geleden`;
-}
+/** Hoeveel items er onder "Je laatste werk" passen zonder een lijst te worden. */
+const MAX_RECENT = 6;
+
+const RAPPORT_SOORT: Record<ReportInput["outputType"], string> = {
+  rapporttekst: "rapporttekst",
+  oudergesprek: "oudergesprek-verslag",
+  oudermail: "oudermail-concept",
+};
 
 export default async function AppDashboard() {
   const supabase = await createServerSupabaseClient();
@@ -30,50 +31,79 @@ export default async function AppDashboard() {
       .from("lessons")
       .select("id, input, output, created_at")
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(MAX_RECENT),
     supabase
       .schema("facula")
       .from("tests")
       .select("id, input, output, created_at")
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(MAX_RECENT),
     supabase
       .schema("facula")
       .from("reports")
-      .select("id, input, output, created_at")
+      .select("id, input, created_at")
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(MAX_RECENT),
   ]);
 
-  const lessen = lessenRes.data ?? [];
-  const toetsen = toetsenRes.data ?? [];
-  const rapporten = rapportenRes.data ?? [];
-
   const paid = user ? await isPaidSubscriber(supabase, user.id) : false;
-  const usage = user ? await getCurrentUsage(supabase, user.id) : { lessons: 0, tests: 0, reports: 0 };
+  const usage = user
+    ? await getCurrentUsage(supabase, user.id)
+    : { lessons: 0, tests: 0, reports: 0 };
 
   /*
-   * Maximaal vijf rijen, en alleen lessen: een les heeft een detailpagina
-   * (/app/lessons/[id]) en is dus echt te openen. Toetsen en rapporten
-   * hebben die pagina nog niet, dus die staan als leesbare regel onder de
-   * lijst in plaats van als rij die nergens heen gaat.
+   * Eén lijst met alle drie de soorten door elkaar, nieuwste eerst. Elk soort
+   * haalt eerst zijn eigen laatste zes op; na het samenvoegen blijven er zes
+   * over. Dat is genoeg om "waar was ik gebleven" te beantwoorden zonder dat
+   * het startscherm een archief wordt.
    */
-  const laatsteLessen = lessen.slice(0, 5);
-  const andersGemaakt = [
-    toetsen.length > 0 ? `${toetsen.length} ${toetsen.length === 1 ? "toets" : "toetsen"}` : null,
-    rapporten.length > 0
-      ? `${rapporten.length} ${rapporten.length === 1 ? "rapport" : "rapporten"}`
-      : null,
-  ].filter((deel): deel is string => deel !== null);
+  const recent: RecentItem[] = [
+    ...(lessenRes.data ?? []).map((rij) => {
+      const input = rij.input as GeneratedLesson["input"];
+      const output = rij.output as Pick<GeneratedLesson, "titel">;
+      return {
+        id: rij.id as string,
+        soort: "les" as const,
+        titel: output.titel,
+        detail: input.vak + " " + input.niveau + " " + input.leerjaar,
+        createdAt: rij.created_at as string,
+      };
+    }),
+    ...(toetsenRes.data ?? []).map((rij) => {
+      const input = rij.input as GeneratedTest["input"];
+      const output = rij.output as Pick<GeneratedTest, "titel" | "vragen">;
+      return {
+        id: rij.id as string,
+        soort: "toets" as const,
+        titel: output.titel,
+        detail:
+          output.vragen.length + " vragen · " + input.niveau + " " + input.leerjaar,
+        createdAt: rij.created_at as string,
+      };
+    }),
+    // Bewust alleen de soort tekst, geen leerling-label: zie RecenteLijst.
+    ...(rapportenRes.data ?? []).map((rij) => {
+      const input = rij.input as ReportInput;
+      return {
+        id: rij.id as string,
+        soort: "rapport" as const,
+        titel: RAPPORT_SOORT[input.outputType] ?? "rapporttekst",
+        detail: "zonder naam in dit overzicht",
+        createdAt: rij.created_at as string,
+      };
+    }),
+  ]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, MAX_RECENT);
+
+  const voornaam = user?.email ? user.email.split("@")[0] : "";
 
   return (
     <div>
-      <h1 className="font-display text-3xl text-marine">
-        Welkom{user?.email ? `, ${user.email.split("@")[0]}` : ""}
-      </h1>
-      <p className="mt-3 max-w-[60ch] text-base text-tekst-zacht">
-        Kies hieronder wat je wilt maken. Je hoeft alleen je leerdoel in te vullen.
-      </p>
+      <PageHeader
+        titel={voornaam ? "Welkom, " + voornaam : "Welkom"}
+        uitleg="Kies hieronder wat je wilt maken. Je hoeft alleen je leerdoel in te vullen."
+      />
 
       <h2 className="mt-10 font-display text-2xl text-marine">Wat wil je maken?</h2>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -106,85 +136,60 @@ export default async function AppDashboard() {
 
       <section id="werk" className="mt-14">
         <h2 className="font-display text-2xl text-marine">Je laatste werk</h2>
-        {laatsteLessen.length === 0 ? (
-          <p className="mt-4 text-base text-tekst-zacht">
-            Je hebt nog niets gemaakt.{" "}
-            <Link href="/app/lessons/new" className="text-marine underline underline-offset-4">
-              Maak je eerste les
-            </Link>
-            .
-          </p>
-        ) : (
-          <ul className="mt-4 divide-y divide-lijn overflow-hidden rounded-2xl border-2 border-lijn">
-            {laatsteLessen.map((les) => {
-              const input = les.input as GeneratedLesson["input"];
-              const output = les.output as Pick<GeneratedLesson, "titel">;
-              return (
-                <li key={les.id}>
-                  <Link
-                    href={`/app/lessons/${les.id}`}
-                    className="flex min-h-20 flex-col justify-center gap-1 bg-ivoor px-5 py-4 transition-colors duration-200 hover:bg-ivoor-deep sm:flex-row sm:items-center sm:justify-between sm:gap-6"
-                  >
-                    <span className="text-lg font-semibold text-marine">{output.titel}</span>
-                    <span className="text-base text-tekst-zacht">
-                      Les · {input.vak} · {input.niveau} {input.leerjaar} ·{" "}
-                      {tijdGeleden(les.created_at)}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {andersGemaakt.length > 0 && (
-          <p className="mt-4 text-base text-tekst-zacht">
-            Je maakte ook {andersGemaakt.join(" en ")}. Die kun je nu nog niet opnieuw openen, alleen
-            nieuw maken.
-          </p>
-        )}
-      </section>
-
-      <section className="mt-14 rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="font-display text-xl text-marine">Gebruik deze maand</h2>
-              {paid ? (
-                <StatusBadge
-                  label="Abonnee"
-                  tone="success"
-                  uitleg="Onbeperkt gebruik als betalend abonnee"
-                />
-              ) : (
-                <StatusBadge
-                  label="Gratis"
-                  tone="neutral"
-                  uitleg={`Gratis: ${FREE_QUOTA_PER_MONTH} per soort per maand`}
-                />
-              )}
-            </div>
-            {paid ? (
-              <p className="mt-3 text-base text-tekst-zacht">
-                Je hebt een abonnement. Er is geen maandlimiet.
-              </p>
-            ) : (
-              <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-base text-tekst-zacht">
-                <li>
-                  {usage.lessons} van {FREE_QUOTA_PER_MONTH} lessen
-                </li>
-                <li>
-                  {usage.tests} van {FREE_QUOTA_PER_MONTH} toetsen
-                </li>
-                <li>
-                  {usage.reports} van {FREE_QUOTA_PER_MONTH} rapporten
-                </li>
-              </ul>
-            )}
-          </div>
-          {!paid && <UpgradeButton />}
+        <div className="mt-4">
+          {recent.length === 0 ? (
+            <EmptyState
+              tekst="Hier komt te staan wat je maakt: lessen, toetsen en rapportteksten. Je kunt ze daarna altijd opnieuw openen en downloaden."
+              actie={
+                <ButtonLink href="/app/lessons/new" variant="primary">
+                  Maak je eerste les
+                </ButtonLink>
+              }
+            />
+          ) : (
+            <RecenteLijst items={recent} />
+          )}
         </div>
       </section>
+
+      <Section
+        className="mt-14"
+        titel="Gebruik deze maand"
+        actie={paid ? undefined : <UpgradeButton />}
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          {paid ? (
+            <StatusBadge
+              label="Abonnee"
+              tone="success"
+              uitleg="Onbeperkt gebruik als betalend abonnee"
+            />
+          ) : (
+            <StatusBadge
+              label="Gratis"
+              tone="neutral"
+              uitleg={"Gratis: " + FREE_QUOTA_PER_MONTH + " per soort per maand"}
+            />
+          )}
+        </div>
+        <div className="mt-5 grid gap-6 sm:grid-cols-3">
+          <UsageMeter
+            label="Lessen"
+            gebruikt={usage.lessons}
+            limiet={paid ? null : FREE_QUOTA_PER_MONTH}
+          />
+          <UsageMeter
+            label="Toetsen"
+            gebruikt={usage.tests}
+            limiet={paid ? null : FREE_QUOTA_PER_MONTH}
+          />
+          <UsageMeter
+            label="Rapportteksten"
+            gebruikt={usage.reports}
+            limiet={paid ? null : FREE_QUOTA_PER_MONTH}
+          />
+        </div>
+      </Section>
     </div>
   );
 }
-
