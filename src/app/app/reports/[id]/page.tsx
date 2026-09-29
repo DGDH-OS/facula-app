@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { RapportWeergave } from "@/components/reports/RapportWeergave";
 import { ButtonLink } from "@/components/ui/Button";
 import type { GeneratedReport } from "@/lib/types";
+import { normaliseerRapportGuardrail } from "@/lib/report-compat";
 
 /**
  * Een eerder geschreven rapporttekst terugzien, kopiëren of downloaden.
@@ -46,7 +47,7 @@ export default async function ReportDetailPage({
     createdAt: rij.created_at,
     input: rij.input,
     tekst: rij.output.tekst,
-    guardrail: rij.output.guardrail,
+    guardrail: normaliseerRapportGuardrail(rij.output?.guardrail),
   };
 
   return (

@@ -48,6 +48,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ongeldige aanvraag." }, { status: 400 });
+  }
+
   const leerlingLabel = limitString(body.leerlingLabel, 2000);
   const aantekeningen = limitString(body.aantekeningen, 2000);
 

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { ErrorNotice } from "@/components/ui/Notice";
 import { controleerRapportKwaliteit } from "@/lib/report-quality";
 import { controleerOutputTegenInvoer } from "@/lib/avg-guardrails";
+import { normaliseerRapportGuardrail, rapportExportGeblokkeerd } from "@/lib/report-compat";
 
 const OUTPUT_LABEL: Record<RapportOutputType, string> = {
   rapporttekst: "Rapporttekst",
@@ -47,10 +48,16 @@ export function RapportWeergave({
   const [tekst, setTekst] = useState(rapport.tekst);
   const [checks, setChecks] = useState<boolean[]>(Array(6).fill(false));
   const kwaliteit = controleerRapportKwaliteit(rapport.input, tekst);
+  const guardrail = normaliseerRapportGuardrail(rapport.guardrail);
+  const exportGeblokkeerd = rapportExportGeblokkeerd(
+    controleerOutputTegenInvoer(rapport.input.aantekeningen, tekst).ok,
+    checks,
+  );
+  const exportHintId = "rapport-export-hint";
 
   async function handleCopy() {
     const actueleGuardrail = controleerOutputTegenInvoer(rapport.input.aantekeningen, tekst);
-    if (!actueleGuardrail.ok || checks.some((check) => !check)) {
+    if (rapportExportGeblokkeerd(actueleGuardrail.ok, checks)) {
       setExportFout("Vink eerst alle coachchecks aan en los harde waarschuwingen op.");
       return;
     }
@@ -66,6 +73,10 @@ export function RapportWeergave({
   }
 
   async function exporteerNaarWord() {
+    if (exportGeblokkeerd) {
+      setExportFout("Vink eerst alle coachchecks aan en los harde waarschuwingen op.");
+      return;
+    }
     setExporteren(true);
     setExportFout(null);
     try {
@@ -87,11 +98,11 @@ export function RapportWeergave({
           de docent blijft degene die hem nakijkt. */}
       <AiMelding />
 
-      {!rapport.guardrail.ok && (
+      {!guardrail.ok && (
         <div className="rounded-xl border-2 border-fout-tekst bg-fout-vlak px-5 py-4">
           <p className="text-base font-medium text-fout-tekst">
             Let op: hier staat mogelijk cijfer- of oordeel-taal die niet uit je
-            aantekeningen kwam ({rapport.guardrail.gevondenWoorden.join(", ")}).
+            aantekeningen kwam ({guardrail.gevondenWoorden.join(", ")}).
           </p>
           <p className="mt-1 text-base text-tekst">
             Lees de tekst na voordat je hem gebruikt.
@@ -156,11 +167,15 @@ export function RapportWeergave({
         <Button variant="primary" onClick={handleCopy}>
           {gekopieerd ? "Gekopieerd ✓" : "Kopieer de tekst"}
         </Button>
-        <Button onClick={exporteerNaarWord} disabled={exporteren} aria-busy={exporteren}>
+        <Button onClick={exporteerNaarWord} disabled={exporteren || exportGeblokkeerd} aria-busy={exporteren} aria-describedby={exportHintId}>
           {exporteren ? "Bezig met downloaden..." : "Download als Word"}
         </Button>
         {extraActie}
       </div>
+
+      <p id={exportHintId} className="text-base text-tekst-zacht">
+        Download als Word wordt beschikbaar nadat alle coachchecks zijn aangevinkt en harde waarschuwingen zijn opgelost.
+      </p>
 
       <p className="text-base text-tekst-zacht">
         Geen automatische koppeling met Magister of Somtoday.{" "}
