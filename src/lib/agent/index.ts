@@ -1,5 +1,11 @@
 import { maakResultaat, valideerVelden } from "./generator";
-import { isPlainRecord, weigerIndienNodig } from "./policy";
+import {
+  dichteLijst,
+  eigenSleutels,
+  isPlainRecord,
+  leesEigen,
+  weigerIndienNodig,
+} from "./policy";
 import { workflowById } from "./registry";
 import type {
   AssistentActie,
@@ -86,56 +92,66 @@ function isNonEmptyString(waarde: unknown): waarde is string {
   return typeof waarde === "string" && waarde.trim().length > 0;
 }
 
-function isStringLijst(waarde: unknown): waarde is string[] {
-  try {
-    if (!Array.isArray(waarde)) return false;
-    for (let i = 0; i < waarde.length; i += 1) {
-      if (!Object.prototype.hasOwnProperty.call(waarde, i)) {
-        return false;
-      }
-      const regel = waarde[i];
-      if (typeof regel !== "string" || regel.trim().length === 0) {
-        return false;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
+function dichteStringLijst(waarde: unknown): string[] | null {
+  const lijst = dichteLijst(waarde);
+  if (!lijst) return null;
+  if (!lijst.every((regel) => isNonEmptyString(regel))) return null;
+  return lijst as string[];
 }
 
-function isVeldRecord(waarde: unknown): waarde is Record<string, string> {
-  if (!isPlainRecord(waarde)) return false;
-  return Object.values(waarde).every((v) => typeof v === "string");
+function veldRecordVan(waarde: unknown): Record<string, string> | null {
+  if (!isPlainRecord(waarde)) return null;
+  const sleutels = eigenSleutels(waarde);
+  if (!sleutels) return null;
+  const uit: Record<string, string> = {};
+  for (const sleutel of sleutels) {
+    const gelezen = leesEigen(waarde, sleutel);
+    if (!gelezen.ok || typeof gelezen.waarde !== "string") return null;
+    uit[sleutel] = gelezen.waarde;
+  }
+  return uit;
 }
 
-function isBevestigdKlaar(waarde: unknown): waarde is AssistentKlaar {
-  if (!isPlainRecord(waarde)) return false;
-  for (const sleutel of Object.keys(waarde)) {
-    if (!KLAAR_SLEUTELS.has(sleutel)) return false;
+function leesVeld(waarde: object, id: string): unknown {
+  const gelezen = leesEigen(waarde, id);
+  return gelezen.ok ? gelezen.waarde : undefined;
+}
+
+type BevestigdKlaar = {
+  workflowId: WorkflowId;
+  checklist: string[];
+};
+
+function snapshotBevestigdKlaar(waarde: unknown): BevestigdKlaar | null {
+  if (!isPlainRecord(waarde)) return null;
+  const sleutels = eigenSleutels(waarde);
+  if (!sleutels) return null;
+  for (const sleutel of sleutels) {
+    if (!KLAAR_SLEUTELS.has(sleutel)) return null;
   }
-  if (waarde.soort !== "klaar") return false;
-  if (waarde.requiresConfirmation !== true) return false;
-  if (waarde.menselijkeControle !== true) return false;
-  if (!isNonEmptyString(waarde.titel)) return false;
-  if (!isNonEmptyString(waarde.samenvatting)) return false;
-  if (!isStringLijst(waarde.checklist)) return false;
-  if (!waarde.checklist.length) return false;
-  if (!waarde.checklist.every((regel) => isNonEmptyString(regel))) {
-    return false;
-  }
-  if (!isStringLijst(waarde.waarschuwingen)) return false;
-  const workflow = workflowById(waarde.workflowId);
-  if (!workflow) return false;
-  if (waarde.titel !== workflow.titel) return false;
-  if (!isVeldRecord(waarde.ingevuldeVelden)) return false;
+  if (leesVeld(waarde, "soort") !== "klaar") return null;
+  if (leesVeld(waarde, "requiresConfirmation") !== true) return null;
+  if (leesVeld(waarde, "menselijkeControle") !== true) return null;
+  const titel = leesVeld(waarde, "titel");
+  const samenvatting = leesVeld(waarde, "samenvatting");
+  if (!isNonEmptyString(titel)) return null;
+  if (!isNonEmptyString(samenvatting)) return null;
+  const checklist = dichteStringLijst(leesVeld(waarde, "checklist"));
+  if (!checklist || !checklist.length) return null;
+  if (!dichteStringLijst(leesVeld(waarde, "waarschuwingen"))) return null;
+  const workflow = workflowById(leesVeld(waarde, "workflowId"));
+  if (!workflow) return null;
+  if (titel !== workflow.titel) return null;
+  const velden = veldRecordVan(leesVeld(waarde, "ingevuldeVelden"));
+  if (!velden) return null;
   const extra = weigerIndienNodig(
-    waarde.ingevuldeVelden,
+    velden,
     workflow.velden.map((v) => v.id),
   );
-  if (extra) return false;
-  const validatie = valideerVelden(workflow.id, waarde.ingevuldeVelden);
-  return validatie.soort === "ok";
+  if (extra) return null;
+  const validatie = valideerVelden(workflow.id, velden);
+  if (validatie.soort !== "ok") return null;
+  return { workflowId: workflow.id, checklist };
 }
 
 /**
@@ -148,18 +164,19 @@ export function voerBevestigdeActieUit(
   bevestigd: boolean,
 ): AssistentActie | AssistentWeigering {
   if (bevestigd !== true) return geenBevestiging();
-  if (!isBevestigdKlaar(voorstel)) {
+  const klaar = snapshotBevestigdKlaar(voorstel);
+  if (!klaar) {
     return geenBevestiging(
       "Dit voorstel is niet bevestigbaar. Kies opnieuw een module.",
     );
   }
-  const workflow = workflowById(voorstel.workflowId);
+  const workflow = workflowById(klaar.workflowId);
   if (!workflow) return onbekend();
   return {
     soort: "actie",
-    workflowId: voorstel.workflowId,
+    workflowId: klaar.workflowId,
     href: workflow.href,
     label: `Ga naar ${workflow.titel}`,
-    checklist: [...voorstel.checklist],
+    checklist: [...klaar.checklist],
   };
 }

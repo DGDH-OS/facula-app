@@ -1,4 +1,9 @@
-import { isPlainRecord, weigerIndienNodig } from "./policy";
+import {
+  eigenSleutels,
+  isPlainRecord,
+  leesEigen,
+  weigerIndienNodig,
+} from "./policy";
 import { workflowById } from "./registry";
 import type {
   AssistentUitkomst,
@@ -21,12 +26,14 @@ function labelVan(
 /**
  * Alleen vaste keuzes. Geen defaults, geen vrije tekst, geen namen.
  */
-function eigenWaarde(
-  velden: Record<string, unknown>,
-  id: string,
-): unknown {
-  if (!Object.prototype.hasOwnProperty.call(velden, id)) return undefined;
-  return velden[id];
+function ongeldigVeld(): AssistentWeigering {
+  return {
+    soort: "geweigerd",
+    code: "ongeldig-veld",
+    melding:
+      "Je kunt hier geen namen, e-mailadressen of leerlingteksten " +
+      "invullen. Kies alleen de vaste opties.",
+  };
 }
 
 export function valideerVelden(
@@ -36,14 +43,8 @@ export function valideerVelden(
   | AssistentVragen
   | AssistentWeigering
   | { soort: "ok"; schoon: Record<string, string> } {
-  if (!isPlainRecord(velden)) {
-    return {
-      soort: "geweigerd",
-      code: "ongeldig-veld",
-      melding:
-        "Je kunt hier geen namen, e-mailadressen of leerlingteksten " +
-        "invullen. Kies alleen de vaste opties.",
-    };
+  if (!isPlainRecord(velden) || !eigenSleutels(velden)) {
+    return ongeldigVeld();
   }
   const workflow = workflowById(workflowId);
   if (!workflow) {
@@ -59,7 +60,9 @@ export function valideerVelden(
   const ongeldig: { id: string; melding: string }[] = [];
 
   for (const veld of workflow.velden) {
-    const bron = eigenWaarde(velden, veld.id);
+    const gelezen = leesEigen(velden, veld.id);
+    if (!gelezen.ok) return ongeldigVeld();
+    const bron = gelezen.waarde;
     if (bron === undefined || bron === "") {
       if (veld.verplicht) ontbrekend.push(veld.id);
       continue;
@@ -175,14 +178,8 @@ export function maakResultaat(
   workflowId: WorkflowId,
   velden: Record<string, string>,
 ): AssistentUitkomst {
-  if (!isPlainRecord(velden)) {
-    return {
-      soort: "geweigerd",
-      code: "ongeldig-veld",
-      melding:
-        "Je kunt hier geen namen, e-mailadressen of leerlingteksten " +
-        "invullen. Kies alleen de vaste opties.",
-    };
+  if (!isPlainRecord(velden) || !eigenSleutels(velden)) {
+    return ongeldigVeld();
   }
   const workflow = workflowById(workflowId);
   if (!workflow) {

@@ -611,6 +611,102 @@ const dichteActie = voerBevestigdeActieUit(
 );
 assert.equal(dichteActie.soort, "actie");
 
+const ownKeysVelden = new Proxy(
+  { ...geldigeLesVelden },
+  {
+    ownKeys() {
+      throw new Error("trap");
+    },
+  },
+);
+weigertVeld(voerAssistentUit("les", alsVelden(ownKeysVelden)));
+weigertVeld(maakResultaat("les", alsVelden(ownKeysVelden)));
+const ownKeysValidatie = valideerVelden("les", alsVelden(ownKeysVelden));
+assert.equal(ownKeysValidatie.soort, "geweigerd");
+if (ownKeysValidatie.soort === "geweigerd") {
+  assert.equal(ownKeysValidatie.code, "ongeldig-veld");
+}
+assert.equal(
+  weigerIndienNodig(ownKeysVelden, lesToegestaan)?.soort,
+  "geweigerd",
+);
+
+const getVelden = new Proxy(
+  { ...geldigeLesVelden },
+  {
+    get(target, prop, receiver) {
+      if (prop === "vak") throw new Error("trap");
+      return Reflect.get(target, prop, receiver);
+    },
+  },
+);
+weigertVeld(voerAssistentUit("les", alsVelden(getVelden)));
+weigertVeld(maakResultaat("les", alsVelden(getVelden)));
+const getValidatie = valideerVelden("les", alsVelden(getVelden));
+assert.equal(getValidatie.soort, "geweigerd");
+if (getValidatie.soort === "geweigerd") {
+  assert.equal(getValidatie.code, "ongeldig-veld");
+}
+assert.equal(weigerIndienNodig(getVelden, lesToegestaan)?.soort, "geweigerd");
+
+const hasVelden = new Proxy(
+  { ...geldigeLesVelden },
+  {
+    has() {
+      throw new Error("trap");
+    },
+  },
+);
+weigertVeld(voerAssistentUit("les", alsVelden(hasVelden)));
+weigertVeld(maakResultaat("les", alsVelden(hasVelden)));
+const hasValidatie = valideerVelden("les", alsVelden(hasVelden));
+assert.equal(hasValidatie.soort, "geweigerd");
+if (hasValidatie.soort === "geweigerd") {
+  assert.equal(hasValidatie.code, "ongeldig-veld");
+}
+assert.equal(weigerIndienNodig(hasVelden, lesToegestaan)?.soort, "geweigerd");
+
+const ownKeysKlaar = new Proxy(les, {
+  ownKeys() {
+    throw new Error("trap");
+  },
+});
+weigertGeenActie(
+  voerBevestigdeActieUit(ownKeysKlaar as AssistentKlaar, true),
+);
+
+const getKlaar = new Proxy(les, {
+  get(target, prop, receiver) {
+    if (prop === "titel") throw new Error("trap");
+    return Reflect.get(target, prop, receiver);
+  },
+});
+weigertGeenActie(voerBevestigdeActieUit(getKlaar as AssistentKlaar, true));
+
+const lijstTrap = new Proxy([...lesToegestaan], {
+  get(target, prop, receiver) {
+    if (prop === "length" || prop === "0") throw new Error("trap");
+    return Reflect.get(target, prop, receiver);
+  },
+});
+assert.equal(
+  weigerIndienNodig(geldigeLesVelden, lijstTrap)?.soort,
+  "geweigerd",
+);
+
+const checklistTrap = new Proxy([...les.checklist], {
+  get(target, prop, receiver) {
+    if (prop === "length" || prop === "0") throw new Error("trap");
+    return Reflect.get(target, prop, receiver);
+  },
+});
+weigertGeenActie(
+  voerBevestigdeActieUit(
+    { ...les, checklist: checklistTrap } as AssistentKlaar,
+    true,
+  ),
+);
+
 function plat(bron: string): string {
   return bron.replace(/\s+/g, " ");
 }
