@@ -58,7 +58,7 @@ const MAX_AANTEKENINGEN = 2000;
  * worden als concept bewaard; die zeggen niets over een leerling.
  */
 type RapportInstellingen = Pick<ReportInput, "outputType" | "toon" | "periode" | "niveau" | "aanspreekvorm" | "lengte">;
-type RapportPersoonlijk = Pick<ReportInput, "leerlingLabel" | "aantekeningen">;
+type RapportPersoonlijk = Pick<ReportInput, "leerlingLabel" | "aantekeningen" | "vak" | "waargenomenSterkte" | "aandachtspunt" | "voorbeeldBewijs" | "vervolgstapInDeKlas">;
 
 const DEFAULT_INSTELLINGEN: RapportInstellingen = {
   outputType: "rapporttekst",
@@ -70,7 +70,7 @@ const DEFAULT_INSTELLINGEN: RapportInstellingen = {
 };
 
 const LEEG_PERSOONLIJK: RapportPersoonlijk = {
-  leerlingLabel: "",
+  leerlingLabel: "L.J.",
   aantekeningen: "",
 };
 
@@ -275,6 +275,13 @@ export default function NewReportPage() {
     }
   }
 
+  function wisInvoer() {
+    setPersoonlijk(LEEG_PERSOONLIJK);
+    setFouten({});
+    setStap(1);
+    requestAnimationFrame(() => leerlingRef.current?.focus());
+  }
+
 
   const samenvatting = `Een ${TOON_LABEL[input.toon]} ${OUTPUT_LABEL[input.outputType]}`;
 
@@ -334,6 +341,15 @@ export default function NewReportPage() {
                 />
               )}
             </Field>
+
+            <div className="grid gap-4 rounded-xl border-2 border-lijn bg-ivoor p-4 sm:grid-cols-2">
+              <CompactVeld label="Vak/leergebied" value={input.vak ?? ""} onChange={(vak) => setPersoonlijk({ ...persoonlijk, vak })} />
+              <p className="text-base text-tekst-zacht">Periode kies je hierboven. De vrije aantekeningen blijven altijd een fallback.</p>
+              <CompactVeld label="Waargenomen sterkte" value={input.waargenomenSterkte ?? ""} onChange={(waargenomenSterkte) => setPersoonlijk({ ...persoonlijk, waargenomenSterkte })} />
+              <CompactVeld label="Aandachtspunt" value={input.aandachtspunt ?? ""} onChange={(aandachtspunt) => setPersoonlijk({ ...persoonlijk, aandachtspunt })} />
+              <CompactVeld label="Voorbeeld/bewijs" value={input.voorbeeldBewijs ?? ""} onChange={(voorbeeldBewijs) => setPersoonlijk({ ...persoonlijk, voorbeeldBewijs })} />
+              <CompactVeld label="Vervolgstap in de klas" value={input.vervolgstapInDeKlas ?? ""} onChange={(vervolgstapInDeKlas) => setPersoonlijk({ ...persoonlijk, vervolgstapInDeKlas })} />
+            </div>
 
             <div className="space-y-6 rounded-xl border-2 border-lijn bg-ivoor p-4">
               <ChoiceCards legend="Rapportperiode" keuzes={PERIODES} waarde={input.periode ?? "rapport-1"} onChange={(waarde) => setInstellingen({ ...instellingen, periode: waarde })} />
@@ -427,6 +443,7 @@ export default function NewReportPage() {
             <Button type="submit" variant="primary" volleBreedte>
               Volgende
             </Button>
+            <Button type="button" onClick={wisInvoer} volleBreedte>Wis invoer</Button>
 
             <p className="text-base text-tekst-zacht">
               Geen automatische koppeling met Magister of Somtoday.{" "}
@@ -511,6 +528,10 @@ export default function NewReportPage() {
       </div>
     </div>
   );
+}
+
+function CompactVeld({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="block text-base font-semibold text-marine">{label}<input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={`${VELD_KLASSEN} mt-1`} /></label>;
 }
 
 /** Eén regel in het overzicht: label, gekozen waarde, en "Wijzig". */

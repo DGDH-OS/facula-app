@@ -10,12 +10,15 @@ import { AiMelding } from "@/components/ui/AiMelding";
 import { Button } from "@/components/ui/Button";
 import { ErrorNotice } from "@/components/ui/Notice";
 import { controleerRapportKwaliteit } from "@/lib/report-quality";
+import { controleerOutputTegenInvoer } from "@/lib/avg-guardrails";
 
 const OUTPUT_LABEL: Record<RapportOutputType, string> = {
   rapporttekst: "Rapporttekst",
   oudergesprek: "Verslag oudergesprek",
   oudermail: "Concept oudermail",
 };
+const TRANSPARANTIE = "Concept gegenereerd uit jouw aantekeningen. Jij blijft auteur. Geen officieel rapport of OKR.";
+const CHECKS = ["Alleen wat ik noteerde", "Concreet voorbeeld", "Sterkte en aandacht", "Geen cijfer/advies", "Initialen", "Toon past bij ontvanger"];
 
 /**
  * De geschreven rapporttekst: voorvertoning, kopieerknop en download.
@@ -42,9 +45,15 @@ export function RapportWeergave({
   const [exporteren, setExporteren] = useState(false);
   const [exportFout, setExportFout] = useState<string | null>(null);
   const [tekst, setTekst] = useState(rapport.tekst);
+  const [checks, setChecks] = useState<boolean[]>(Array(6).fill(false));
   const kwaliteit = controleerRapportKwaliteit(rapport.input, tekst);
 
   async function handleCopy() {
+    const actueleGuardrail = controleerOutputTegenInvoer(rapport.input.aantekeningen, tekst);
+    if (!actueleGuardrail.ok || checks.some((check) => !check)) {
+      setExportFout("Vink eerst alle coachchecks aan en los harde waarschuwingen op.");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(tekst);
       setGekopieerd(true);
@@ -125,6 +134,7 @@ export function RapportWeergave({
           <p className="mt-1 text-base text-tekst-zacht">{huisstijl.schoolnaam}</p>
         )}
         <textarea aria-label="Rapporttekst bewerken" value={tekst} onChange={(event) => setTekst(event.target.value)} rows={12} className="mt-4 min-h-64 w-full rounded-lg border-2 border-lijn bg-ivoor px-4 py-3 font-sans text-base leading-relaxed text-tekst focus:border-marine focus:outline-none focus:ring-2 focus:ring-marine" />
+        <p className="mt-4 text-base text-tekst-zacht">{TRANSPARANTIE} <Link href="/privacy/rapport-module" className="font-semibold text-marine underline">Lees de privacy-uitleg</Link>.</p>
       </article>
 
       <div className="rounded-xl border-2 border-lijn bg-ivoor px-5 py-4" aria-live="polite">
@@ -134,6 +144,13 @@ export function RapportWeergave({
       </div>
 
       {exportFout && <ErrorNotice melding={exportFout} />}
+
+      <fieldset className="rounded-xl border-2 border-lijn bg-ivoor px-5 py-4">
+        <legend className="text-base font-semibold text-marine">Coachcheck voor kopiëren</legend>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {CHECKS.map((label, index) => <label key={label} className="flex min-h-11 items-center gap-2 text-base text-tekst"><input type="checkbox" checked={checks[index]} onChange={(e) => setChecks(checks.map((value, i) => i === index ? e.target.checked : value))} className="h-5 w-5" />{label}</label>)}
+        </div>
+      </fieldset>
 
       <div className="flex flex-wrap gap-3">
         <Button variant="primary" onClick={handleCopy}>

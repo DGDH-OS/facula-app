@@ -138,6 +138,11 @@ export interface ReportInput {
   /** Bij voorkeur gepseudonimiseerd, bijv. "L.J." i.p.v. een volledige naam. */
   leerlingLabel: string;
   aantekeningen: string;
+  vak?: string;
+  waargenomenSterkte?: string;
+  aandachtspunt?: string;
+  voorbeeldBewijs?: string;
+  vervolgstapInDeKlas?: string;
   outputType: RapportOutputType;
   toon: RapportToon;
   periode?: RapportPeriode;

@@ -62,7 +62,9 @@ export const EVALUATIEVE_SIGNAALWOORDEN: string[] = [
 function verwijderDatums(tekst: string): string {
   return tekst
     .replace(/^datum:.*$/gim, "")
-    .replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g, "");
+    .replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g, "")
+    .replace(/\brapport-[1-3]\b/gi, "")
+    .replace(/\bperiode\s+[1-3]\b/gi, "");
 }
 
 /** Vindt losse getallen in tekst die als rapportcijfer gelezen kunnen worden. */

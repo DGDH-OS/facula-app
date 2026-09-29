@@ -1,6 +1,6 @@
 import type { ReportInput } from "./types";
 
-export type ReportQualityKind = "label" | "privacy" | "strength" | "workpoints" | "growth" | "name" | "length";
+export type ReportQualityKind = "label" | "privacy" | "strength" | "workpoints" | "growth" | "name" | "length" | "example" | "positive-negative" | "pii" | "grade";
 export interface ReportQualityCheck { kind: ReportQualityKind; niveau: "waarschuwing" | "tip"; melding: string; }
 export interface ReportQualityResult { ok: boolean; checks: ReportQualityCheck[]; }
 
@@ -8,6 +8,9 @@ const LABELS: Record<string, string> = { lui: "heeft soms een zetje nodig", dom:
 const MEDISCH = /\b(adhd|add|dyslexie|dyscalculie|autisme|autistisch|hoogbegaafd|depressie|diagnose|medicatie)\b/gi;
 const POSITIEF = /\b(goed|sterk|groei|vooruitgang|zelfstandig|actief|helpt|werkt|kan|talent|succes|fijn|betrokken|nieuwsgierig|samenwerken)\b/i;
 const GROEI = /\b(kan oefenen|volgende stap|gaat oefenen|blijven oefenen|probeer|helpt om|werkpunt|groeien|ontwikkelen)\b/i;
+const VOORBEELD = /\b(bijvoorbeeld|zoals|tijdens|opdracht|werkstuk|presentatie|toets|laat zien|waargenomen|bewijs)\b/i;
+const PII = /(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?:\+31|0)\s*\d(?:[\s-]*\d){8,})/i;
+const CIJFER = /\b(?:10|[1-9])(?:[.,][0-9])?\b/;
 
 export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aantekeningen): ReportQualityResult {
   const checks: ReportQualityCheck[] = [];
@@ -17,10 +20,17 @@ export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aan
   const medische = [...new Set(tekst.toLowerCase().match(MEDISCH) ?? [])];
   if (medische.length) checks.push({ kind: "privacy", niveau: "waarschuwing", melding: `Let op: ${medische.join(", ")} zijn bijzondere persoonsgegevens. Laat deze termen weg.` });
   if (!POSITIEF.test(tekst)) checks.push({ kind: "strength", niveau: "waarschuwing", melding: "Voeg minstens één concrete kracht toe." });
+  if (!VOORBEELD.test(tekst)) checks.push({ kind: "example", niveau: "waarschuwing", melding: "Voeg minstens één concreet voorbeeld of bewijs toe." });
+  const heeftNegatief = /\b(moeite|aandacht|niet|lastig|vergeet|ontbreekt|afgeleid)\b/i.test(tekst);
+  const heeftPositief = POSITIEF.test(tekst);
+  if (heeftNegatief && !heeftPositief) checks.push({ kind: "positive-negative", niveau: "waarschuwing", melding: "De tekst noemt alleen aandachtspunten. Voeg ook een sterkte toe." });
+  if (heeftPositief && !heeftNegatief) checks.push({ kind: "positive-negative", niveau: "waarschuwing", melding: "De tekst noemt alleen sterktes. Voeg ook een aandachtspunt toe." });
   const werkpunten = (tekst.toLowerCase().match(/werkpunt|aandachtspunt|moeite met|kan nog|volgende stap/g) ?? []).length;
   if (werkpunten > 2) checks.push({ kind: "workpoints", niveau: "waarschuwing", melding: "Beperk het aantal werkpunten tot maximaal twee." });
   if (werkpunten > 0 && !GROEI.test(tekst)) checks.push({ kind: "growth", niveau: "tip", melding: "Formuleer een werkpunt als volgende stap, met een concrete tip." });
   if (input.leerlingLabel.trim().split(/\s+/).length > 2) checks.push({ kind: "name", niveau: "waarschuwing", melding: "Gebruik alleen een voornaam of initialen, geen volledige naam." });
+  if (PII.test(tekst)) checks.push({ kind: "pii", niveau: "waarschuwing", melding: "Verwijder e-mailadressen en telefoonnummers uit de tekst." });
+  if (CIJFER.test(tekst.replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g, ""))) checks.push({ kind: "grade", niveau: "waarschuwing", melding: "Controleer cijfers in de tekst. Gebruik alleen cijfers die je zelf noteerde." });
   const lengte = input.lengte ?? "normaal";
   const min = lengte === "kort" ? 180 : lengte === "uitgebreid" ? 450 : 280;
   const max = lengte === "kort" ? 700 : lengte === "uitgebreid" ? 1800 : 1200;

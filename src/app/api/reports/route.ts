@@ -61,6 +61,11 @@ export async function POST(request: NextRequest) {
   const input: ReportInput = {
     leerlingLabel,
     aantekeningen,
+    vak: limitString(body.vak, 200) ?? undefined,
+    waargenomenSterkte: limitString(body.waargenomenSterkte, 1000) ?? undefined,
+    aandachtspunt: limitString(body.aandachtspunt, 1000) ?? undefined,
+    voorbeeldBewijs: limitString(body.voorbeeldBewijs, 1000) ?? undefined,
+    vervolgstapInDeKlas: limitString(body.vervolgstapInDeKlas, 1000) ?? undefined,
     outputType: isOutputType(body.outputType) ? body.outputType : "rapporttekst",
     toon: isToon(body.toon) ? body.toon : "vriendelijk-direct",
     periode: PERIODES.includes(body.periode as RapportPeriode) ? body.periode as RapportPeriode : "rapport-1",

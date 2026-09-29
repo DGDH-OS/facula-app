@@ -148,7 +148,8 @@ const TOON_WOORDEN: Record<RapportToon, ToonWoorden> = {
 /* ------------------------------------------------------------------ */
 
 function bouwKernParagraaf(input: ReportInput, woorden: ToonWoorden): string {
-  const { positief, aandacht, overig } = deelIn(input.aantekeningen);
+  const bron = [input.aantekeningen, input.waargenomenSterkte, input.aandachtspunt, input.voorbeeldBewijs, input.vervolgstapInDeKlas].filter(Boolean).join("; ");
+  const { positief, aandacht, overig } = deelIn(bron);
   const zinnen: string[] = [];
 
   if (positief.length > 0) {
@@ -162,7 +163,7 @@ function bouwKernParagraaf(input: ReportInput, woorden: ToonWoorden): string {
   }
   if (zinnen.length === 0) {
     zinnen.push(
-      "Er zijn aantekeningen genoteerd; vul de losse steekwoorden hierboven verder aan voor een vollediger beeld."
+      "Er zijn aantekeningen genoteerd; vul de losse steekwoorden verder aan voor een vollediger beeld."
     );
   }
 
@@ -180,24 +181,26 @@ function bouwRapporttekst(input: ReportInput, woorden: ToonWoorden): string {
     ? `Je hebt deze periode laten zien dat ${opsomming(positief) || "je inzet toont"}.`
     : `${input.leerlingLabel} heeft deze periode laten zien dat ${opsomming(positief) || "er inzet is"}.`;
   const afsluiting = input.aanspreekvorm === "aan-leerling" ? "Blijf deze aanpak gebruiken; zo zet je een mooie volgende stap." : `${input.leerlingLabel} kan deze ontwikkeling de komende periode verder voortzetten.`;
-  return [woorden.aanhef(input.leerlingLabel), opening, kern, afsluiting].join(
+  const vakPeriode = [input.vak, input.periode].filter(Boolean).join(" - ");
+  return [woorden.aanhef(vakPeriode || input.leerlingLabel), opening, kern, afsluiting].join(
     "\n\n"
   );
 }
 
 function bouwOudergesprek(input: ReportInput, woorden: ToonWoorden): string {
-  const kern = bouwKernParagraaf(input, woorden);
-  const kop = `Verslag oudergesprek voor ${input.leerlingLabel}`;
-  const datumregel = `Datum: ${new Date().toLocaleDateString("nl-NL")}`;
+  void woorden;
+  const { positief, aandacht, overig } = deelIn([input.aantekeningen, input.waargenomenSterkte, input.aandachtspunt, input.voorbeeldBewijs, input.vervolgstapInDeKlas].filter(Boolean).join("; "));
+  const kop = `Oudergesprek over ${input.leerlingLabel}`;
+  const sterkte = opsomming(positief) || input.waargenomenSterkte || opsomming(overig) || "Zie de genoteerde observaties.";
+  const punt = opsomming(aandacht) || input.aandachtspunt || "Bespreek dit aandachtspunt samen.";
+  const stap = input.vervolgstapInDeKlas || "Spreek een kleine vervolgstap in de klas af.";
   return [
     kop,
-    datumregel,
-    "",
-    "Besproken punten:",
-    kern,
-    "",
-    woorden.afsluiting,
-  ].join("\n");
+    `• Sterkte: ${sterkte}`,
+    `• Aandacht: ${punt}`,
+    `• Vervolgstap: ${stap}`,
+    "Vraag aan ouder/verzorger: Wat herkent u thuis?",
+  ].join("\n").split(/\s+/).slice(0, 120).join(" ");
 }
 
 function bouwOudermail(input: ReportInput, woorden: ToonWoorden): string {
@@ -219,9 +222,9 @@ function bouwOudermail(input: ReportInput, woorden: ToonWoorden): string {
     "",
     aanhefRegel,
     "",
-    kern,
+    `In de afgelopen periode zagen we het volgende. ${kern}`,
     "",
-    woorden.afsluiting,
+    "We bespreken graag samen wat een passende vervolgstap is.",
     "",
     afsluitRegel,
   ].join("\n");
