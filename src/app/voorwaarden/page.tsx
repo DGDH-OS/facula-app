@@ -66,6 +66,13 @@ export default function VoorwaardenPage() {
                   plaats van volledige namen.
                 </li>
                 <li>
+                  • De Facula Assistent is een hulpmiddel om een bestaande
+                  module te kiezen. Hij beoordeelt niet, geeft geen cijfers
+                  en mag geen leerlingnamen bevatten. Jij blijft
+                  eindverantwoordelijk voor wat je in de klas of naar ouders
+                  stuurt.
+                </li>
+                <li>
                   • Gebruik Facula niet voor onwettige doeleinden of om
                   schade aan derden of aan Facula toe te brengen.
                 </li>

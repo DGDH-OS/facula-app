@@ -44,6 +44,7 @@ import { CoachFloating } from "@/components/coach/CoachPanel";
 function navItems(heeftSchool: boolean, isBeheerder: boolean) {
   const items: { href: string; label: string; actiefOp?: string }[] = [
     { href: "/app", label: "Start", actiefOp: "/app" },
+    { href: "/app/assistent", label: "Assistent", actiefOp: "/app/assistent" },
   ];
 
   if (heeftSchool) {

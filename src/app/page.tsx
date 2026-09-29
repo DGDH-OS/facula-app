@@ -51,6 +51,11 @@ const FAQS = [
       "Nee. Leerlingen loggen nergens in en hebben geen account. Jij voert het leerdoel in, Facula maakt het materiaal, en wat de klas ziet is een PowerPoint of een blad papier.",
   },
   {
+    vraag: "Wat is de Facula Assistent?",
+    antwoord:
+      "Een routeerhulp in de app: je kiest een bestaande module of typt wat je wilt maken. De Assistent is geen chatbot, geeft geen cijfers en verzint geen velden. Onbekende of leerlinggerichte verzoeken weigert hij. Jij blijft verantwoordelijk.",
+  },
+  {
     vraag: "Waar staan onze gegevens?",
     antwoord:
       "Database en hosting staan in de EU, en het taalmodel draait op een EU-regio. Er wordt niet getraind op wat jullie invoeren. Voor een school is er een model-verwerkersovereenkomst met subverwerkers en bewaartermijnen.",

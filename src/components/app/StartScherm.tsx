@@ -4,7 +4,7 @@ import { Tile } from "@/components/ui/Tile";
 import { EmptyState, PageHeader, Section } from "@/components/ui/PageHeader";
 import { UsageMeter } from "@/components/ui/UsageMeter";
 import { ButtonLink } from "@/components/ui/Button";
-import { LesIcon, ToetsIcon, RapportIcon } from "@/components/ui/icons";
+import { LesIcon, ToetsIcon, RapportIcon, AssistentIcon } from "@/components/ui/icons";
 import { RecenteLijst, type RecentItem } from "@/components/app/RecenteLijst";
 import {
   ROL_LABEL,
@@ -52,7 +52,13 @@ export function StartScherm({
       />
 
       <h2 className="mt-10 font-display text-2xl text-marine">Wat wil je maken?</h2>
-      <div className="mt-4 grid gap-6 sm:grid-cols-3 sm:gap-4">
+      <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+        <Tile
+          href="/app/assistent"
+          icoon={<AssistentIcon />}
+          kop="De Assistent"
+          zin="Kies een module. Geen chatbot, geen leerlingnamen, jij blijft verantwoordelijk."
+        />
         <Tile
           href="/app/lessons/new"
           icoon={<LesIcon />}

@@ -12,7 +12,7 @@ export default function PrivacyPage() {
             Privacyverklaring
           </h1>
           <p className="mt-4 text-base text-tekst-zacht">
-            Laatst bijgewerkt: 27 september 2026
+            Laatst bijgewerkt: 29 september 2026
           </p>
           <p className="mt-6 text-base text-tekst">
             Deze pagina legt in gewone taal uit welke gegevens Facula van je
@@ -133,6 +133,26 @@ export default function PrivacyPage() {
                 rapportteksten worden gegenereerd door software die op onze
                 eigen servers draait, dus je invoer wordt niet naar een
                 extern AI-bedrijf gestuurd.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="font-display text-xl text-marine">
+                De Facula Assistent
+              </h2>
+              <p className="mt-2 text-base leading-relaxed text-tekst">
+                De Assistent is een routeerhulp naar bestaande modules. Hij
+                slaat geen leerlingnamen op, zet geen persoonsgegevens in een
+                webadres en vult ontbrekende velden niet zelf in. Typ geen
+                namen, e-mailadressen, telefoonnummers, cijfers of diagnoses
+                in dat scherm. Meer uitleg:{" "}
+                <Link
+                  href="/ai"
+                  className="font-semibold text-marine underline underline-offset-4"
+                >
+                  AI in Facula
+                </Link>
+                .
               </p>
             </section>
 

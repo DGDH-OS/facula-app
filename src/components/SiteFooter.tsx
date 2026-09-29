@@ -70,6 +70,14 @@ export default function SiteFooter() {
               <li>Export naar PowerPoint en Word</li>
               <li>
                 <Link
+                  href="/ai"
+                  className="inline-flex min-h-14 items-center text-tekst underline underline-offset-4"
+                >
+                  AI in Facula
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/privacy"
                   className="inline-flex min-h-14 items-center text-tekst underline underline-offset-4"
                 >

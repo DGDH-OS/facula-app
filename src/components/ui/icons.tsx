@@ -48,6 +48,16 @@ export function ToetsIcon() {
   );
 }
 
+/** Klok — de Assistent als routeerhulp, geen chat. */
+export function AssistentIcon() {
+  return (
+    <IconFrame>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </IconFrame>
+  );
+}
+
 /** Tekstballon — een rapport of oudermail. */
 export function RapportIcon() {
   return (
