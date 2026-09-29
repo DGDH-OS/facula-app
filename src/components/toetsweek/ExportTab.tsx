@@ -15,6 +15,8 @@ import type {
   ToetsweekSignaal,
 } from "@/lib/toetsweek/planner";
 import type { ToetsItem } from "@/lib/toetsweek/types";
+import { NakijkplanningTab } from "./NakijkplanningTab";
+import { OverzichtTab } from "./OverzichtTab";
 
 const ICS_KEUZES: { id: IcsKeuze; label: string }[] = [
   { id: "toetsen", label: "Alleen toetsen en deadlines" },
@@ -65,6 +67,12 @@ export function ExportTab(props: {
   }
 
   return (
+    <>
+    <div className="hidden space-y-8 print:block">
+      <h1 className="font-display text-3xl text-marine">Toetsweekplanner</h1>
+      <OverzichtTab analyses={analyses} signalen={signalen} />
+      <NakijkplanningTab items={items} nakijkplanning={nakijkplanning} />
+    </div>
     <section className="space-y-6 print:hidden">
       <p className="max-w-2xl text-lg text-tekst-zacht">
         Exporteer het overzicht per klas per week, de signalen en de
@@ -123,5 +131,6 @@ export function ExportTab(props: {
         </p>
       )}
     </section>
+    </>
   );
 }

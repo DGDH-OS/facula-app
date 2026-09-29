@@ -4,7 +4,8 @@ import {
   type ToetsweekInstellingen,
 } from "./types";
 
-const MAX_HORIZON_DAGEN = 120;
+/** Veiligheidsgrens tegen eindeloze lussen: tien jaar, ruim boven elke echte cijferdeadline. */
+const MAX_HORIZON_DAGEN = 3660;
 
 const DAGNAMEN = [
   "zondag",

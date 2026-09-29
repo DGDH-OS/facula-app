@@ -224,6 +224,21 @@ assert.equal(tekort.tekortMinuten, 140);
 assert.ok(tekort.melding.includes("140 minuten nakijktijd tekort"));
 assert.ok(tekort.melding.includes(dagnaam("2026-10-07")));
 assert.ok(tekort.melding.includes("140 minuten per dag extra vrij"));
+
+// Lange deadline (ruim 4 maanden): geen kunstmatige horizon die een vals tekort geeft.
+const langItem = item({
+  id: "lang-1",
+  klas: "H5a",
+  vak: "geschiedenis",
+  datum: "2026-09-01",
+  cijferdeadline: "2027-03-01",
+  aantalLeerlingen: 100,
+  nakijkminuten: 60,
+});
+const langPlanning = berekenNakijkplanning([langItem], { ...instellingen, nakijkminutenPerDag: 50 });
+assert.equal(langPlanning.tekorten.length, 0);
+const laatsteDag = langPlanning.dagen[langPlanning.dagen.length - 1].datum;
+assert.ok(laatsteDag > "2027-01-01", "planning loopt door na 120 dagen: " + laatsteDag);
 assert.ok(!bevatGat(tekort.melding), "tekortmelding heeft een gat of dubbele punt");
 
 assert.equal(telWerkdagenTussen("2026-10-06", "2026-10-06", tekortInstellingen), 1);
