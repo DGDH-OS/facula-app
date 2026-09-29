@@ -17,7 +17,7 @@ const VERBODEN = new Set([
  * namen horen hier niet als invoer, dus ook niet als filter achteraf.
  */
 export function weigerIndienNodig(
-  velden: Record<string, string>,
+  velden: Record<string, unknown>,
   toegestaan: readonly string[],
 ): AssistentWeigering | null {
   const mag = new Set(toegestaan);

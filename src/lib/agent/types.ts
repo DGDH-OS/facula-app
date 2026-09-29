@@ -51,7 +51,7 @@ export interface AssistentVragen {
 
 /**
  * Voorstel na geldige keuzes. Nog geen actie: de docent moet apart
- * bevestigen voordat er genavigeerd of gekopieerd mag worden.
+ * bevestigen voordat er lokaal genavigeerd mag worden.
  */
 export interface AssistentKlaar {
   soort: "klaar";
@@ -65,7 +65,7 @@ export interface AssistentKlaar {
   ingevuldeVelden: Record<string, string>;
 }
 
-/** Pas na aparte bevestiging. Alleen lokale, omkeerbare effecten. */
+/** Pas na aparte bevestiging. Alleen lokale navigatie (href). */
 export interface AssistentActie {
   soort: "actie";
   workflowId: WorkflowId;

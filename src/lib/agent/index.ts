@@ -27,6 +27,26 @@ function onbekend(): AssistentWeigering {
   };
 }
 
+function ongeldigVeld(): AssistentWeigering {
+  return {
+    soort: "geweigerd",
+    code: "ongeldig-veld",
+    melding:
+      "Je kunt hier geen namen, e-mailadressen of leerlingteksten " +
+      "invullen. Kies alleen de vaste opties.",
+  };
+}
+
+function isPlainVelden(
+  velden: unknown,
+): velden is Record<string, unknown> {
+  return (
+    typeof velden === "object" &&
+    velden !== null &&
+    !Array.isArray(velden)
+  );
+}
+
 /**
  * Alleen een gekozen module plus vaste enum-velden. Geen vrije tekst,
  * geen trefwoordmatcher. Geeft een voorstel; nog geen actie.
@@ -37,6 +57,7 @@ export function voerAssistentUit(
 ): AssistentUitkomst {
   const workflow = workflowById(gekozen);
   if (!workflow) return onbekend();
+  if (!isPlainVelden(velden)) return ongeldigVeld();
 
   const extra = weigerIndienNodig(
     velden,

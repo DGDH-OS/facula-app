@@ -1,4 +1,4 @@
-import type { WorkflowDefinitie, WorkflowId } from "./types";
+import type { WorkflowDefinitie } from "./types";
 
 const VAKKEN = [
   { waarde: "Maatschappijleer", label: "Maatschappijleer" },
@@ -156,14 +156,19 @@ export const WORKFLOWS: readonly WorkflowDefinitie[] = [
   },
 ];
 
-const BY_ID = Object.fromEntries(WORKFLOWS.map((w) => [w.id, w])) as Record<
-  WorkflowId,
-  WorkflowDefinitie
->;
+const BY_ID = new Map<string, WorkflowDefinitie>(
+  WORKFLOWS.map((w) => [w.id, w]),
+);
 
-export function workflowById(
-  id: string | undefined | null,
-): WorkflowDefinitie | undefined {
-  if (!id) return undefined;
-  return BY_ID[id as WorkflowId];
+/**
+ * Runtime-safe lookup. Unknown strings, prototype keys and empty
+ * values return undefined. Never reads Object.prototype.
+ */
+export function workflowById(id: unknown): WorkflowDefinitie | undefined {
+  if (typeof id !== "string" || id.length === 0) return undefined;
+  const gevonden = BY_ID.get(id);
+  if (!gevonden) return undefined;
+  const veldenOk = Array.isArray(gevonden.velden);
+  if (!veldenOk) return undefined;
+  return gevonden;
 }

@@ -42,7 +42,6 @@ export function AssistentScherm() {
   const [actie, setActie] = useState<AssistentActie | null>(null);
   const [fout, setFout] = useState("");
   const [status, setStatus] = useState("");
-  const [kopie, setKopie] = useState("");
 
   const workflow = workflowById(workflowId);
 
@@ -53,7 +52,6 @@ export function AssistentScherm() {
     setVoorstel(null);
     setActie(null);
     setFout("");
-    setKopie("");
     setStatus("Opnieuw begonnen. Er is nog niets gebeurd.");
   }
 
@@ -63,7 +61,6 @@ export function AssistentScherm() {
     setVoorstel(null);
     setActie(null);
     setFout("");
-    setKopie("");
     setStap("formulier");
     setStatus("Module gekozen. Kies de vaste opties. Nog niets gebeurd.");
   }
@@ -95,21 +92,8 @@ export function AssistentScherm() {
     setActie(uit);
     setStap("gebruikt");
     setStatus(
-      "Voorstel in gebruik. Je kunt de checklist kopiëren of de module openen.",
+      "Voorstel in gebruik. Open de module. Niets is gekopieerd of opgeslagen.",
     );
-  }
-
-  async function kopieerChecklist() {
-    if (!actie) return;
-    const tekst = actie.checklist.map((regel) => `- ${regel}`).join("\n");
-    try {
-      await navigator.clipboard.writeText(tekst);
-      setKopie("Checklist gekopieerd.");
-      setStatus("Checklist gekopieerd.");
-    } catch {
-      setKopie("Kopiëren lukte niet. Selecteer de tekst zelf.");
-      setStatus("Kopiëren lukte niet. Selecteer de tekst zelf.");
-    }
   }
 
   return (
@@ -278,15 +262,7 @@ export function AssistentScherm() {
                 <li key={regel}>{regel}</li>
               ))}
             </ol>
-            {kopie && (
-              <p className="text-base text-tekst" role="status">
-                {kopie}
-              </p>
-            )}
             <div className="flex flex-wrap gap-3">
-              <Button type="button" onClick={() => void kopieerChecklist()}>
-                Kopieer checklist
-              </Button>
               <ButtonLink href={actie.href}>{actie.label}</ButtonLink>
               <Button
                 type="button"
@@ -294,7 +270,6 @@ export function AssistentScherm() {
                 onClick={() => {
                   setStap("voorstel");
                   setActie(null);
-                  setKopie("");
                   setStatus("Terug naar het voorstel. Niets is verstuurd.");
                 }}
               >

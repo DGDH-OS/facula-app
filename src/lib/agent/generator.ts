@@ -20,9 +20,17 @@ function labelVan(
 /**
  * Alleen vaste keuzes. Geen defaults, geen vrije tekst, geen namen.
  */
+function eigenWaarde(
+  velden: Record<string, unknown>,
+  id: string,
+): unknown {
+  if (!Object.prototype.hasOwnProperty.call(velden, id)) return undefined;
+  return velden[id];
+}
+
 export function valideerVelden(
   workflowId: WorkflowId,
-  velden: Record<string, string>,
+  velden: Record<string, unknown>,
 ):
   | AssistentVragen
   | AssistentWeigering
@@ -41,7 +49,19 @@ export function valideerVelden(
   const ongeldig: { id: string; melding: string }[] = [];
 
   for (const veld of workflow.velden) {
-    const ruw = (velden[veld.id] ?? "").trim();
+    const bron = eigenWaarde(velden, veld.id);
+    if (bron === undefined || bron === "") {
+      if (veld.verplicht) ontbrekend.push(veld.id);
+      continue;
+    }
+    if (typeof bron !== "string") {
+      ongeldig.push({
+        id: veld.id,
+        melding: `${veld.label} is geen toegestane waarde. Kies uit de lijst.`,
+      });
+      continue;
+    }
+    const ruw = bron.trim();
     if (!ruw) {
       if (veld.verplicht) ontbrekend.push(veld.id);
       continue;

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   voerAssistentUit,
   voerBevestigdeActieUit,
@@ -6,6 +7,10 @@ import {
   workflowById,
 } from "../src/lib/agent";
 import type { WorkflowId } from "../src/lib/agent/types";
+
+function alsVelden(waarde: unknown): Record<string, string> {
+  return waarde as Record<string, string>;
+}
 
 const BESTAANDE_HREFS = new Set(WORKFLOWS.map((w) => w.href));
 
@@ -34,6 +39,47 @@ if (onbekendId.soort === "geweigerd") {
 }
 assert.equal(workflowById("niet-bestaand"), undefined);
 assert.equal(workflowById(undefined), undefined);
+assert.equal(workflowById(null), undefined);
+assert.equal(workflowById(42), undefined);
+
+const prototypeIds = [
+  "__proto__",
+  "constructor",
+  "toString",
+  "null",
+  "undefined",
+  "",
+] as const;
+for (const id of prototypeIds) {
+  assert.equal(workflowById(id), undefined);
+  const uit = voerAssistentUit(id as WorkflowId);
+  assert.equal(uit.soort, "geweigerd");
+  if (uit.soort === "geweigerd") assert.equal(uit.code, "onbekend");
+}
+
+const nietStringBronnen: unknown[] = [
+  { vak: 42 },
+  { vak: null },
+  { vak: ["Geschiedenis"] },
+  { vak: true },
+  { vak: { waarde: "Geschiedenis" } },
+];
+for (const bron of nietStringBronnen) {
+  const uit = voerAssistentUit("les", alsVelden(bron));
+  assert.equal(uit.soort, "vragen");
+  if (uit.soort === "vragen") {
+    assert.ok(uit.ongeldigeVelden.some((f) => f.id === "vak"));
+  }
+}
+
+const geenRecordBronnen: unknown[] = [null, ["les"], 7, false];
+for (const bron of geenRecordBronnen) {
+  const uit = voerAssistentUit("les", alsVelden(bron));
+  assert.equal(uit.soort, "geweigerd");
+  if (uit.soort === "geweigerd") {
+    assert.equal(uit.code, "ongeldig-veld");
+  }
+}
 
 const extraNaam = voerAssistentUit("les", { naam: "Jan" });
 assert.equal(extraNaam.soort, "geweigerd");
@@ -112,6 +158,8 @@ assert.equal(zonderBevestiging.soort, "geweigerd");
 if (zonderBevestiging.soort === "geweigerd") {
   assert.equal(zonderBevestiging.code, "geen-bevestiging");
 }
+assert.equal("href" in zonderBevestiging, false);
+assert.equal("send" in zonderBevestiging, false);
 
 const lesActie = voerBevestigdeActieUit(les, true);
 assert.equal(lesActie.soort, "actie");
@@ -119,11 +167,23 @@ if (lesActie.soort !== "actie") throw new Error("verwacht actie");
 assert.equal(lesActie.href, "/app/lessons/new");
 assert.equal(lesActie.href.includes("?"), false);
 assert.ok(BESTAANDE_HREFS.has(lesActie.href));
+assert.equal(lesActie.href.startsWith("/app/"), true);
+assert.equal(/^https?:/i.test(lesActie.href), false);
+assert.deepEqual(Object.keys(lesActie).sort(), [
+  "checklist",
+  "href",
+  "label",
+  "soort",
+  "workflowId",
+]);
 assert.equal("send" in lesActie, false);
 assert.equal("save" in lesActie, false);
 assert.equal("export" in lesActie, false);
 assert.equal("print" in lesActie, false);
 assert.equal("grade" in lesActie, false);
+assert.equal("clipboard" in lesActie, false);
+assert.equal("download" in lesActie, false);
+assert.equal("copy" in lesActie, false);
 
 const toets = klaar("toets", {
   vak: "Economie",
@@ -203,7 +263,30 @@ for (const w of WORKFLOWS) {
     assert.equal(geweigerd.soort, "geweigerd");
     const actie = voerBevestigdeActieUit(voorstel, true);
     assert.equal(actie.soort, "actie");
+    if (actie.soort === "actie") {
+      assert.equal(actie.href.startsWith("/app/"), true);
+      assert.equal("href" in geweigerd, false);
+    }
   }
+}
+
+const verbodenApi = new RegExp(
+  "navigator\\.clipboard|clipboard\\.write|window\\.print|" +
+    "document\\.execCommand|URL\\.createObjectURL|" +
+    "localStorage|sessionStorage|indexedDB",
+);
+const bronnen = [
+  "src/components/app/AssistentScherm.tsx",
+  "src/lib/agent/index.ts",
+  "src/lib/agent/registry.ts",
+  "src/lib/agent/generator.ts",
+  "src/lib/agent/policy.ts",
+  "src/lib/agent/types.ts",
+];
+for (const pad of bronnen) {
+  const tekst = readFileSync(pad, "utf8");
+  assert.equal(verbodenApi.test(tekst), false, pad);
+  assert.equal(tekst.includes("Kopieer checklist"), false, pad);
 }
 
 console.log("agent-test: alle checks geslaagd");
