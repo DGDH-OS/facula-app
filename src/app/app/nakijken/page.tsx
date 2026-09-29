@@ -1,32 +1,139 @@
 "use client";
-import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Field, VELD_KLASSEN } from "@/components/ui/Field";
-import { controleerNakijkenPrivacy } from "@/lib/report-quality";
-import { STARTERS, berekenCijfer, nieuwCriterium, valideerRubric } from "@/lib/nakijken/rubric";
-import { klasSignalen, maakFeedback, totaalPunten } from "@/lib/nakijken/feedback";
-import type { Leerling, Niveau, Rubric } from "@/lib/nakijken";
-import { Document, Packer, Paragraph, HeadingLevel } from "docx";
 
-const basis: Rubric = { titel: "", criteria: [nieuwCriterium("Inhoud"), nieuwCriterium("Opbouw")], maxPunten: 12, cesuur: null };
+import { useMemo, useState } from "react";
+import { controleerNakijkenPrivacy } from "@/lib/report-quality";
+import { klasSignalen, maakFeedback } from "@/lib/nakijken/feedback";
+import { nieuwCriterium } from "@/lib/nakijken/rubric";
+import type { Leerling, Rubric } from "@/lib/nakijken";
+import { RubricBouwer } from "@/components/nakijken/RubricBouwer";
+import { LeerlingBeoordeling } from "@/components/nakijken/LeerlingBeoordeling";
+import { KlasOverzicht } from "@/components/nakijken/KlasOverzicht";
+import { exporteerWordDocument } from "@/components/nakijken/NakijkExport";
+
+const basis: Rubric = {
+  titel: "",
+  criteria: [nieuwCriterium("Inhoud"), nieuwCriterium("Opbouw")],
+  maxPunten: 12,
+  cesuur: null,
+};
+type Tab = "rubric" | "nakijken" | "overzicht";
+
 export default function NakijkenPage() {
-  const [rubric, setRubric] = useState<Rubric>(basis); const [leerlingen, setLeerlingen] = useState<Leerling[]>([]); const [initialen, setInitialen] = useState(""); const [tab, setTab] = useState<"rubric" | "nakijken" | "overzicht">("rubric"); const [melding, setMelding] = useState("");
-  const signalen = useMemo(() => klasSignalen(rubric, leerlingen), [rubric, leerlingen]);
-  const updateCriterium = (index: number, naam: string) => setRubric((r) => ({ ...r, criteria: r.criteria.map((c, i) => i === index ? { ...c, naam } : c) }));
-  const voegLeerlingToe = () => { const waarde = initialen.trim(); if (!waarde) return; setLeerlingen((ls) => [...ls, { id: `${Date.now()}`, initialen: waarde, keuzes: {}, notitie: "" }]); setInitialen(""); };
-  const kopieer = async (tekst: string) => { const privacy = controleerNakijkenPrivacy(tekst); if (privacy.blokkeer) { setMelding(`Kopiëren geblokkeerd: verwijder ${privacy.redenen.join(" en ")}.`); return; } await navigator.clipboard.writeText(tekst); setMelding("Gekopieerd."); };
-  const exporteer = async () => { const tekst = leerlingen.map((l) => `${l.initialen}\n${maakFeedback(rubric, l)}`).join("\n\n"); await kopieer(tekst); };
-  const exporteerWord = async () => { const tekst = leerlingen.flatMap((l) => [new Paragraph({ text: l.initialen, heading: HeadingLevel.HEADING_2 }), new Paragraph(maakFeedback(rubric, l))]); const blob = await Packer.toBlob(new Document({ sections: [{ children: [new Paragraph({ text: rubric.titel || "Nakijkhulp", heading: HeadingLevel.HEADING_1 }), ...tekst] }] })); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "nakijkhulp-feedback.docx"; a.click(); URL.revokeObjectURL(url); setMelding("Word-bestand gedownload."); };
-  return <div className="mx-auto max-w-5xl space-y-8">
-    <header><p className="text-base font-semibold text-marine">Facula · Nakijkhulp</p><h1 className="mt-2 font-display text-4xl text-marine">Sneller nakijken, betere feedback</h1><p className="mt-3 max-w-2xl text-lg text-tekst-zacht">Werk met een duidelijke rubric en geef iedere leerling een concrete volgende stap. Gegevens blijven alleen in dit tabblad.</p></header>
-    <nav aria-label="Stappen" className="flex flex-wrap gap-2">{([["rubric","1. Rubric"],["nakijken","2. Nakijken"],["overzicht","3. Klas-overzicht"]] as const).map(([id,label]) => <button key={id} onClick={() => setTab(id)} className={`min-h-11 rounded-full border-2 px-4 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-marine ${tab === id ? "border-marine bg-marine text-op-donker" : "border-lijn text-marine"}`}>{label}</button>)}</nav>
-    {tab === "rubric" && <section className="space-y-6"><div className="rounded-xl border-2 border-lijn bg-ivoor p-5"><Field label="Opdracht" verplicht hulptekst="Kies een naam die leerlingen herkennen.">{(ids) => <input {...ids} className={VELD_KLASSEN} value={rubric.titel} onChange={(e) => setRubric({ ...rubric, titel: e.target.value })} />}</Field><label className="mt-5 block text-base font-semibold text-marine">Starter gebruiken</label><select className={VELD_KLASSEN} aria-label="Starter gebruiken" onChange={(e) => { const s = STARTERS[e.target.value]; if (s) setRubric({ ...rubric, titel: s.titel, criteria: s.criteria.map(nieuwCriterium) }); }}><option>Kies een voorbeeld</option>{Object.keys(STARTERS).map((x) => <option key={x}>{x}</option>)}</select></div>
-      <div className="grid gap-4 md:grid-cols-2">{rubric.criteria.map((c, i) => <article key={c.id} className="rounded-xl border-2 border-lijn bg-ivoor p-5"><label className="block text-base font-semibold text-marine" htmlFor={c.id}>Criterium {i + 1}</label><input id={c.id} className={VELD_KLASSEN} value={c.naam} onChange={(e) => updateCriterium(i, e.target.value)} />{c.niveaus.map((n, j) => <div key={j} className="mt-3"><label className="block text-base font-semibold text-tekst">Niveau {j + 1}: {n.label}</label><input aria-label={`${c.naam}, beschrijving niveau ${j + 1}`} className={VELD_KLASSEN} value={n.descriptor} onChange={(e) => setRubric({ ...rubric, criteria: rubric.criteria.map((x, k) => k === i ? { ...x, niveaus: x.niveaus.map((y, l) => l === j ? { ...y, descriptor: e.target.value } : y) } : x) })} /></div>)}</article>)}</div>
-      <div className="flex flex-wrap gap-3"><Button onClick={() => setRubric({ ...rubric, criteria: [...rubric.criteria, nieuwCriterium()] })} disabled={rubric.criteria.length >= 6}>Criterium toevoegen</Button><Button variant="primary" onClick={() => { const fouten = valideerRubric(rubric); setMelding(fouten[0] ?? "Rubric opgeslagen in dit tabblad."); if (!fouten.length) setTab("nakijken"); }}>{rubric.criteria.length}/6 criteria klaar</Button></div>
-    </section>}
-    {tab === "nakijken" && <section className="space-y-6"><div className="rounded-xl border-2 border-lijn bg-ivoor p-5"><Field label="Leerling toevoegen" hulptekst="Gebruik alleen initialen, bijvoorbeeld L.J.">{(ids) => <input {...ids} className={VELD_KLASSEN} value={initialen} onChange={(e) => setInitialen(e.target.value)} onKeyDown={(e) => e.key === "Enter" && voegLeerlingToe()} />}</Field><Button className="mt-3" onClick={voegLeerlingToe}>Leerling toevoegen</Button></div>{leerlingen.map((l, li) => <article key={l.id} className="rounded-xl border-2 border-lijn bg-ivoor p-5"><h2 className="font-display text-2xl text-marine">{l.initialen}</h2>{rubric.criteria.map((c) => <fieldset key={c.id} className="mt-5"><legend className="text-base font-semibold text-marine">{c.naam}</legend><div className="mt-2 grid gap-2 sm:grid-cols-4">{c.niveaus.map((n, i) => <button key={i} aria-label={`${c.naam}: ${n.label}`} onClick={() => setLeerlingen((ls) => ls.map((x, k) => k === li ? { ...x, keuzes: { ...x.keuzes, [c.id]: (i + 1) as Niveau } } : x))} className={`min-h-14 rounded-lg border-2 p-2 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-marine ${l.keuzes[c.id] === i + 1 ? "border-marine bg-marine text-op-donker" : "border-lijn text-marine"}`}><span className="block text-lg">{i + 1}</span>{n.label}</button>)}</div><p className="mt-2 text-base text-tekst-zacht">{l.keuzes[c.id] ? c.niveaus[l.keuzes[c.id] - 1].descriptor : "Kies een niveau."}</p></fieldset>)}<label className="mt-5 block text-base font-semibold text-marine" htmlFor={`notitie-${l.id}`}>Korte notitie, optioneel</label><textarea id={`notitie-${l.id}`} className={`${VELD_KLASSEN} mt-2`} rows={3} value={l.notitie} onChange={(e) => setLeerlingen((ls) => ls.map((x, k) => k === li ? { ...x, notitie: e.target.value } : x))} /><p className="mt-3 text-base font-semibold text-marine">Punten: {totaalPunten(rubric, l)} / {rubric.maxPunten}{rubric.cesuur ? ` · cijfer ${berekenCijfer(totaalPunten(rubric, l), rubric.maxPunten, rubric.cesuur)} (berekend uit jouw punten)` : ""}</p><Button className="mt-3" onClick={() => kopieer(maakFeedback(rubric, l))}>Kopieer feedback</Button></article>)}<div className="flex flex-wrap gap-3"><Button onClick={exporteer} disabled={!leerlingen.length}>Kopieer alles</Button><Button onClick={() => setTab("overzicht")}>Bekijk klas-overzicht</Button></div></section>}
-    {tab === "overzicht" && <section className="space-y-6"><div className="overflow-x-auto rounded-xl border-2 border-lijn bg-ivoor"><table className="w-full min-w-[42rem] text-left text-base"><caption className="p-5 text-left font-display text-2xl text-marine">Klas-overzicht</caption><thead><tr className="border-t-2 border-lijn">{["Initialen", ...rubric.criteria.map((c) => c.naam)].map((x) => <th key={x} className="p-3 font-semibold">{x}</th>)}</tr></thead><tbody>{leerlingen.map((l) => <tr key={l.id} className="border-t border-lijn"><th className="p-3">{l.initialen}</th>{rubric.criteria.map((c) => <td key={c.id} className="p-3">{l.keuzes[c.id] ?? "–"}</td>)}</tr>)}</tbody></table></div><div className="grid gap-3 md:grid-cols-2">{signalen.map((s) => <div key={s.criterium} className={`rounded-xl border-2 p-4 ${s.melding ? "border-waarschuwing-tekst bg-waarschuwing-vlak" : "border-lijn"}`}><p className="text-base font-semibold text-marine">{s.criterium}: {s.percentageOnvoldoende}% onvoldoende</p>{s.melding && <p className="mt-1 text-base" aria-live="polite">{s.melding}</p>}</div>)}</div><div className="flex flex-wrap gap-3"><Button onClick={exporteer}>Kopieer alles</Button><Button onClick={exporteerWord} disabled={!leerlingen.length}>Download als Word</Button><Button onClick={() => setLeerlingen([])}>Wis alles</Button></div></section>}
-    {melding && <p role="status" aria-live="polite" className="rounded-xl border-2 border-lijn bg-neutraal-vlak p-4 text-base">{melding}</p>}
-    <p className="text-base text-tekst-zacht">Gebruik alleen initialen. Gegevens blijven alleen in dit tabblad en verdwijnen bij sluiten of vernieuwen.</p>
-  </div>;
+  const [rubric, setRubric] = useState<Rubric>(basis);
+  const [leerlingen, setLeerlingen] = useState<Leerling[]>([]);
+  const [initialen, setInitialen] = useState("");
+  const [tab, setTab] = useState<Tab>("rubric");
+  const [melding, setMelding] = useState("");
+  const signalen = useMemo(
+    () => klasSignalen(rubric, leerlingen),
+    [rubric, leerlingen],
+  );
+
+  async function kopieer(tekst: string) {
+    const privacy = controleerNakijkenPrivacy(tekst);
+    if (privacy.blokkeer) {
+      setMelding(
+        `Kopiëren geblokkeerd: verwijder ${privacy.redenen.join(" en ")}.`,
+      );
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(tekst);
+      setMelding("Gekopieerd.");
+    } catch {
+      setMelding(
+        "Kopiëren lukte niet. Selecteer de tekst en kopieer hem zelf.",
+      );
+    }
+  }
+  async function exporteer() {
+    await kopieer(
+      leerlingen
+        .map(
+          (leerling) =>
+            `${leerling.initialen}\n${maakFeedback(rubric, leerling)}`,
+        )
+        .join("\n\n"),
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-8">
+      <header>
+        <p className="text-base font-semibold text-marine">
+          Facula · Nakijkhulp
+        </p>
+        <h1 className="mt-2 font-display text-4xl text-marine">
+          Sneller nakijken, betere feedback
+        </h1>
+        <p className="mt-3 max-w-2xl text-lg text-tekst-zacht">
+          Werk met een duidelijke rubric en geef iedere leerling een concrete
+          volgende stap. Gegevens blijven alleen in dit tabblad.
+        </p>
+      </header>
+      <nav aria-label="Stappen" className="flex flex-wrap gap-2">
+        {(
+          [
+            ["rubric", "1. Rubric"],
+            ["nakijken", "2. Nakijken"],
+            ["overzicht", "3. Klas-overzicht"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            type="button"
+            key={id}
+            onClick={() => setTab(id)}
+            className={`min-h-11 rounded-full border-2 px-4 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-marine ${tab === id ? "border-marine bg-marine text-op-donker" : "border-lijn text-marine"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {tab === "rubric" && (
+        <RubricBouwer
+          rubric={rubric}
+          setRubric={setRubric}
+          setMelding={setMelding}
+          naarNakijken={() => setTab("nakijken")}
+        />
+      )}
+      {tab === "nakijken" && (
+        <LeerlingBeoordeling
+          rubric={rubric}
+          leerlingen={leerlingen}
+          setLeerlingen={setLeerlingen}
+          initialen={initialen}
+          setInitialen={setInitialen}
+          kopieer={kopieer}
+          naarOverzicht={() => setTab("overzicht")}
+        />
+      )}
+      {tab === "overzicht" && (
+        <KlasOverzicht
+          rubric={rubric}
+          leerlingen={leerlingen}
+          signalen={signalen}
+          exporteer={exporteer}
+          exporteerWord={async () => {
+            await exporteerWordDocument(rubric, leerlingen);
+            setMelding("Word-bestand gedownload.");
+          }}
+          wisAlles={() => setLeerlingen([])}
+        />
+      )}
+      {melding && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-xl border-2 border-lijn bg-neutraal-vlak p-4 text-base"
+        >
+          {melding}
+        </p>
+      )}
+      <p className="text-base text-tekst-zacht">
+        Gebruik alleen initialen. Gegevens blijven alleen in dit tabblad en
+        verdwijnen bij sluiten of vernieuwen.
+      </p>
+    </div>
+  );
 }

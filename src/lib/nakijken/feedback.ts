@@ -1,6 +1,59 @@
 import type { Criterium, Leerling, Niveau, Rubric } from "./types";
 import { puntenVoor } from "./rubric";
-const volgende = ["Bekijk één voorbeeld en benoem wat je daar ziet.", "Gebruik bij je volgende poging een kort stappenplan.", "Controleer je werk met de succescriteria.", "Leg je aanpak uit aan een klasgenoot en verbeter één detail."];
-export function maakFeedback(rubric: Rubric, leerling: Leerling): string { const gekozen = rubric.criteria.map((c) => ({ c, n: leerling.keuzes[c.id] })).filter((x): x is { c: Criterium; n: Niveau } => Boolean(x.n)); const goed = gekozen.filter(({ n }) => n >= 3); const beter = gekozen.filter(({ n }) => n <= 2); const regels = ["Feed up", `Je doel was: ${rubric.titel}.`, "", "Feed back", goed.length ? `Wat goed ging: ${goed.map(({ c, n }) => `${c.naam}: ${c.niveaus[n - 1].descriptor}`).join("; ")}.` : "Wat goed ging: je hebt de opdracht aangepakt.", beter.length ? `Wat beter kan: ${beter.map(({ c, n }) => `${c.naam}: ${c.niveaus[n - 1].descriptor}`).join("; ")}.` : "Wat beter kan: kijk nog eens naar een detail dat je wilt aanscherpen.", leerling.notitie.trim() ? `Jouw notitie: ${leerling.notitie.trim()}` : "", "", "Feed forward", `Volgende stap: ${volgende[Math.max(0, Math.min(3, (beter[0]?.n ?? 3) - 1))]}`]; return regels.filter((regel, i) => regel || regels[i - 1]).join("\n"); }
-export function klasSignalen(rubric: Rubric, leerlingen: Leerling[]) { return rubric.criteria.map((criterium) => { const onvoldoende = leerlingen.filter((l) => l.keuzes[criterium.id] === 1).length; const percentageOnvoldoende = leerlingen.length ? Math.round((onvoldoende / leerlingen.length) * 100) : 0; return { criterium: criterium.naam, percentageOnvoldoende, melding: percentageOnvoldoende >= 60 ? `Klas-signaal: criterium ${criterium.naam} scoort bij ${percentageOnvoldoende}% onvoldoende, overweeg herhaling.` : null }; }); }
-export function totaalPunten(rubric: Rubric, leerling: Leerling) { return rubric.criteria.reduce((sum, c) => sum + (leerling.keuzes[c.id] ? puntenVoor(c, leerling.keuzes[c.id]) : 0), 0); }
+export function maakFeedback(rubric: Rubric, leerling: Leerling): string {
+  const gekozen = rubric.criteria
+    .map((criterium) => ({ criterium, niveau: leerling.keuzes[criterium.id] }))
+    .filter((item): item is { criterium: Criterium; niveau: Niveau } =>
+      Boolean(item.niveau),
+    );
+  const goed = gekozen.filter(({ niveau }) => niveau >= 3);
+  const beter = gekozen.filter(({ niveau }) => niveau <= 2);
+  const laagste = [...gekozen].sort((a, b) => a.niveau - b.niveau)[0];
+  const regels = [
+    "Feed up",
+    `Je doel was: ${rubric.titel}.`,
+    "",
+    "Feed back",
+    goed.length
+      ? `Wat goed ging: ${goed.map(({ criterium }) => criterium.sterkZin).join(" ")}`
+      : "Wat goed ging: je hebt de opdracht aangepakt.",
+    beter.length
+      ? `Wat beter kan: ${beter.map(({ criterium }) => criterium.groeiZin).join(" ")}`
+      : "Wat beter kan: kijk nog eens naar een detail dat je wilt aanscherpen.",
+    leerling.notitie.trim() ? `Jouw notitie: ${leerling.notitie.trim()}` : "",
+    "",
+    "Feed forward",
+    `Volgende stap: ${laagste?.criterium.volgendeStap ?? "Controleer je werk met de succescriteria."}`,
+  ];
+  return regels.filter((regel, index) => regel || regels[index - 1]).join("\n");
+}
+
+export function klasSignalen(rubric: Rubric, leerlingen: Leerling[]) {
+  return rubric.criteria.map((criterium) => {
+    const onvoldoende = leerlingen.filter(
+      (leerling) => leerling.keuzes[criterium.id] === 1,
+    ).length;
+    const percentageOnvoldoende = leerlingen.length
+      ? Math.round((onvoldoende / leerlingen.length) * 100)
+      : 0;
+    return {
+      criterium: criterium.naam,
+      percentageOnvoldoende,
+      melding:
+        percentageOnvoldoende >= 60
+          ? `Klas-signaal: criterium ${criterium.naam} scoort bij ${percentageOnvoldoende}% onvoldoende, overweeg herhaling.`
+          : null,
+    };
+  });
+}
+
+export function totaalPunten(rubric: Rubric, leerling: Leerling) {
+  return rubric.criteria.reduce(
+    (sum, criterium) =>
+      sum +
+      (leerling.keuzes[criterium.id]
+        ? puntenVoor(criterium, leerling.keuzes[criterium.id])
+        : 0),
+    0,
+  );
+}
