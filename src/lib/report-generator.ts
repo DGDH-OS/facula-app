@@ -30,6 +30,7 @@ const POSITIEVE_TREFWOORDEN = [
   "gemotiveerd",
   "actief",
   "behulpzaam",
+  "helpt",
   "enthousiast",
   "vooruitgang",
   "verbeterd",
@@ -114,30 +115,38 @@ function opsomming(fragmenten: string[]): string {
 
 interface ToonWoorden {
   aanhef: (label: string) => string;
-  positiefIntro: string;
+  sterkteIntro: (label: string) => string;
   aandachtIntro: string;
+  voorbeeldIntro: string;
+  vervolgstapIntro: string;
   afsluiting: string;
 }
 
 const TOON_WOORDEN: Record<RapportToon, ToonWoorden> = {
   formeel: {
     aanhef: (label) => `Betreffende ${label}:`,
-    positiefIntro: "Wat opvalt in de afgelopen periode is dat",
-    aandachtIntro: "Daarnaast valt op dat",
+    sterkteIntro: (label) => `Wat bij ${label} goed gaat:`,
+    aandachtIntro: "Aandachtspunt:",
+    voorbeeldIntro: "Een voorbeeld:",
+    vervolgstapIntro: "Volgende stap in de klas:",
     afsluiting:
       "Bovenstaande is een feitelijke weergave van waargenomen gedrag en werkhouding, bedoeld als aanvulling op het reguliere overleg.",
   },
   "vriendelijk-direct": {
     aanhef: (label) => `Over ${label}:`,
-    positiefIntro: "Het valt op dat",
-    aandachtIntro: "Een aandachtspunt is dat",
+    sterkteIntro: (label) => `Bij ${label} zien we als sterkte:`,
+    aandachtIntro: "Een aandachtspunt:",
+    voorbeeldIntro: "Dat blijkt bijvoorbeeld uit:",
+    vervolgstapIntro: "De volgende stap in de klas:",
     afsluiting:
       "Dit is een korte, feitelijke samenvatting, fijn om samen op te pakken waar nodig.",
   },
   warm: {
     aanhef: (label) => `Even over ${label}:`,
-    positiefIntro: "Het is fijn om te zien dat",
-    aandachtIntro: "Wel is het goed om te benoemen dat",
+    sterkteIntro: (label) => `Wat goed gaat bij ${label}:`,
+    aandachtIntro: "Aandachtspunt:",
+    voorbeeldIntro: "Een voorbeeld:",
+    vervolgstapIntro: "Volgende stap in de klas:",
     afsluiting:
       "Deze tekst is bedoeld als een warme, eerlijke terugkoppeling op wat is waargenomen.",
   },
@@ -147,19 +156,67 @@ const TOON_WOORDEN: Record<RapportToon, ToonWoorden> = {
 /* Kernparagraaf — gedeeld door alle output-typen                       */
 /* ------------------------------------------------------------------ */
 
+function normaliseer(fragment: string): string {
+  return fragment.toLocaleLowerCase().replace(/[.!?]+$/g, "").trim();
+}
+
+function uniekeFragmenten(fragmenten: string[]): string[] {
+  const gezien = new Set<string>();
+  return fragmenten.filter((fragment) => {
+    const sleutel = normaliseer(fragment);
+    if (!sleutel || gezien.has(sleutel)) return false;
+    gezien.add(sleutel);
+    return true;
+  });
+}
+
+interface RapportOnderdelen {
+  sterktes: string[];
+  aandacht: string[];
+  voorbeeld?: string;
+  vervolgstap?: string;
+  overig: string[];
+}
+
+function verzamelOnderdelen(input: ReportInput): RapportOnderdelen {
+  const gestructureerd = [input.waargenomenSterkte, input.aandachtspunt, input.voorbeeldBewijs, input.vervolgstapInDeKlas]
+    .filter((fragment): fragment is string => Boolean(fragment && fragment.trim()));
+  const vrijeFragmenten = uniekeFragmenten(splitsAantekeningen(input.aantekeningen))
+    .filter((fragment) => {
+      const sleutel = normaliseer(fragment);
+      return !gestructureerd.some((veld) => {
+        const veldSleutel = normaliseer(veld);
+        return veldSleutel === sleutel || veldSleutel.includes(sleutel) || sleutel.includes(veldSleutel);
+      });
+    });
+  const { positief, aandacht, overig } = deelIn(vrijeFragmenten.join(", "));
+  return {
+    sterktes: uniekeFragmenten([input.waargenomenSterkte, ...positief].filter((fragment): fragment is string => Boolean(fragment))),
+    aandacht: uniekeFragmenten([input.aandachtspunt, ...aandacht].filter((fragment): fragment is string => Boolean(fragment))),
+    voorbeeld: input.voorbeeldBewijs,
+    vervolgstap: input.vervolgstapInDeKlas,
+    overig,
+  };
+}
+
 function bouwKernParagraaf(input: ReportInput, woorden: ToonWoorden): string {
-  const bron = [input.aantekeningen, input.waargenomenSterkte, input.aandachtspunt, input.voorbeeldBewijs, input.vervolgstapInDeKlas].filter(Boolean).join("; ");
-  const { positief, aandacht, overig } = deelIn(bron);
+  const onderdelen = verzamelOnderdelen(input);
   const zinnen: string[] = [];
 
-  if (positief.length > 0) {
-    zinnen.push(`${woorden.positiefIntro} ${opsomming(positief)}.`);
+  if (onderdelen.sterktes.length > 0) {
+    zinnen.push(`${woorden.sterkteIntro(input.leerlingLabel)} ${opsomming(onderdelen.sterktes)}.`);
   }
-  if (aandacht.length > 0) {
-    zinnen.push(`${woorden.aandachtIntro} ${opsomming(aandacht)}.`);
+  if (onderdelen.aandacht.length > 0) {
+    zinnen.push(`${woorden.aandachtIntro} ${opsomming(onderdelen.aandacht)}.`);
   }
-  if (overig.length > 0) {
-    zinnen.push(`Verder is genoteerd: ${opsomming(overig)}.`);
+  if (onderdelen.voorbeeld) {
+    zinnen.push(`${woorden.voorbeeldIntro} ${alsZinsdeel(onderdelen.voorbeeld)}.`);
+  }
+  if (onderdelen.vervolgstap) {
+    zinnen.push(`${woorden.vervolgstapIntro} ${alsZinsdeel(onderdelen.vervolgstap)}.`);
+  }
+  if (onderdelen.overig.length > 0) {
+    zinnen.push(`Verder is genoteerd: ${opsomming(onderdelen.overig)}.`);
   }
   if (zinnen.length === 0) {
     zinnen.push(
@@ -176,10 +233,9 @@ function bouwKernParagraaf(input: ReportInput, woorden: ToonWoorden): string {
 
 function bouwRapporttekst(input: ReportInput, woorden: ToonWoorden): string {
   const kern = bouwKernParagraaf(input, woorden);
-  const positief = deelIn(input.aantekeningen).positief;
   const opening = input.aanspreekvorm === "aan-leerling"
-    ? `Je hebt deze periode laten zien dat ${opsomming(positief) || "je inzet toont"}.`
-    : `${input.leerlingLabel} heeft deze periode laten zien dat ${opsomming(positief) || "er inzet is"}.`;
+    ? "Deze periode zijn je observaties samengevat."
+    : `Deze periode zijn de observaties over ${input.leerlingLabel} samengevat.`;
   const afsluiting = input.aanspreekvorm === "aan-leerling" ? "Blijf deze aanpak gebruiken; zo zet je een mooie volgende stap." : `${input.leerlingLabel} kan deze ontwikkeling de komende periode verder voortzetten.`;
   const vakPeriode = [input.vak, input.periode].filter(Boolean).join(" - ");
   return [woorden.aanhef(vakPeriode || input.leerlingLabel), opening, kern, afsluiting].join(
@@ -189,18 +245,23 @@ function bouwRapporttekst(input: ReportInput, woorden: ToonWoorden): string {
 
 function bouwOudergesprek(input: ReportInput, woorden: ToonWoorden): string {
   void woorden;
-  const { positief, aandacht, overig } = deelIn([input.aantekeningen, input.waargenomenSterkte, input.aandachtspunt, input.voorbeeldBewijs, input.vervolgstapInDeKlas].filter(Boolean).join("; "));
+  const onderdelen = verzamelOnderdelen(input);
   const kop = `Oudergesprek over ${input.leerlingLabel}`;
-  const sterkte = opsomming(positief) || input.waargenomenSterkte || opsomming(overig) || "Zie de genoteerde observaties.";
-  const punt = opsomming(aandacht) || input.aandachtspunt || "Bespreek dit aandachtspunt samen.";
-  const stap = input.vervolgstapInDeKlas || "Spreek een kleine vervolgstap in de klas af.";
-  return [
+  const regels = [
     kop,
-    `• Sterkte: ${sterkte}`,
-    `• Aandacht: ${punt}`,
-    `• Vervolgstap: ${stap}`,
+    `• Sterkte: ${opsomming(onderdelen.sterktes) || "Zie de genoteerde observaties."}`,
+    `• Aandacht: ${opsomming(onderdelen.aandacht) || "Bespreek dit aandachtspunt samen."}`,
+    ...(onderdelen.voorbeeld ? [`• Voorbeeld: ${onderdelen.voorbeeld}`] : []),
+    `• Vervolgstap: ${onderdelen.vervolgstap || "Spreek een kleine vervolgstap in de klas af."}`,
     "Vraag aan ouder/verzorger: Wat herkent u thuis?",
-  ].join("\n").split(/\s+/).slice(0, 120).join(" ");
+  ];
+  let woordenTotaal = 0;
+  return regels.map((regel) => {
+    const woordenOver = Math.max(0, 120 - woordenTotaal);
+    const ingekort = regel.split(/\s+/).slice(0, woordenOver).join(" ");
+    woordenTotaal += ingekort ? ingekort.split(/\s+/).length : 0;
+    return ingekort;
+  }).join("\n");
 }
 
 function bouwOudermail(input: ReportInput, woorden: ToonWoorden): string {
