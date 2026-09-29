@@ -1,7 +1,7 @@
 import type { ReportInput } from "./types";
 
 export type ReportQualityKind = "label" | "privacy" | "strength" | "workpoints" | "growth" | "name" | "length" | "example" | "positive-negative" | "pii" | "grade";
-export interface ReportQualityCheck { kind: ReportQualityKind; niveau: "waarschuwing" | "tip"; melding: string; }
+export interface ReportQualityCheck { kind: ReportQualityKind; niveau: "blokkade" | "waarschuwing" | "tip"; melding: string; }
 export interface ReportQualityResult { ok: boolean; checks: ReportQualityCheck[]; }
 
 const LABELS: Record<string, string> = { lui: "heeft soms een zetje nodig", dom: "kan dit nog oefenen", slecht: "kan hierin groeien", ongemotiveerd: "heeft hulp nodig om te starten" };
@@ -18,7 +18,7 @@ export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aan
     if (new RegExp(`\\b${woord}\\b`, "i").test(tekst)) checks.push({ kind: "label", niveau: "waarschuwing", melding: `Vermijd '${woord}'. Suggestie: ${alternatief}.` });
   });
   const medische = [...new Set(tekst.toLowerCase().match(MEDISCH) ?? [])];
-  if (medische.length) checks.push({ kind: "privacy", niveau: "waarschuwing", melding: `Let op: ${medische.join(", ")} zijn bijzondere persoonsgegevens. Laat deze termen weg.` });
+  if (medische.length) checks.push({ kind: "privacy", niveau: "blokkade", melding: `Let op: ${medische.join(", ")} zijn bijzondere persoonsgegevens. Laat deze termen weg.` });
   if (!POSITIEF.test(tekst)) checks.push({ kind: "strength", niveau: "waarschuwing", melding: "Voeg minstens één concrete kracht toe." });
   if (!VOORBEELD.test(tekst)) checks.push({ kind: "example", niveau: "waarschuwing", melding: "Voeg minstens één concreet voorbeeld of bewijs toe." });
   const heeftNegatief = /\b(moeite|aandacht|niet|lastig|vergeet|ontbreekt|afgeleid)\b/i.test(tekst);
@@ -29,13 +29,13 @@ export function controleerRapportKwaliteit(input: ReportInput, tekst = input.aan
   if (werkpunten > 2) checks.push({ kind: "workpoints", niveau: "waarschuwing", melding: "Beperk het aantal werkpunten tot maximaal twee." });
   if (werkpunten > 0 && !GROEI.test(tekst)) checks.push({ kind: "growth", niveau: "tip", melding: "Formuleer een werkpunt als volgende stap, met een concrete tip." });
   if (input.leerlingLabel.trim().split(/\s+/).length > 2) checks.push({ kind: "name", niveau: "waarschuwing", melding: "Gebruik alleen een voornaam of initialen, geen volledige naam." });
-  if (PII.test(tekst)) checks.push({ kind: "pii", niveau: "waarschuwing", melding: "Verwijder e-mailadressen en telefoonnummers uit de tekst." });
+  if (PII.test(tekst)) checks.push({ kind: "pii", niveau: "blokkade", melding: "Verwijder e-mailadressen en telefoonnummers uit de tekst." });
   if (CIJFER.test(tekst.replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g, ""))) checks.push({ kind: "grade", niveau: "waarschuwing", melding: "Controleer cijfers in de tekst. Gebruik alleen cijfers die je zelf noteerde." });
   const lengte = input.lengte ?? "normaal";
   const min = lengte === "kort" ? 180 : lengte === "uitgebreid" ? 450 : 280;
   const max = lengte === "kort" ? 700 : lengte === "uitgebreid" ? 1800 : 1200;
   if (tekst.length < min || tekst.length > max) checks.push({ kind: "length", niveau: "tip", melding: `De tekst past niet goed bij de gekozen lengte (${min}-${max} tekens).` });
-  return { ok: checks.every((check) => check.niveau !== "waarschuwing"), checks };
+  return { ok: checks.every((check) => check.niveau === "tip"), checks };
 }
 
 export const RAPPORT_ZINNENBANK: Record<string, string[]> = {

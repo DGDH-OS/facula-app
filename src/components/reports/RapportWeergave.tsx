@@ -52,12 +52,13 @@ export function RapportWeergave({
   const exportGeblokkeerd = rapportExportGeblokkeerd(
     controleerOutputTegenInvoer(rapport.input.aantekeningen, tekst).ok,
     checks,
+    kwaliteit,
   );
   const exportHintId = "rapport-export-hint";
 
   async function handleCopy() {
     const actueleGuardrail = controleerOutputTegenInvoer(rapport.input.aantekeningen, tekst);
-    if (rapportExportGeblokkeerd(actueleGuardrail.ok, checks)) {
+    if (rapportExportGeblokkeerd(actueleGuardrail.ok, checks, kwaliteit)) {
       setExportFout("Vink eerst alle coachchecks aan en los harde waarschuwingen op.");
       return;
     }
@@ -173,8 +174,8 @@ export function RapportWeergave({
         {extraActie}
       </div>
 
-      <p id={exportHintId} className="text-base text-tekst-zacht">
-        Download als Word wordt beschikbaar nadat alle coachchecks zijn aangevinkt en harde waarschuwingen zijn opgelost.
+      <p id={exportHintId} aria-live="polite" className="text-base text-tekst-zacht">
+        {kwaliteit.checks.find((check) => check.niveau === "blokkade")?.melding ?? "Download als Word wordt beschikbaar nadat alle coachchecks zijn aangevinkt en harde waarschuwingen zijn opgelost."}
       </p>
 
       <p className="text-base text-tekst-zacht">

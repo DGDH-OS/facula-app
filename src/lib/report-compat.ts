@@ -1,4 +1,5 @@
 import type { ReportGuardrailResultaat } from "./types";
+import type { ReportQualityResult } from "./report-quality";
 
 export const VEILIGE_RAPPORT_GUARDRAIL: ReportGuardrailResultaat = {
   ok: true,
@@ -19,6 +20,6 @@ export function normaliseerRapportGuardrail(value: unknown): ReportGuardrailResu
   };
 }
 
-export function rapportExportGeblokkeerd(guardrailOk: boolean, checks: boolean[]): boolean {
-  return !guardrailOk || checks.some((check) => !check);
+export function rapportExportGeblokkeerd(guardrailOk: boolean, checks: boolean[], kwaliteit?: ReportQualityResult): boolean {
+  return !guardrailOk || checks.some((check) => !check) || kwaliteit?.checks.some((check) => check.niveau === "blokkade") === true;
 }

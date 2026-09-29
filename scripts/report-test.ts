@@ -15,6 +15,15 @@ const report = genereerRapportTekst(input);
 assert.match(report.tekst, /Sanne/);
 assert.match(report.tekst, /volgende periode|ontwikkeling|volgende stap/i);
 assert.equal(controleerRapportKwaliteit(input, "Sanne is lui en heeft ADHD").ok, false);
+const editedMedical = controleerRapportKwaliteit(input, "Sanne werkt zelfstandig en heeft ADHD");
+assert.equal(editedMedical.checks.some((check) => check.kind === "privacy" && check.niveau === "blokkade"), true);
+assert.equal(rapportExportGeblokkeerd(true, [true, true], editedMedical), true);
+const editedPii = controleerRapportKwaliteit(input, "Sanne werkt zelfstandig; mail docent@example.com");
+assert.equal(editedPii.checks.some((check) => check.kind === "pii" && check.niveau === "blokkade"), true);
+assert.equal(rapportExportGeblokkeerd(true, [true, true], editedPii), true);
+const editedWarning = controleerRapportKwaliteit(input, "Sanne is lui maar werkt zelfstandig");
+assert.equal(editedWarning.checks.some((check) => check.niveau === "waarschuwing"), true);
+assert.equal(rapportExportGeblokkeerd(true, [true, true], editedWarning), false);
 assert.equal(controleerRapportKwaliteit(input, "werkt zelfstandig en helpt anderen").checks.some((check) => check.kind === "strength"), false);
 console.log("report tests passed");
 
