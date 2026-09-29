@@ -225,6 +225,20 @@ assert.ok(tekort.melding.includes("140 minuten nakijktijd tekort"));
 assert.ok(tekort.melding.includes(dagnaam("2026-10-07")));
 assert.ok(tekort.melding.includes("140 minuten per dag extra vrij"));
 
+// Lege cijferdeadline: planning rekent met 10 werkdagen na de toets.
+const zonderDeadline = item({
+  id: "leeg-1",
+  klas: "H4b",
+  vak: "aardrijkskunde",
+  datum: "2026-10-05",
+  cijferdeadline: "",
+  aantalLeerlingen: 10,
+  nakijkminuten: 6,
+});
+const leegPlanning = berekenNakijkplanning([zonderDeadline], instellingen);
+assert.equal(leegPlanning.tekorten.length, 0);
+assert.equal(leegPlanning.dagen.reduce((som, d) => som + d.toewijzingen.length, 0) > 0, true);
+
 // Lange deadline (ruim 4 maanden): geen kunstmatige horizon die een vals tekort geeft.
 const langItem = item({
   id: "lang-1",

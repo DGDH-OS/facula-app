@@ -368,13 +368,15 @@ export function berekenNakijkplanning(
   items: ToetsItem[],
   instellingen: ToetsweekInstellingen,
 ): NakijkplanningResultaat {
-  const geldig = items.filter(
-    (item) =>
-      valideerItem(item).length === 0 &&
-      item.cijferdeadline &&
-      isGeldigeDatum(item.cijferdeadline) &&
-      item.nakijkminuten > 0,
-  );
+  // Lege cijferdeadline: reken met de standaard (10 werkdagen na de toets), zoals de UI belooft.
+  const metDeadline = items
+    .filter((item) => valideerItem(item).length === 0 && item.nakijkminuten > 0)
+    .map((item) =>
+      item.cijferdeadline.trim()
+        ? item
+        : { ...item, cijferdeadline: standaardCijferdeadline(item.datum, instellingen) },
+    );
+  const geldig = metDeadline.filter((item) => isGeldigeDatum(item.cijferdeadline));
   const gesorteerd = [...geldig].sort((a, b) => a.cijferdeadline.localeCompare(b.cijferdeadline));
   const capaciteit = new Map<string, number>();
   const toewijzingenPerDag = new Map<string, NakijkToewijzing[]>();

@@ -87,7 +87,7 @@ export async function downloadToetsweekWoord(
           ...(tekortAlineas.length ? tekortAlineas : []),
           ...(nakijkAlineas.length
             ? nakijkAlineas
-            : [new Paragraph("Nog geen cijferdeadlines om op te plannen.")]),
+            : [new Paragraph("Nog niets om na te kijken.")]),
         ],
       },
     ],

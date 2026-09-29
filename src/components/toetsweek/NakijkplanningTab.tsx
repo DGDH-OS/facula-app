@@ -24,7 +24,7 @@ export function NakijkplanningTab({
       )}
       {dagen.length === 0 ? (
         <p className="text-base text-tekst-zacht">
-          Nog geen cijferdeadlines om op te plannen. Vul een cijferdeadline in bij een toets.
+          Nog niets om na te kijken. Vul een toets in met het aantal leerlingen.
         </p>
       ) : (
         <div className="space-y-4">
