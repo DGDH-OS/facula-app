@@ -158,7 +158,7 @@ const data: Array<[string, string[], string[], string, CoachActie[]?]> = [
     ["oudergesprek voorbereiden", "gesprek met ouders"],
     ["oudergesprek", "ouders", "voorbereiden"],
     "Noteer doel, twee concrete observaties, wat al werkt en één vervolgstap. Begin met samenwerking. Vraag wat ouders herkennen en spreek af wie wat doet en wanneer je terugkijkt.",
-    acties("/app/reports/new", "Bereid een gesprek voor"),
+    acties("/app/ouders", "Bereid een gesprek voor"),
   ],
   [
     "tien-minuten",
@@ -177,6 +177,7 @@ const data: Array<[string, string[], string[], string, CoachActie[]?]> = [
     ["mail naar ouders", "oudercommunicatie"],
     ["oudermail", "mail", "ouders"],
     "Houd de mail kort: reden, feit, wat je vraagt en wanneer je reageert. Gebruik een neutrale onderwerpregel. Zet geen gevoelige leerlinginformatie in een groepsmail. Lees de mail na alsof hij wordt doorgestuurd.",
+    acties("/app/ouders", "Maak een oudermail"),
   ],
   [
     "avg-delen",
