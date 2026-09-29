@@ -6,6 +6,9 @@ export type GesprekInput = {
   afspraak: string;
   minuten: 10 | 20;
 };
+function hoofdletter(tekst: string): string {
+  return tekst ? tekst.charAt(0).toUpperCase() + tekst.slice(1) : tekst;
+}
 export function maakGespreksplanning(input: GesprekInput) {
   const tijden = input.minuten === 10 ? [1, 2, 2, 2, 2, 1] : [2, 4, 4, 4, 3, 3];
   const doel = input.doel || "de ontwikkeling van uw kind";
@@ -30,7 +33,7 @@ export function maakGespreksplanning(input: GesprekInput) {
     .map((naam, index) => `- ${tijden[index]} min: ${naam}`)
     .join("\n");
   const vragen = [
-    input.vraag || "Wat herkent u hiervan thuis?",
+    hoofdletter(input.vraag) || "Wat herkent u hiervan thuis?",
     "Wanneer ziet u dit gedrag vooral?",
     "Wat zou thuis een haalbare volgende stap zijn?",
   ];
@@ -52,7 +55,7 @@ export function maakGespreksplanning(input: GesprekInput) {
     vragen.map((vraag) => `- ${vraag}`).join("\n"),
     "",
     "Afspraak",
-    input.afspraak ||
+    hoofdletter(input.afspraak) ||
       "Spreek één concrete volgende stap en een moment van terugkijken af.",
   ].join("\n");
   return { tijden, tekst };

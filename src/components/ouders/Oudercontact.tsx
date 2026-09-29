@@ -23,6 +23,11 @@ export function Oudercontact() {
     toon: "vriendelijk",
     lengte: "normaal",
     naam: "",
+    datum: "",
+    locatie: "",
+    tijd: "",
+    meenemen: "",
+    belmomenten: "",
   });
   const [gesprek, setGesprek] = useState<GesprekInput>({
     doel: "",

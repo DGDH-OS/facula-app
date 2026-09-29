@@ -79,6 +79,42 @@ export function MailTab({
           onChange={(value) => update("actie", value)}
           multiline
         />
+        {mail.aanleiding === "Schoolreis / activiteit info" && (
+          <>
+            <Veld
+              label="Datum"
+              value={mail.datum}
+              onChange={(value) => update("datum", value)}
+              placeholder="Bijvoorbeeld 12 oktober"
+            />
+            <Veld
+              label="Locatie"
+              value={mail.locatie}
+              onChange={(value) => update("locatie", value)}
+              placeholder="Bijvoorbeeld Museon Den Haag"
+            />
+            <Veld
+              label="Vertrektijd"
+              value={mail.tijd}
+              onChange={(value) => update("tijd", value)}
+              placeholder="Bijvoorbeeld 08.30 uur"
+            />
+            <Veld
+              label="Wat meenemen"
+              value={mail.meenemen}
+              onChange={(value) => update("meenemen", value)}
+              placeholder="Bijvoorbeeld een lunchpakket en regenjas"
+            />
+          </>
+        )}
+        {mail.aanleiding === "Reactie op boze mail (de-escalerend)" && (
+          <Veld
+            label="Belmomenten"
+            value={mail.belmomenten}
+            onChange={(value) => update("belmomenten", value)}
+            placeholder="Bijvoorbeeld dinsdag om 15.30 uur"
+          />
+        )}
         <Veld
           label="Naam docent"
           value={mail.naam}
