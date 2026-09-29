@@ -39,11 +39,11 @@ export default function AiPage() {
             <section>
               <h2 className="font-display text-xl text-marine">2. De Assistent is geen chatbot</h2>
               <p className="mt-2 text-base leading-relaxed text-tekst">
-                De Facula Assistent herkent welke bestaande module je bedoelt
-                (les, toets, rapport, oudercontact, coach, nakijken,
-                toetsweek) en maakt een checklist. Hij gebruikt geen
-                taalmodel, verzint geen ontbrekende velden en beoordeelt geen
-                leerlingen. Onbekende verzoeken weigert hij.
+                De Facula Assistent laat je een bestaande module kiezen
+                en daarna alleen vaste opties. Hij gebruikt geen
+                taalmodel, verzint geen velden en beoordeelt geen
+                leerlingen. Je kunt hier geen namen, e-mailadressen of
+                leerlingteksten invullen.
               </p>
             </section>
 
@@ -59,9 +59,8 @@ export default function AiPage() {
             <section>
               <h2 className="font-display text-xl text-marine">4. Persoonsgegevens</h2>
               <p className="mt-2 text-base leading-relaxed text-tekst">
-                Typ geen namen, e-mailadressen, telefoonnummers, cijfers of
-                diagnoses in de Assistent of de coach. In de rapport-module
-                gebruik je alleen initialen. Details staan in de{" "}
+                Je kunt in de Assistent geen namen, e-mailadressen of
+                leerlingteksten invullen. Details staan in de{" "}
                 <Link href="/privacy" className="font-semibold text-marine underline underline-offset-4">
                   privacyverklaring
                 </Link>

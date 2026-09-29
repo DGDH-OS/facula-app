@@ -53,7 +53,10 @@ const FAQS = [
   {
     vraag: "Wat is de Facula Assistent?",
     antwoord:
-      "Een routeerhulp in de app: je kiest een bestaande module of typt wat je wilt maken. De Assistent is geen chatbot, geeft geen cijfers en verzint geen velden. Onbekende of leerlinggerichte verzoeken weigert hij. Jij blijft verantwoordelijk.",
+      "Een routeerhulp in de app: je kiest een bestaande module en " +
+      "vaste opties. Je kunt hier geen namen, e-mailadressen of " +
+      "leerlingteksten invullen. De Assistent is geen chatbot, geeft " +
+      "geen cijfers en verzint geen velden. Jij blijft verantwoordelijk.",
   },
   {
     vraag: "Waar staan onze gegevens?",

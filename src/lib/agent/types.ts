@@ -9,17 +9,14 @@ export type WorkflowId =
   | "nakijken"
   | "toetsweek";
 
-export type VeldSoort = "tekst" | "keuze" | "getal";
+export type VeldSoort = "keuze";
 
 export interface AssistentVeld {
   id: string;
   label: string;
   soort: VeldSoort;
   verplicht: boolean;
-  keuzes?: readonly { waarde: string; label: string }[];
-  min?: number;
-  max?: number;
-  maxLengte?: number;
+  keuzes: readonly { waarde: string; label: string }[];
   hulp?: string;
 }
 
@@ -27,30 +24,20 @@ export interface WorkflowDefinitie {
   id: WorkflowId;
   titel: string;
   korteUitleg: string;
-  trefwoorden: readonly string[];
   href: string;
   velden: readonly AssistentVeld[];
   privacyWaarschuwing?: string;
 }
 
 export type WeigerCode =
-  | "pii"
-  | "beoordeling"
-  | "overgang"
-  | "leerlinggericht"
   | "onbekend"
   | "ontbrekend-veld"
-  | "ongeldig-veld";
+  | "ongeldig-veld"
+  | "geen-bevestiging";
 
 export interface AssistentWeigering {
   soort: "geweigerd";
   code: WeigerCode;
-  melding: string;
-}
-
-export interface AssistentKiezen {
-  soort: "kiezen";
-  kandidaten: WorkflowId[];
   melding: string;
 }
 
@@ -62,25 +49,32 @@ export interface AssistentVragen {
   melding: string;
 }
 
+/**
+ * Voorstel na geldige keuzes. Nog geen actie: de docent moet apart
+ * bevestigen voordat er genavigeerd of gekopieerd mag worden.
+ */
 export interface AssistentKlaar {
   soort: "klaar";
   workflowId: WorkflowId;
   titel: string;
   samenvatting: string;
   checklist: string[];
-  volgendeStap: { href: string; label: string };
   waarschuwingen: string[];
-  /** Altijd true: de docent blijft eindverantwoordelijk. */
   menselijkeControle: true;
-  /**
-   * Alleen de velden die de docent zelf invulde. Nooit een verzonnen
-   * default, nooit een leerlingnaam in een querystring.
-   */
+  requiresConfirmation: true;
   ingevuldeVelden: Record<string, string>;
+}
+
+/** Pas na aparte bevestiging. Alleen lokale, omkeerbare effecten. */
+export interface AssistentActie {
+  soort: "actie";
+  workflowId: WorkflowId;
+  href: string;
+  label: string;
+  checklist: string[];
 }
 
 export type AssistentUitkomst =
   | AssistentWeigering
-  | AssistentKiezen
   | AssistentVragen
   | AssistentKlaar;

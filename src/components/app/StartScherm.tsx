@@ -57,7 +57,7 @@ export function StartScherm({
           href="/app/assistent"
           icoon={<AssistentIcon />}
           kop="De Assistent"
-          zin="Kies een module. Geen chatbot, geen leerlingnamen, jij blijft verantwoordelijk."
+          zin="Kies een module met vaste keuzes. Geen vrije tekst, geen namen."
         />
         <Tile
           href="/app/lessons/new"

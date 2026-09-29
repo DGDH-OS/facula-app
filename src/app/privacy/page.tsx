@@ -141,11 +141,10 @@ export default function PrivacyPage() {
                 De Facula Assistent
               </h2>
               <p className="mt-2 text-base leading-relaxed text-tekst">
-                De Assistent is een routeerhulp naar bestaande modules. Hij
-                slaat geen leerlingnamen op, zet geen persoonsgegevens in een
-                webadres en vult ontbrekende velden niet zelf in. Typ geen
-                namen, e-mailadressen, telefoonnummers, cijfers of diagnoses
-                in dat scherm. Meer uitleg:{" "}
+                De Assistent is een routeerhulp naar bestaande modules.
+                Je kunt hier geen namen, e-mailadressen of leerlingteksten
+                invullen. Hij zet geen persoonsgegevens in een webadres
+                en vult ontbrekende velden niet zelf in. Meer uitleg:{" "}
                 <Link
                   href="/ai"
                   className="font-semibold text-marine underline underline-offset-4"

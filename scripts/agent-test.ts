@@ -1,67 +1,61 @@
 import assert from "node:assert/strict";
-import { voerAssistentUit, WORKFLOWS, workflowById } from "../src/lib/agent";
+import {
+  voerAssistentUit,
+  voerBevestigdeActieUit,
+  WORKFLOWS,
+  workflowById,
+} from "../src/lib/agent";
+import type { WorkflowId } from "../src/lib/agent/types";
 
 const BESTAANDE_HREFS = new Set(WORKFLOWS.map((w) => w.href));
 
-function klaar(vraag: string, velden: Record<string, string> = {}, gekozen?: Parameters<typeof voerAssistentUit>[2]) {
-  const uit = voerAssistentUit(vraag, velden, gekozen);
+function klaar(
+  gekozen: WorkflowId,
+  velden: Record<string, string> = {},
+) {
+  const uit = voerAssistentUit(gekozen, velden);
   assert.equal(uit.soort, "klaar");
   if (uit.soort !== "klaar") throw new Error("verwacht klaar");
+  assert.equal(uit.requiresConfirmation, true);
+  assert.equal("href" in uit, false);
   return uit;
 }
 
-const onbekend = voerAssistentUit("boek een vliegticket naar Rome");
-assert.equal(onbekend.soort, "geweigerd");
-if (onbekend.soort === "geweigerd") assert.equal(onbekend.code, "onbekend");
-
-const leeg = voerAssistentUit("   ");
+const leeg = voerAssistentUit();
 assert.equal(leeg.soort, "geweigerd");
 if (leeg.soort === "geweigerd") assert.equal(leeg.code, "onbekend");
 
-const piiMail = voerAssistentUit("maak een les voor jan@school.nl");
-assert.equal(piiMail.soort, "geweigerd");
-if (piiMail.soort === "geweigerd") assert.equal(piiMail.code, "pii");
+const onbekendId = voerAssistentUit(
+  "niet-bestaand" as unknown as WorkflowId,
+);
+assert.equal(onbekendId.soort, "geweigerd");
+if (onbekendId.soort === "geweigerd") {
+  assert.equal(onbekendId.code, "onbekend");
+}
+assert.equal(workflowById("niet-bestaand"), undefined);
+assert.equal(workflowById(undefined), undefined);
 
-const piiTel = voerAssistentUit("toets voor 0612345678");
-assert.equal(piiTel.soort, "geweigerd");
-if (piiTel.soort === "geweigerd") assert.equal(piiTel.code, "pii");
+const extraNaam = voerAssistentUit("les", { naam: "Jan" });
+assert.equal(extraNaam.soort, "geweigerd");
+if (extraNaam.soort === "geweigerd") {
+  assert.equal(extraNaam.code, "ongeldig-veld");
+}
 
-const piiMedisch = voerAssistentUit("maak een rapport over adhd");
-assert.equal(piiMedisch.soort, "geweigerd");
-if (piiMedisch.soort === "geweigerd") assert.equal(piiMedisch.code, "pii");
+const extraMail = voerAssistentUit("les", { email: "a@b.nl" });
+assert.equal(extraMail.soort, "geweigerd");
 
-const piiNaam = voerAssistentUit("les voor Jan Jansen over de EU");
-assert.equal(piiNaam.soort, "geweigerd");
-if (piiNaam.soort === "geweigerd") assert.equal(piiNaam.code, "pii");
-
-const piiVeld = voerAssistentUit("maak een les", {
-  leerdoel: "Mail naar ouder@school.nl",
+const vrijTekst = voerAssistentUit("les", {
   vak: "Geschiedenis",
   niveau: "havo",
   leerjaar: "4",
+  leerdoel: "vrije tekst over Jan",
 });
-assert.equal(piiVeld.soort, "geweigerd");
-if (piiVeld.soort === "geweigerd") assert.equal(piiVeld.code, "pii");
-
-const cijfer = voerAssistentUit("geef een cijfer voor deze toets");
-assert.equal(cijfer.soort, "geweigerd");
-if (cijfer.soort === "geweigerd") assert.equal(cijfer.code, "beoordeling");
-
-const overgang = voerAssistentUit("moet deze klas blijven zitten");
-assert.equal(overgang.soort, "geweigerd");
-if (overgang.soort === "geweigerd") assert.equal(overgang.code, "overgang");
-
-const zakken = voerAssistentUit("advies of hij gaat zakken");
-assert.equal(zakken.soort, "geweigerd");
-if (zakken.soort === "geweigerd") assert.equal(zakken.code, "overgang");
-
-const leerlinggericht = voerAssistentUit("maak een les voor leerlingen om zelf te maken");
-assert.equal(leerlinggericht.soort, "geweigerd");
-if (leerlinggericht.soort === "geweigerd") {
-  assert.equal(leerlinggericht.code, "leerlinggericht");
+assert.equal(vrijTekst.soort, "vragen");
+if (vrijTekst.soort === "vragen") {
+  assert.ok(vrijTekst.ongeldigeVelden.some((f) => f.id === "leerdoel"));
 }
 
-const ontbreekt = voerAssistentUit("maak een les over de industriële revolutie");
+const ontbreekt = voerAssistentUit("les");
 assert.equal(ontbreekt.soort, "vragen");
 if (ontbreekt.soort === "vragen") {
   assert.equal(ontbreekt.workflowId, "les");
@@ -72,7 +66,11 @@ if (ontbreekt.soort === "vragen") {
   assert.equal(ontbreekt.ontbrekendeVelden.includes("leerling"), false);
 }
 
-const geenDefault = voerAssistentUit("les", { niveau: "havo", leerjaar: "4", leerdoel: "De EU uitleggen" });
+const geenDefault = voerAssistentUit("les", {
+  niveau: "havo",
+  leerjaar: "4",
+  leerdoel: "eu",
+});
 assert.equal(geenDefault.soort, "vragen");
 if (geenDefault.soort === "vragen") {
   assert.ok(geenDefault.ontbrekendeVelden.includes("vak"));
@@ -83,7 +81,7 @@ const ongeldigVak = voerAssistentUit("les", {
   vak: "Wiskunde",
   niveau: "havo",
   leerjaar: "4",
-  leerdoel: "De EU uitleggen",
+  leerdoel: "eu",
 });
 assert.equal(ongeldigVak.soort, "vragen");
 if (ongeldigVak.soort === "vragen") {
@@ -94,75 +92,118 @@ const ongeldigJaar = voerAssistentUit("les", {
   vak: "Geschiedenis",
   niveau: "havo",
   leerjaar: "9",
-  leerdoel: "De EU uitleggen",
+  leerdoel: "eu",
 });
 assert.equal(ongeldigJaar.soort, "vragen");
 
-const les = klaar("maak een les", {
+const les = klaar("les", {
   vak: "Geschiedenis",
   niveau: "havo",
   leerjaar: "4",
-  leerdoel: "De industriële revolutie uitleggen",
+  leerdoel: "industrie",
 });
 assert.equal(les.workflowId, "les");
 assert.equal(les.menselijkeControle, true);
-assert.equal(les.volgendeStap.href, "/app/lessons/new");
-assert.equal(les.volgendeStap.href.includes("?"), false);
 assert.equal(les.ingevuldeVelden.vak, "Geschiedenis");
 assert.equal(les.ingevuldeVelden.leerdoel.includes("Jan"), false);
-assert.ok(BESTAANDE_HREFS.has(les.volgendeStap.href));
 
-const toets = klaar("ik wil een toets maken", {
+const zonderBevestiging = voerBevestigdeActieUit(les, false);
+assert.equal(zonderBevestiging.soort, "geweigerd");
+if (zonderBevestiging.soort === "geweigerd") {
+  assert.equal(zonderBevestiging.code, "geen-bevestiging");
+}
+
+const lesActie = voerBevestigdeActieUit(les, true);
+assert.equal(lesActie.soort, "actie");
+if (lesActie.soort !== "actie") throw new Error("verwacht actie");
+assert.equal(lesActie.href, "/app/lessons/new");
+assert.equal(lesActie.href.includes("?"), false);
+assert.ok(BESTAANDE_HREFS.has(lesActie.href));
+assert.equal("send" in lesActie, false);
+assert.equal("save" in lesActie, false);
+assert.equal("export" in lesActie, false);
+assert.equal("print" in lesActie, false);
+assert.equal("grade" in lesActie, false);
+
+const toets = klaar("toets", {
   vak: "Economie",
   niveau: "vwo",
   leerjaar: "5",
-  leerdoel: "Vraag en aanbod",
+  leerdoel: "vraag-aanbod",
 });
 assert.equal(toets.workflowId, "toets");
-assert.equal(toets.volgendeStap.href, "/app/tests/new");
+const toetsActie = voerBevestigdeActieUit(toets, true);
+assert.equal(toetsActie.soort, "actie");
+if (toetsActie.soort === "actie") {
+  assert.equal(toetsActie.href, "/app/tests/new");
+}
 
-const toetsweek = klaar("plan de toetsweek");
+const toetsweek = klaar("toetsweek");
 assert.equal(toetsweek.workflowId, "toetsweek");
-assert.equal(toetsweek.volgendeStap.href, "/app/toetsweek");
 assert.equal(toetsweek.menselijkeControle, true);
+const twActie = voerBevestigdeActieUit(toetsweek, true);
+assert.equal(twActie.soort, "actie");
+if (twActie.soort === "actie") {
+  assert.equal(twActie.href, "/app/toetsweek");
+}
 
-const rapport = klaar("schrijf een rapporttekst", { outputType: "rapporttekst" });
+const rapport = klaar("rapport", { outputType: "rapporttekst" });
 assert.equal(rapport.workflowId, "rapport");
-assert.equal(rapport.volgendeStap.href, "/app/reports/new");
 assert.equal("leerlingLabel" in rapport.ingevuldeVelden, false);
-assert.ok(rapport.waarschuwingen.some((w) => w.toLowerCase().includes("initialen")));
+assert.equal(
+  rapport.checklist.join(" ").toLowerCase().includes("initialen"),
+  false,
+);
+const rapportActie = voerBevestigdeActieUit(rapport, true);
+assert.equal(rapportActie.soort, "actie");
+if (rapportActie.soort === "actie") {
+  assert.equal(rapportActie.href, "/app/reports/new");
+}
 
-const oudermail = klaar("een oudermail voorbereiden");
+const oudermail = klaar("oudermail");
 assert.equal(oudermail.workflowId, "oudermail");
-assert.equal(oudermail.volgendeStap.href, "/app/ouders");
+const mailActie = voerBevestigdeActieUit(oudermail, true);
+assert.equal(mailActie.soort, "actie");
+if (mailActie.soort === "actie") {
+  assert.equal(mailActie.href, "/app/ouders");
+}
 
-const gesprek = klaar("help met een oudergesprek");
+const gesprek = klaar("oudergesprek");
 assert.equal(gesprek.workflowId, "oudergesprek");
-assert.equal(gesprek.volgendeStap.href, "/app/ouders");
 
-const coach = klaar("vraag aan de coach over vakdidactiek");
+const coach = klaar("coach");
 assert.equal(coach.workflowId, "coach");
-assert.equal(coach.volgendeStap.href, "/app/coach");
+const coachActie = voerBevestigdeActieUit(coach, true);
+assert.equal(coachActie.soort, "actie");
+if (coachActie.soort === "actie") {
+  assert.equal(coachActie.href, "/app/coach");
+}
 
-const nakijken = klaar("nakijken van de stapel plannen");
+const nakijken = klaar("nakijken");
 assert.equal(nakijken.workflowId, "nakijken");
-assert.equal(nakijken.volgendeStap.href, "/app/nakijken");
-
-const viaKaart = voerAssistentUit("", {}, "les");
-assert.equal(viaKaart.soort, "vragen");
-
-const viaKaartVelden = klaar("", {
-  vak: "Aardrijkskunde",
-  niveau: "vmbo-t",
-  leerjaar: "3",
-  leerdoel: "Verstedelijking",
-}, "les");
-assert.equal(viaKaartVelden.workflowId, "les");
+const nakActie = voerBevestigdeActieUit(nakijken, true);
+assert.equal(nakActie.soort === "actie" && nakActie.href, "/app/nakijken");
 
 for (const w of WORKFLOWS) {
-  assert.equal(workflowById(w.id).href.startsWith("/app/"), true);
+  const def = workflowById(w.id);
+  assert.ok(def);
+  assert.equal(def.href.startsWith("/app/"), true);
   assert.equal(w.href.includes("naam="), false);
-  assert.equal(w.velden.some((v) => /naam|leerling|email|telefoon|diagnose/i.test(v.id)), false);
+  assert.equal(
+    w.velden.some((v) => /naam|leerling|email|telefoon|diagnose/i.test(v.id)),
+    false,
+  );
+  assert.equal(
+    w.velden.every((v) => v.soort === "keuze" && v.keuzes.length > 0),
+    true,
+  );
+  const voorstel = voerAssistentUit(w.id, {});
+  if (voorstel.soort === "klaar") {
+    const geweigerd = voerBevestigdeActieUit(voorstel, false);
+    assert.equal(geweigerd.soort, "geweigerd");
+    const actie = voerBevestigdeActieUit(voorstel, true);
+    assert.equal(actie.soort, "actie");
+  }
 }
 
 console.log("agent-test: alle checks geslaagd");

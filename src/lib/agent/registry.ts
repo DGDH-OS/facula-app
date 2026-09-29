@@ -13,104 +13,92 @@ const NIVEAUS = [
   { waarde: "vwo", label: "vwo" },
 ] as const;
 
+const LEERJAREN = [
+  { waarde: "1", label: "Leerjaar 1" },
+  { waarde: "2", label: "Leerjaar 2" },
+  { waarde: "3", label: "Leerjaar 3" },
+  { waarde: "4", label: "Leerjaar 4" },
+  { waarde: "5", label: "Leerjaar 5" },
+  { waarde: "6", label: "Leerjaar 6" },
+] as const;
+
+const LEERDOELEN = [
+  { waarde: "eu", label: "EU-instellingen uitleggen" },
+  { waarde: "industrie", label: "Industriële revolutie uitleggen" },
+  { waarde: "vraag-aanbod", label: "Vraag en aanbod uitleggen" },
+  { waarde: "verstedelijking", label: "Verstedelijking uitleggen" },
+  { waarde: "democratie", label: "Democratie en rechtsstaat uitleggen" },
+  { waarde: "klimaat", label: "Klimaat en duurzaamheid uitleggen" },
+  { waarde: "bronnen", label: "Bronnen beoordelen" },
+  { waarde: "globalisering", label: "Globalisering uitleggen" },
+] as const;
+
 const RAPPORT_OUTPUT = [
   { waarde: "rapporttekst", label: "Rapporttekst" },
   { waarde: "oudergesprek", label: "Oudergesprek-verslag" },
   { waarde: "oudermail", label: "Oudermail-concept" },
 ] as const;
 
+const PRIVACY =
+  "Je kunt hier geen namen, e-mailadressen of leerlingteksten invullen.";
+
+const LES_VELDEN = [
+  {
+    id: "vak",
+    label: "Vak",
+    soort: "keuze" as const,
+    verplicht: true,
+    keuzes: VAKKEN,
+  },
+  {
+    id: "niveau",
+    label: "Niveau",
+    soort: "keuze" as const,
+    verplicht: true,
+    keuzes: NIVEAUS,
+  },
+  {
+    id: "leerjaar",
+    label: "Leerjaar",
+    soort: "keuze" as const,
+    verplicht: true,
+    keuzes: LEERJAREN,
+  },
+  {
+    id: "leerdoel",
+    label: "Leerdoel",
+    soort: "keuze" as const,
+    verplicht: true,
+    keuzes: LEERDOELEN,
+    hulp: "Alleen deze onderwerpen. Geen vrije tekst.",
+  },
+];
+
 /**
- * Alleen bestaande modules. Velden komen uit de bestaande schema's
- * (LessonInput, TestInput, ReportInput). Geen extra velden, geen
- * leerlingnamen in dit register.
+ * Alleen bestaande modules. Velden zijn vaste keuzes, nooit vrije tekst
+ * en nooit leerling-identificerende ids.
  */
 export const WORKFLOWS: readonly WorkflowDefinitie[] = [
   {
     id: "les",
     titel: "Les voorbereiden",
-    korteUitleg: "Naar de lesgenerator. Jij vult het leerdoel in; Facula verzint geen leerlinggegevens.",
-    trefwoorden: ["les", "lesvoorbereiding", "lesmateriaal", "powerpoint", "ppt"],
+    korteUitleg: "Naar de lesgenerator. Alleen vaste keuzes, geen namen.",
     href: "/app/lessons/new",
-    velden: [
-      {
-        id: "vak",
-        label: "Vak",
-        soort: "keuze",
-        verplicht: true,
-        keuzes: VAKKEN,
-      },
-      {
-        id: "niveau",
-        label: "Niveau",
-        soort: "keuze",
-        verplicht: true,
-        keuzes: NIVEAUS,
-      },
-      {
-        id: "leerjaar",
-        label: "Leerjaar",
-        soort: "getal",
-        verplicht: true,
-        min: 1,
-        max: 6,
-      },
-      {
-        id: "leerdoel",
-        label: "Leerdoel",
-        soort: "tekst",
-        verplicht: true,
-        maxLengte: 2000,
-        hulp: "In jouw woorden. Geen leerlingnamen.",
-      },
-    ],
+    velden: LES_VELDEN,
   },
   {
     id: "toets",
     titel: "Toets maken",
-    korteUitleg: "Naar de toetsgenerator. Alleen leerdoel en instellingen, geen cijfers of namen.",
-    trefwoorden: ["toets", "toetsvragen", "proefwerk", "so ", "schriftelijke overhoring"],
+    korteUitleg: "Naar de toetsgenerator. Geen cijfers en geen namen.",
     href: "/app/tests/new",
-    velden: [
-      {
-        id: "vak",
-        label: "Vak",
-        soort: "keuze",
-        verplicht: true,
-        keuzes: VAKKEN,
-      },
-      {
-        id: "niveau",
-        label: "Niveau",
-        soort: "keuze",
-        verplicht: true,
-        keuzes: NIVEAUS,
-      },
-      {
-        id: "leerjaar",
-        label: "Leerjaar",
-        soort: "getal",
-        verplicht: true,
-        min: 1,
-        max: 6,
-      },
-      {
-        id: "leerdoel",
-        label: "Leerdoel",
-        soort: "tekst",
-        verplicht: true,
-        maxLengte: 2000,
-        hulp: "Wat moet de toets toetsen? Geen leerlingnamen.",
-      },
-    ],
+    velden: LES_VELDEN,
   },
   {
     id: "rapport",
     titel: "Rapporttekst voorbereiden",
-    korteUitleg: "Naar de rapport-module. Initialen vul je daar zelf in, niet hier.",
-    trefwoorden: ["rapport", "rapporttekst", "rapportage"],
+    korteUitleg: "Naar de rapport-module. Hier geen leerlingtekst.",
     href: "/app/reports/new",
-    privacyWaarschuwing:
-      "Typ hier geen namen, cijfers of diagnoses. In de rapport-module gebruik je alleen initialen.",
+    privacyWaarschuwing: PRIVACY,
     velden: [
       {
         id: "outputType",
@@ -131,46 +119,38 @@ export const WORKFLOWS: readonly WorkflowDefinitie[] = [
   {
     id: "oudermail",
     titel: "Oudermail voorbereiden",
-    korteUitleg: "Naar oudercontact. Geen namen in dit scherm.",
-    trefwoorden: ["oudermail", "mail naar ouders", "ouderbericht"],
+    korteUitleg: "Naar oudercontact. Hier geen namen of mails.",
     href: "/app/ouders",
-    privacyWaarschuwing:
-      "Geen leerlingnamen of contactgegevens in dit scherm. Die horen in de oudercontact-module, met initialen.",
+    privacyWaarschuwing: PRIVACY,
     velden: [],
   },
   {
     id: "oudergesprek",
     titel: "Oudergesprek voorbereiden",
-    korteUitleg: "Naar oudercontact. Het gesprek bereid je daar voor.",
-    trefwoorden: ["oudergesprek", "10-minutengesprek", "ouderavond"],
+    korteUitleg: "Naar oudercontact. Het gesprek maak je daar.",
     href: "/app/ouders",
-    privacyWaarschuwing:
-      "Geen leerlingnamen in dit scherm. Bereid het gesprek voor in de oudercontact-module.",
+    privacyWaarschuwing: PRIVACY,
     velden: [],
   },
   {
     id: "coach",
     titel: "Vraag aan de coach",
-    korteUitleg: "Naar de vakcoach. Alleen vakdidactiek, geen leerlingdossiers.",
-    trefwoorden: ["coach", "vakdidactiek", "lesidee vragen"],
+    korteUitleg: "Naar de vakcoach. Alleen vakdidactiek.",
     href: "/app/coach",
     velden: [],
   },
   {
     id: "nakijken",
     titel: "Nakijken plannen",
-    korteUitleg: "Naar nakijken. Geen cijfers of namen in dit scherm.",
-    trefwoorden: ["nakijken", "nakijkstapel", "werkdruk nakijken"],
+    korteUitleg: "Naar nakijken. Geen cijfers in dit scherm.",
     href: "/app/nakijken",
-    privacyWaarschuwing:
-      "De Assistent geeft geen cijfers en beoordeelt geen werk. Dat doe jij in de nakijk-module.",
+    privacyWaarschuwing: PRIVACY,
     velden: [],
   },
   {
     id: "toetsweek",
     titel: "Toetsweek plannen",
     korteUitleg: "Naar de toetsweek-planner.",
-    trefwoorden: ["toetsweek", "toetsperiode", "toetsrooster"],
     href: "/app/toetsweek",
     velden: [],
   },
@@ -181,8 +161,9 @@ const BY_ID = Object.fromEntries(WORKFLOWS.map((w) => [w.id, w])) as Record<
   WorkflowDefinitie
 >;
 
-export function workflowById(id: WorkflowId): WorkflowDefinitie {
-  return BY_ID[id];
+export function workflowById(
+  id: string | undefined | null,
+): WorkflowDefinitie | undefined {
+  if (!id) return undefined;
+  return BY_ID[id as WorkflowId];
 }
-
-export const BEKENDE_TITELS = WORKFLOWS.map((w) => w.titel).join(", ");
