@@ -27,6 +27,7 @@ export function GesprekTab({
   const [sterkAfgekapt, setSterkAfgekapt] = useState(false);
   const [aandachtAfgekapt, setAandachtAfgekapt] = useState(false);
   const output = maakGespreksplanning(state);
+  const privacy = privacyOuders(output.tekst);
 
   function updateSterk(waarde: string) {
     const { regels, afgekapt } = beperkRegels(waarde, MAX_STERK);
@@ -105,8 +106,15 @@ export function GesprekTab({
         </fieldset>
         <button
           type="button"
-          onClick={() => window.print()}
-          className={`mt-4 min-h-11 rounded-lg border-2 border-marine px-4 ${focusRingClass}`}
+          disabled={privacy.blokkeer}
+          onClick={() => {
+            if (!privacy.blokkeer) window.print();
+          }}
+          className={[
+            "mt-4 min-h-11 rounded-lg border-2 border-marine px-4",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            focusRingClass,
+          ].join(" ")}
         >
           Print
         </button>
@@ -114,7 +122,7 @@ export function GesprekTab({
       <OuderOutput
         titel="Gespreksplanning"
         tekst={output.tekst}
-        privacy={privacyOuders(output.tekst)}
+        privacy={privacy}
       />
     </section>
   );
