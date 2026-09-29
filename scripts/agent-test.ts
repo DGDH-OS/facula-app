@@ -8,6 +8,7 @@ import {
   workflowById,
 } from "../src/lib/agent";
 import { maakResultaat, valideerVelden } from "../src/lib/agent/generator";
+import { isPlainRecord } from "../src/lib/agent/policy";
 import type { AssistentKlaar, WorkflowId } from "../src/lib/agent/types";
 
 function alsVelden(waarde: unknown): Record<string, string> {
@@ -534,6 +535,81 @@ if (geldigDirect.soort === "klaar") {
   const geldigeActie = voerBevestigdeActieUit(geldigDirect, true);
   assert.equal(geldigeActie.soort, "actie");
 }
+
+const r = Proxy.revocable({}, {});
+r.revoke();
+const herroepen = r.proxy;
+assert.equal(isPlainRecord(herroepen), false);
+assert.equal(
+  voerAssistentUit("les", alsVelden(herroepen)).soort,
+  "geweigerd",
+);
+weigertGeenActie(
+  voerBevestigdeActieUit(herroepen as AssistentKlaar, true),
+);
+assert.equal(weigerIndienNodig(herroepen, ["vak"])?.soort, "geweigerd");
+assert.equal(
+  weigerIndienNodig({ vak: "Geschiedenis" }, herroepen)?.soort,
+  "geweigerd",
+);
+assert.equal(
+  valideerVelden("les", herroepen as Record<string, string>).soort === "ok",
+  false,
+);
+assert.equal(
+  maakResultaat("les", herroepen as Record<string, string>).soort,
+  "geweigerd",
+);
+assert.equal(workflowById(herroepen), undefined);
+assert.equal(voerAssistentUit(herroepen as WorkflowId).soort, "geweigerd");
+
+const protoGooit = new Proxy(
+  {},
+  {
+    getPrototypeOf() {
+      throw new Error("proto");
+    },
+  },
+);
+assert.equal(isPlainRecord(protoGooit), false);
+assert.equal(
+  voerAssistentUit("les", alsVelden(protoGooit)).soort,
+  "geweigerd",
+);
+weigertGeenActie(
+  voerBevestigdeActieUit(protoGooit as AssistentKlaar, true),
+);
+
+const sparseChecklist = [...les.checklist];
+sparseChecklist.length = sparseChecklist.length + 1;
+weigertGeenActie(
+  voerBevestigdeActieUit(
+    { ...les, checklist: sparseChecklist } as AssistentKlaar,
+    true,
+  ),
+);
+
+const sparseWaarschuwingen = [...les.waarschuwingen];
+sparseWaarschuwingen.length = sparseWaarschuwingen.length + 1;
+weigertGeenActie(
+  voerBevestigdeActieUit(
+    {
+      ...les,
+      waarschuwingen: sparseWaarschuwingen,
+    } as AssistentKlaar,
+    true,
+  ),
+);
+
+const dichteActie = voerBevestigdeActieUit(
+  {
+    ...les,
+    checklist: [...les.checklist],
+    waarschuwingen: [...les.waarschuwingen],
+  },
+  true,
+);
+assert.equal(dichteActie.soort, "actie");
 
 function plat(bron: string): string {
   return bron.replace(/\s+/g, " ");

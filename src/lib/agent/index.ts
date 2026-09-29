@@ -87,7 +87,21 @@ function isNonEmptyString(waarde: unknown): waarde is string {
 }
 
 function isStringLijst(waarde: unknown): waarde is string[] {
-  return Array.isArray(waarde) && waarde.every((r) => typeof r === "string");
+  try {
+    if (!Array.isArray(waarde)) return false;
+    for (let i = 0; i < waarde.length; i += 1) {
+      if (!Object.prototype.hasOwnProperty.call(waarde, i)) {
+        return false;
+      }
+      const regel = waarde[i];
+      if (typeof regel !== "string" || regel.trim().length === 0) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isVeldRecord(waarde: unknown): waarde is Record<string, string> {

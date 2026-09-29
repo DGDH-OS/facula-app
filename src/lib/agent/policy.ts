@@ -30,11 +30,16 @@ function ongeldigVeld(): AssistentWeigering {
 export function isPlainRecord(
   waarde: unknown,
 ): waarde is Record<string, unknown> {
-  if (typeof waarde !== "object" || waarde === null || Array.isArray(waarde)) {
+  if (typeof waarde !== "object" || waarde === null) {
     return false;
   }
-  const proto = Object.getPrototypeOf(waarde);
-  return proto === Object.prototype || proto === null;
+  try {
+    if (Array.isArray(waarde)) return false;
+    const proto = Object.getPrototypeOf(waarde);
+    return proto === Object.prototype || proto === null;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -46,13 +51,19 @@ export function weigerIndienNodig(
   velden: unknown,
   toegestaan: unknown,
 ): AssistentWeigering | null {
-  if (!isPlainRecord(velden) || !Array.isArray(toegestaan)) {
+  let ids: unknown[] | null = null;
+  try {
+    if (Array.isArray(toegestaan)) ids = toegestaan;
+  } catch {
+    ids = null;
+  }
+  if (!isPlainRecord(velden) || !ids) {
     return ongeldigVeld();
   }
-  if (!toegestaan.every((id) => typeof id === "string")) {
+  if (!ids.every((id) => typeof id === "string")) {
     return ongeldigVeld();
   }
-  const mag = new Set(toegestaan);
+  const mag = new Set(ids);
   for (const id of Object.keys(velden)) {
     const sleutel = id.toLowerCase();
     if (VERBODEN.has(sleutel) || !mag.has(id)) {
