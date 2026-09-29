@@ -27,6 +27,10 @@ const vragen: Array<[string, string]> = [
 for (const [vraag, id] of vragen)
   assert.equal(matchCoachVraag(vraag).entry?.id, id, `${vraag} matchte niet`);
 assert.equal(matchCoachVraag("qzxv blorp 999").entry, null);
+assert.equal(matchCoachVraag("banaan fiets").related.length, 0);
+assert.ok(["avg-initialen", "avg-delen"].includes(
+  matchCoachVraag("mag ik de naam van een leerling mailen").entry?.id ?? "",
+));
 assert.equal(controleerCoachPii("mail me op docent@example.nl").bevatPii, true);
 assert.equal(controleerCoachPii("bel 06-1234-5678").bevatPii, true);
 assert.equal(controleerCoachPii("de diagnose ADHD bespreken").bevatPii, true);
@@ -34,7 +38,7 @@ assert.equal(controleerCoachPii("mail over Jan Jansen").bevatPii, true);
 assert.equal(controleerCoachPii("Wat Is EDI").bevatPii, false);
 assert.equal(controleerCoachPii("Hoe Maak Ik Een Toets").bevatPii, false);
 for (const url of zoekUrls(
-  "Mail Jan Jansen op jan@example.nl of 06-1234-5678 over ADHD",
+  "Mail Jan Jansen op jan@example.nl of jane@example.com, bel 06-1234-5678 of 06 9876 5432 over ADHD",
 )) {
   const u = new URL(url);
   assert.ok(
@@ -46,7 +50,12 @@ for (const url of zoekUrls(
       "duckduckgo.com",
     ].includes(u.hostname),
   );
-  assert.ok(!url.includes("jan%40example.nl") && !url.includes("1234"));
+  assert.ok(
+    !url.includes("jan%40example.nl") &&
+      !url.includes("jane%40example.com") &&
+      !url.includes("1234") &&
+      !url.includes("9876"),
+  );
 }
 assert.deepEqual(maakWeekplan(["mails", "mails"]), [
   "Kies per dag één hoofdtaak en houd een leeg blok voor onverwachte zaken.",

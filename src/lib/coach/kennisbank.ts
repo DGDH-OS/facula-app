@@ -181,13 +181,13 @@ const data: Array<[string, string[], string[], string, CoachActie[]?]> = [
   [
     "avg-delen",
     ["wat mag ik delen", "AVG delen met ouders"],
-    ["avg", "delen", "privacy"],
+    ["avg", "delen", "privacy", "naam", "leerling", "mailen", "versturen"],
     "Deel alleen wat nodig is met de juiste ontvanger. Controleer adressen en gebruik BCC bij een groep. Zet geen medische of gevoelige details in een gewone mail. Vraag bij twijfel je schoolleiding of privacycontact.",
   ],
   [
     "avg-initialen",
     ["initialen gebruiken", "leerling pseudoniem"],
-    ["initialen", "pseudoniem", "naam"],
+    ["initialen", "pseudoniem", "naam", "leerling", "mailen", "versturen"],
     "Initialen helpen, maar maken informatie niet automatisch anoniem. Combineer zo min mogelijk kenmerken en deel alleen met mensen die het nodig hebben. Zet leerlingnamen niet in deze coachchat.",
   ],
   [

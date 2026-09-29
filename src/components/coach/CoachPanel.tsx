@@ -194,7 +194,7 @@ function CoachContent({
   const [berichten, setBerichten] = useState<Bericht[]>([]);
   const [pii, setPii] = useState<string | null>(null);
   useEffect(() => {
-    if (embedded) inputRef.current?.focus();
+    if (embedded || onClose) inputRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose?.();
       if (event.key !== "Tab" || !panelRef.current) return;
@@ -361,8 +361,10 @@ export function CoachFloating() {
       </button>
       {open && (
         <>
-          <button
+          <div
             aria-label="Sluit coachpaneel"
+            aria-hidden="true"
+            tabIndex={-1}
             className="fixed inset-0 z-40 bg-marine/30"
             onClick={close}
           />

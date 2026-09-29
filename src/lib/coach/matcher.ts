@@ -4,8 +4,13 @@ export type PiiResult = { bevatPii: boolean; reden?: string };
 const medische =
   /\b(diabetes|adhd|autisme|medicatie|depressie|diagnose|dyslexie|gezondheid|allergie)\b/i;
 const email = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/i;
+const emailGlobaal = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g;
 const telefoon =
   /(?:\+?31\s?6|06)[\s-]?\d{4}[\s-]?\d{4}|\b\d{3}[\s-]\d{2}[\s-]\d{2}[\s-]\d{2}\b/;
+const telefoonGlobaal =
+  /(?:\+?31\s?6|06)[\s-]?\d{4}[\s-]?\d{4}|\b\d{3}[\s-]\d{2}[\s-]\d{2}[\s-]\d{2}\b/g;
+const medischeGlobaal =
+  /\b(diabetes|adhd|autisme|medicatie|depressie|diagnose|dyslexie|gezondheid|allergie)\b/gi;
 const naam =
   /\b[A-ZÁÉÍÓÚÀÈÌÒÙ][a-záéíóúàèìòù]+\s+[A-ZÁÉÍÓÚÀÈÌÒÙ][a-záéíóúàèìòù]+\b/g;
 const gewoneWoorden = new Set([
@@ -84,17 +89,21 @@ export function matchCoachVraag(vraag: string): MatchResult {
   const top = scored[0];
   return {
     entry: top && top.score >= 1 ? top.entry : null,
-    related: scored.slice(top?.score >= 1 ? 1 : 0, 3).map((x) => x.entry),
+    related:
+      top?.score >= 1
+        ? scored.filter((item) => item.score >= 1).slice(1, 3).map((item) => item.entry)
+        : [],
     score: top?.score ?? 0,
   };
 }
 export function zoekUrls(vraag: string): string[] {
   const schoon = vraag
-    .replace(email, "")
-    .replace(telefoon, "")
-    .replace(medische, "")
-    .replace(naam, "")
+    .replaceAll(emailGlobaal, "")
+    .replaceAll(telefoonGlobaal, "")
+    .replaceAll(medischeGlobaal, "")
+    .replaceAll(naam, "")
     .trim();
+  if (controleerCoachPii(schoon).bevatPii) return [];
   const q = encodeURIComponent(schoon);
   return [
     `https://www.kennisnet.nl/zoeken/?q=${q}`,
