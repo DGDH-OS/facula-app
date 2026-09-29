@@ -29,3 +29,15 @@ export function maakVerslag(input: VerslagInput) {
     input.vervolg || "Nog invullen",
   ].join("\n");
 }
+export function verslagNaarMail(
+  input: VerslagInput,
+): { observatie: string; actie: string } {
+  const actie = input.afspraken
+    .filter((item) => item.wie || item.wat || item.wanneer)
+    .map(
+      (item) =>
+        `${item.wie || "Wie"}: ${item.wat || "Wat"} (${item.wanneer || "Wanneer"})`,
+    )
+    .join("; ");
+  return { observatie: input.besproken, actie };
+}

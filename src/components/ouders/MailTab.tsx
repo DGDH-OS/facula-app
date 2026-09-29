@@ -8,13 +8,12 @@ import { OuderOutput } from "./OuderOutput";
 export function MailTab({
   mail,
   setMail,
-  kopieer,
 }: {
   mail: MailInput;
   setMail: (mail: MailInput) => void;
-  kopieer: (tekst: string) => void;
 }) {
   const output = maakOudermail(mail);
+  const privacy = privacyOuders(`${output.subject}\n${output.body}`);
   const mailto = [
     "mailto:?subject=",
     encodeURIComponent(output.subject),
@@ -125,8 +124,7 @@ export function MailTab({
         titel="Mailtekst"
         onderwerp={output.subject}
         tekst={output.body}
-        privacy={privacyOuders(output.body)}
-        kopieer={kopieer}
+        privacy={privacy}
         mailto={mailto}
       />
     </section>

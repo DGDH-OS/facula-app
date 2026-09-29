@@ -6,6 +6,7 @@ import {
   privacyOuders,
   type MailInput,
 } from "../src/lib/ouders/templates";
+import { verslagNaarMail } from "../src/lib/ouders/verslag";
 const tonen = [
   "vriendelijk",
   "neutraal-zakelijk",
@@ -221,6 +222,61 @@ if (
   !privacyOuders("06 12345678").blokkeer
 )
   throw new Error("Privacyblokkade ontbreekt");
+
+// Onderwerp + tekst moeten samen gecontroleerd worden: een e-mailadres dat
+// alleen in het onderwerp staat mag niet ongemerkt door de tekst-check heen.
+const onderwerpMetEmail = "Onderwerp met test@example.com";
+const tekstZonderGevoeligeData = "Gewone inhoud zonder gevoelige gegevens.";
+if (!privacyOuders(`${onderwerpMetEmail}\n${tekstZonderGevoeligeData}`).blokkeer)
+  throw new Error("Privacyguard mist een e-mailadres in het onderwerp");
+if (privacyOuders(tekstZonderGevoeligeData).blokkeer)
+  throw new Error("Privacyguard blokkeert onterecht schone tekst");
+
+// Verslag: elke afspraakregel moet terugkomen, niet alleen de eerste.
+const verslagMeerdereAfspraken = maakVerslag({
+  datum: "2-2-2026",
+  aanwezigen: "ouder en docent",
+  besproken: "planning",
+  afspraken: [
+    { wie: "docent", wat: "belt", wanneer: "maandag" },
+    { wie: "ouder", wat: "mailt terug", wanneer: "woensdag" },
+  ],
+  vervolg: "",
+});
+if (
+  !verslagMeerdereAfspraken.includes("docent: belt (maandag)") ||
+  !verslagMeerdereAfspraken.includes("ouder: mailt terug (woensdag)")
+)
+  throw new Error("Niet elke afspraakregel staat in het verslag");
+
+// verslagNaarMail is een pure functie: observatie komt uit besproken, actie
+// is de samenvoeging van alle afspraken met "; ".
+const samenvatting = verslagNaarMail({
+  datum: "",
+  aanwezigen: "",
+  besproken: "de voortgang van de opdrachten",
+  afspraken: [
+    { wie: "docent", wat: "belt", wanneer: "maandag" },
+    { wie: "ouder", wat: "mailt terug", wanneer: "woensdag" },
+  ],
+  vervolg: "",
+});
+if (samenvatting.observatie !== "de voortgang van de opdrachten")
+  throw new Error("verslagNaarMail geeft de verkeerde observatie terug");
+if (
+  samenvatting.actie !==
+  "docent: belt (maandag); ouder: mailt terug (woensdag)"
+)
+  throw new Error("verslagNaarMail geeft de verkeerde actie terug");
+const legeSamenvatting = verslagNaarMail({
+  datum: "",
+  aanwezigen: "",
+  besproken: "niets besproken",
+  afspraken: [],
+  vervolg: "",
+});
+if (legeSamenvatting.actie !== "")
+  throw new Error("verslagNaarMail geeft actie terug zonder afspraken");
 const url = [
   "mailto:?subject=",
   encodeURIComponent("Onderwerp"),
