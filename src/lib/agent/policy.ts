@@ -22,12 +22,19 @@ function ongeldigVeld(): AssistentWeigering {
   };
 }
 
-function isPlainRecord(waarde: unknown): waarde is Record<string, unknown> {
-  return (
-    typeof waarde === "object" &&
-    waarde !== null &&
-    !Array.isArray(waarde)
-  );
+/**
+ * Alleen kale records: prototype is Object.prototype of null.
+ * Custom classes en Object.create({ ... }) vallen af, zodat
+ * geërfde PII-sleutels niet buiten Object.keys om binnenkomen.
+ */
+export function isPlainRecord(
+  waarde: unknown,
+): waarde is Record<string, unknown> {
+  if (typeof waarde !== "object" || waarde === null || Array.isArray(waarde)) {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(waarde);
+  return proto === Object.prototype || proto === null;
 }
 
 /**

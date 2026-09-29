@@ -1,4 +1,4 @@
-import { weigerIndienNodig } from "./policy";
+import { isPlainRecord, weigerIndienNodig } from "./policy";
 import { workflowById } from "./registry";
 import type {
   AssistentUitkomst,
@@ -27,14 +27,6 @@ function eigenWaarde(
 ): unknown {
   if (!Object.prototype.hasOwnProperty.call(velden, id)) return undefined;
   return velden[id];
-}
-
-function isPlainRecord(waarde: unknown): waarde is Record<string, unknown> {
-  return (
-    typeof waarde === "object" &&
-    waarde !== null &&
-    !Array.isArray(waarde)
-  );
 }
 
 export function valideerVelden(

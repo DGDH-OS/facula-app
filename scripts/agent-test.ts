@@ -83,6 +83,53 @@ for (const bron of geenRecordBronnen) {
   }
 }
 
+const geldigeLesVelden = {
+  vak: "Geschiedenis",
+  niveau: "havo",
+  leerjaar: "4",
+  leerdoel: "eu",
+};
+const lesToegestaan = Object.keys(geldigeLesVelden);
+
+function weigertVeld(uit: { soort: string; code?: string }) {
+  assert.equal(uit.soort, "geweigerd");
+  assert.equal(uit.code, "ongeldig-veld");
+}
+
+function erfPii(velden: Record<string, string>, proto: object) {
+  return Object.assign(Object.create(proto), velden);
+}
+
+class CustomVelden {}
+const erfBronnen: unknown[] = [
+  erfPii(geldigeLesVelden, { naam: "Jan" }),
+  erfPii(geldigeLesVelden, { __proto__: { naam: "Jan" } }),
+  erfPii(geldigeLesVelden, { constructor: { naam: "Jan" } }),
+  Object.assign(new CustomVelden(), geldigeLesVelden),
+];
+for (const bron of erfBronnen) {
+  const velden = alsVelden(bron);
+  weigertVeld(voerAssistentUit("les", velden));
+  weigertVeld(maakResultaat("les", velden));
+  const validatie = valideerVelden("les", velden);
+  assert.equal(validatie.soort === "ok", false);
+  if (validatie.soort === "geweigerd") {
+    assert.equal(validatie.code, "ongeldig-veld");
+  }
+  const weiger = weigerIndienNodig(bron, lesToegestaan);
+  assert.equal(weiger?.soort, "geweigerd");
+}
+
+const kaleLes = voerAssistentUit("les", { ...geldigeLesVelden });
+assert.equal(kaleLes.soort, "klaar");
+const nullProtoLes = Object.assign(Object.create(null), geldigeLesVelden);
+assert.equal(voerAssistentUit("les", alsVelden(nullProtoLes)).soort, "klaar");
+assert.equal(weigerIndienNodig(nullProtoLes, lesToegestaan), null);
+assert.equal(
+  valideerVelden("les", alsVelden(nullProtoLes)).soort,
+  "ok",
+);
+
 const extraNaam = voerAssistentUit("les", { naam: "Jan" });
 assert.equal(extraNaam.soort, "geweigerd");
 if (extraNaam.soort === "geweigerd") {
@@ -408,6 +455,25 @@ const valseBevestiging = [
 for (const vals of valseBevestiging) {
   weigertGeenActie(voerBevestigdeActieUit(les, vals));
 }
+
+const erfVelden = alsVelden(erfPii(geldigeLesVelden, { naam: "Jan" }));
+weigertGeenActie(
+  voerBevestigdeActieUit(
+    { ...les, ingevuldeVelden: erfVelden } as unknown as AssistentKlaar,
+    true,
+  ),
+);
+weigertGeenActie(
+  voerBevestigdeActieUit(
+    Object.assign(Object.create({ naam: "Jan" }), les) as AssistentKlaar,
+    true,
+  ),
+);
+const nullProtoKlaar = Object.assign(Object.create(null), les);
+assert.equal(
+  voerBevestigdeActieUit(nullProtoKlaar as AssistentKlaar, true).soort,
+  "actie",
+);
 
 const nullValidatie = valideerVelden(
   "les" as WorkflowId,

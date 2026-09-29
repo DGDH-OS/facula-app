@@ -1,5 +1,5 @@
 import { maakResultaat, valideerVelden } from "./generator";
-import { weigerIndienNodig } from "./policy";
+import { isPlainRecord, weigerIndienNodig } from "./policy";
 import { workflowById } from "./registry";
 import type {
   AssistentActie,
@@ -37,16 +37,6 @@ function ongeldigVeld(): AssistentWeigering {
   };
 }
 
-function isPlainVelden(
-  velden: unknown,
-): velden is Record<string, unknown> {
-  return (
-    typeof velden === "object" &&
-    velden !== null &&
-    !Array.isArray(velden)
-  );
-}
-
 /**
  * Alleen een gekozen module plus vaste enum-velden. Geen vrije tekst,
  * geen trefwoordmatcher. Geeft een voorstel; nog geen actie.
@@ -57,7 +47,7 @@ export function voerAssistentUit(
 ): AssistentUitkomst {
   const workflow = workflowById(gekozen);
   if (!workflow) return onbekend();
-  if (!isPlainVelden(velden)) return ongeldigVeld();
+  if (!isPlainRecord(velden)) return ongeldigVeld();
 
   const extra = weigerIndienNodig(
     velden,
@@ -101,12 +91,12 @@ function isStringLijst(waarde: unknown): waarde is string[] {
 }
 
 function isVeldRecord(waarde: unknown): waarde is Record<string, string> {
-  if (!isPlainVelden(waarde)) return false;
+  if (!isPlainRecord(waarde)) return false;
   return Object.values(waarde).every((v) => typeof v === "string");
 }
 
 function isBevestigdKlaar(waarde: unknown): waarde is AssistentKlaar {
-  if (!isPlainVelden(waarde)) return false;
+  if (!isPlainRecord(waarde)) return false;
   for (const sleutel of Object.keys(waarde)) {
     if (!KLAAR_SLEUTELS.has(sleutel)) return false;
   }
