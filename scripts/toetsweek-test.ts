@@ -437,6 +437,8 @@ const geblokkeerdItems = [
   }),
 ];
 assert.throws(() => genereerICS(geblokkeerdItems, [], "toetsen"), /geblokkeerd/);
+const ongeldigeIcs = genereerICS([item({ id: "leeg", datum: "", klas: "", vak: "" })], [], "toetsen");
+assert.ok(!ongeldigeIcs.includes("BEGIN:VEVENT"), "ongeldige rij mag niet in ICS");
 
 assert.equal(dagnaam("2026-10-06"), "dinsdag 6 oktober");
 for (const analyse of analyseerPerKlasPerWeek(allesSamen, instellingen)) {

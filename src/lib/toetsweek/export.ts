@@ -1,6 +1,11 @@
 import { Document, HeadingLevel, Packer, Paragraph } from "docx";
 import { privacyOuders } from "@/lib/ouders/privacy";
-import { dagnaam, isoWeekLabel, type KlasWeekAnalyse } from "./planner";
+import {
+  dagnaam,
+  filterGeldigeItems,
+  isoWeekLabel,
+  type KlasWeekAnalyse,
+} from "./planner";
 import type {
   NakijkDagPlanning,
   NakijkTekort,
@@ -218,11 +223,12 @@ export function genereerICS(
         + " uit de toetsnaam of notitie.",
     );
   }
+  const geldigeItems = filterGeldigeItems(items).geldig;
   const dtstamp = nuAlsDtstamp();
-  const zoekItem = itemZoeker(items);
+  const zoekItem = itemZoeker(geldigeItems);
   const events: string[] = [];
   if (keuze === "toetsen" || keuze === "beide") {
-    for (const item of items) events.push(toetsEvent(item, dtstamp));
+    for (const item of geldigeItems) events.push(toetsEvent(item, dtstamp));
   }
   if (keuze === "nakijken" || keuze === "beide") {
     for (const dag of nakijkdagen) {
