@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { haalHuisstijl, HUISSTIJL_KOLOMMEN } from "@/lib/huisstijl/server";
+import { HUISSTIJL_KOLOMMEN } from "@/lib/huisstijl/server";
+import { haalActieveHuisstijl } from "@/lib/huisstijl/actief";
 import {
   controleerContrast,
   normaliseerHex,
@@ -25,8 +26,18 @@ function isLettertype(waarde: unknown): waarde is Lettertype {
 
 /**
  * GET /api/huisstijl
- * De huisstijl van de ingelogde docent. Geeft altijd een bruikbare stijl
- * terug, ook zonder opgeslagen rij: dan de standaardstijl van Facula.
+ *
+ * Geeft de huisstijl die NU geldt (`huisstijl`), plus de eigen huisstijl van de
+ * docent (`eigen`) en wat zijn school ervan vindt. Drie dingen in één antwoord,
+ * omdat twee schermen elk iets anders nodig hebben:
+ *
+ *   - de voorvertoning bij een export wil de stijl die eruit komt rollen, en
+ *     dat is bij een afgedwongen schoolhuisstijl niet de eigen stijl;
+ *   - het instelscherm /app/huisstijl wil de eigen stijl om te kunnen
+ *     bewerken, plus de mededeling dat de school hem overstemt.
+ *
+ * Geeft altijd een bruikbare stijl terug, ook zonder opgeslagen rij: dan de
+ * schoolhuisstijl, en zonder school de standaardstijl van Facula.
  */
 export async function GET() {
   const supabase = await createServerSupabaseClient();
@@ -38,8 +49,17 @@ export async function GET() {
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
-  const huisstijl = await haalHuisstijl(supabase, user.id);
-  return NextResponse.json({ huisstijl }, { headers: { "Cache-Control": "no-store" } });
+  const actief = await haalActieveHuisstijl(supabase, user.id);
+  return NextResponse.json(
+    {
+      huisstijl: actief.huisstijl,
+      eigen: actief.eigen,
+      bron: actief.bron,
+      schoolNaam: actief.schoolNaam,
+      schoolAfdwingen: actief.afdwingen,
+    },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 /**

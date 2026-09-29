@@ -6,7 +6,7 @@ import {
 } from "@/lib/pptx-export-mihiriban-style";
 import { bouwLesPresentatie, slugify } from "@/lib/pptx-export";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { haalHuisstijl, haalLogoBestand } from "@/lib/huisstijl/server";
+import { haalActiefLogoBestand, haalActieveHuisstijl } from "@/lib/huisstijl/actief";
 
 /**
  * GET /api/lessons/[id]/pptx
@@ -63,14 +63,17 @@ export async function GET(
 
   const zoek = request.nextUrl.searchParams;
   const eigenHuisstijl = zoek.get("huisstijl") === "1";
-  const huisstijl = await haalHuisstijl(supabase, user.id);
+  // De actieve huisstijl: die van de school als de school hem afdwingt, anders
+  // de eigen stijl van de docent. Zie src/lib/huisstijl/actief.ts.
+  const actief = await haalActieveHuisstijl(supabase, user.id);
+  const huisstijl = actief.huisstijl;
 
   // Het logo staat aan zodra de docent er een heeft, tenzij hij het op dit
   // scherm uitzet of in zijn huisstijl standaard uit heeft staan.
   const logoGevraagd = zoek.has("logo")
     ? zoek.get("logo") === "1"
     : huisstijl.logoStandaardAan;
-  const logo = logoGevraagd ? await haalLogoBestand(supabase, huisstijl, user.id) : null;
+  const logo = logoGevraagd ? await haalActiefLogoBestand(supabase, actief) : null;
 
   try {
     const buffer = eigenHuisstijl

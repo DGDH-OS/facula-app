@@ -2,19 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   claimLogoLease,
-  geldigLogoPad,
-  haalHuisstijl,
   LOGO_BUCKET,
   LOGO_LEASE_BEZET_MELDING,
   LOGO_LEASE_VERLOPEN_MELDING,
   logoLeaseNogGeldig,
-  logoMimeType,
   logoPad,
   releaseLogoLease,
   ruimVerweesdLogoOp,
   schrijfLogoMetLease,
   verwijderLogoObjecten,
 } from "@/lib/huisstijl/server";
+import { haalActiefLogo, haalActieveHuisstijl } from "@/lib/huisstijl/actief";
 import { isToegestaanLogoType, maakLogo } from "@/lib/huisstijl/logo";
 import { normaliseerLogo } from "@/lib/huisstijl/normalize-logo";
 import { MAX_LOGO_BYTES, resolveHuisstijl } from "@/lib/huisstijl/themes";
@@ -69,8 +67,14 @@ const MAX_AANGEKONDIGDE_BYTES = Math.round(MAX_LOGO_BYTES * 1.1);
 
 /**
  * GET /api/huisstijl/logo
- * Levert het logo van de ingelogde docent als afbeelding. Dit is het enige
- * pad waarlangs een logo de bucket verlaat: de bucket zelf is privé.
+ *
+ * Levert het logo dat NU geldt als afbeelding: het schoollogo als de
+ * schoolhuisstijl actief is, anders het eigen logo van de docent. Dit is het
+ * enige pad waarlangs een logo de bucket verlaat: de bucket zelf is privé.
+ *
+ * De keuze welk logo dat is, staat in haalActieveHuisstijl() en niet hier. Zo
+ * kan de voorvertoning in de app nooit een ander logo tonen dan de export
+ * gebruikt: ze vragen het allebei aan dezelfde functie.
  */
 export async function GET() {
   const supabase = await createServerSupabaseClient();
@@ -82,37 +86,20 @@ export async function GET() {
     return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
   }
 
-  const huisstijl = await haalHuisstijl(supabase, user.id);
-  // haalHuisstijl() gooit een pad dat niet van deze docent is al weg; deze
-  // regel maakt dat expliciet op de plek waar het pad echt gebruikt wordt.
-  if (!geldigLogoPad(huisstijl.logoPath, user.id)) {
+  const actief = await haalActieveHuisstijl(supabase, user.id);
+  // haalActiefLogo() controleert het pad tegen de juiste scope (eigen of
+  // school) vóór het downloaden, en geeft null bij alles wat daar niet in past.
+  const logo = await haalActiefLogo(supabase, actief);
+  if (!logo) {
     return NextResponse.json({ error: "Geen logo ingesteld." }, { status: 404 });
   }
 
-  const { data, error } = await supabase.storage
-    .from(LOGO_BUCKET)
-    .download(logoPad(user.id));
-
-  if (error || !data) {
-    console.error("Schoollogo ophalen mislukt", error);
-    return NextResponse.json({ error: "Logo niet gevonden." }, { status: 404 });
-  }
-
-  const bytes = new Uint8Array(await data.arrayBuffer());
-  // Het pad heeft geen extensie meer, dus het type komt uit logo_mime of
-  // anders uit de bestandskop. Niet uit data.type: die is niet altijd gezet,
-  // en een leeg of verkeerd Content-Type maakt van een afbeelding een download
-  // die de browser niet toont.
-  const mime = logoMimeType(bytes, huisstijl.logoMime);
-  if (!mime) {
-    console.error("Schoollogo heeft geen herkenbaar bestandstype", { userId: user.id });
-    return NextResponse.json({ error: "Logo niet gevonden." }, { status: 404 });
-  }
-
-  return new NextResponse(bytes, {
+  // new Uint8Array(...): de bytes komen uit een generieke Uint8Array en die
+  // accepteert BodyInit niet direct in deze TypeScript-versie.
+  return new NextResponse(new Uint8Array(logo.bytes), {
     status: 200,
     headers: {
-      "Content-Type": mime,
+      "Content-Type": logo.mimeType,
       // private: het logo hoort in de browsercache van deze docent te mogen
       // staan, maar nooit in een gedeelde cache onderweg.
       "Cache-Control": "private, max-age=60",

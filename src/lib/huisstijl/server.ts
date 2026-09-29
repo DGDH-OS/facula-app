@@ -71,6 +71,56 @@ export function geldigLogoPad(pad: string | null | undefined, userId: string): b
 }
 
 /**
+ * Het logopad van een school: 'school/<school_id>/logo'.
+ *
+ * Zelfde gedachte als bij een docent: precies één toegestane objectnaam per
+ * school, dus een upload overschrijft zichzelf en geen opruiming hoeft ooit een
+ * ander object te raken. De prefix 'school/' houdt de twee soorten paden
+ * bovendien uit elkaar: een docentpad begint altijd met een uuid.
+ */
+export function schoolLogoPad(schoolId: string): string {
+  return "school/" + schoolId + "/logo";
+}
+
+const SCHOOL_LOGO_PAD_VORM =
+  /^school\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/logo$/;
+
+/** Of dit pad het logopad van déze school is. */
+export function geldigSchoolLogoPad(
+  pad: string | null | undefined,
+  schoolId: string | null
+): boolean {
+  if (typeof pad !== "string" || !schoolId) return false;
+  return SCHOOL_LOGO_PAD_VORM.test(pad) && pad === schoolLogoPad(schoolId);
+}
+
+/**
+ * Waartegen een logopad uit de database gecontroleerd moet worden.
+ *
+ * Een pad uit de database is altijd verdacht (zie geldigLogoPad), maar sinds er
+ * ook schoollogo's zijn, is "hoort dit bij mij" niet meer één vraag: het pad
+ * hoort bij de docent óf bij zijn school. Dit maakt expliciet welke van de twee
+ * geldt, zodat er nooit een pad doorglipt omdat de controle "wel ergens" klopte.
+ */
+export type LogoScope =
+  | { soort: "eigen"; userId: string }
+  | { soort: "school"; schoolId: string | null };
+
+export function eigenLogoScope(userId: string): LogoScope {
+  return { soort: "eigen", userId };
+}
+
+/** Of dit pad binnen deze scope hoort. */
+export function geldigLogoPadInScope(
+  pad: string | null | undefined,
+  scope: LogoScope
+): boolean {
+  return scope.soort === "eigen"
+    ? geldigLogoPad(pad, scope.userId)
+    : geldigSchoolLogoPad(pad, scope.schoolId);
+}
+
+/**
  * De Nederlandse melding bij een bezette logo-lease. Staat hier zodat de route
  * en de tests dezelfde tekst gebruiken.
  */
@@ -333,11 +383,27 @@ export async function haalLogo(
   huisstijl: Huisstijl,
   userId: string
 ): Promise<Logo | null> {
-  if (!geldigLogoPad(huisstijl.logoPath, userId)) return null;
+  return haalLogoVanPad(supabase, huisstijl, eigenLogoScope(userId));
+}
 
-  const { data, error } = await supabase.storage
-    .from(LOGO_BUCKET)
-    .download(logoPad(userId));
+/**
+ * Hetzelfde, maar voor een pad dat van de docent óf van zijn school kan zijn.
+ *
+ * Het pad komt uit de huisstijl (dus uit de database) en wordt hier tegen de
+ * meegegeven scope gecontroleerd voordat er iets gedownload wordt. Klopt het
+ * niet, dan is het antwoord "geen logo" en niet "dan proberen we het toch":
+ * dat is precies het onbewaakte doorgeefluik waarmee een pad van iemand anders
+ * bruikbaar wordt.
+ */
+export async function haalLogoVanPad(
+  supabase: SupabaseClient,
+  huisstijl: Huisstijl,
+  scope: LogoScope
+): Promise<Logo | null> {
+  const pad = huisstijl.logoPath;
+  if (!geldigLogoPadInScope(pad, scope) || !pad) return null;
+
+  const { data, error } = await supabase.storage.from(LOGO_BUCKET).download(pad);
 
   if (error || !data) {
     console.error("Schoollogo ophalen mislukt", error);

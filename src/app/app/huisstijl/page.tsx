@@ -45,6 +45,14 @@ export default function HuisstijlPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoStandaardAan, setLogoStandaardAan] = useState(true);
 
+  // Hoort deze docent bij een school, en dwingt die school haar huisstijl af?
+  // Dan blijft dit formulier bruikbaar (zijn instellingen blijven van hem),
+  // maar hoort er boven te staan dat het nu niets uitmaakt voor zijn exports.
+  // Niets uitzetten of verbergen: een leeg scherm zonder uitleg is verwarrender
+  // dan een formulier met een eerlijke mededeling erboven.
+  const [schoolNaamVanSchool, setSchoolNaamVanSchool] = useState<string | null>(null);
+  const [schoolAfdwingen, setSchoolAfdwingen] = useState(false);
+
   const [laden, setLaden] = useState(true);
   const [opslaan, setOpslaan] = useState(false);
   const [logoBezig, setLogoBezig] = useState(false);
@@ -76,9 +84,14 @@ export default function HuisstijlPage() {
   useEffect(() => {
     let actueel = true;
     (async () => {
-      const huisstijl = await haalHuisstijlClient();
+      const antwoord = await haalHuisstijlClient();
       if (!actueel) return;
-      neemOver(huisstijl);
+      // Het formulier bewerkt de EIGEN huisstijl, ook als de school de hare
+      // afdwingt: wat de docent hier instelt blijft van hem en geldt weer zodra
+      // de school het afdwingen uitzet.
+      neemOver(antwoord.eigen);
+      setSchoolNaamVanSchool(antwoord.schoolNaam);
+      setSchoolAfdwingen(antwoord.schoolAfdwingen);
       setLaden(false);
     })();
     return () => {
@@ -190,6 +203,20 @@ export default function HuisstijlPage() {
         Stel dit een keer in. Daarna kun je bij elke les, toets en rapporttekst
         kiezen of je hem in je eigen huisstijl downloadt.
       </p>
+
+      {schoolAfdwingen && (
+        <p className="mt-6 flex items-start gap-2 rounded-xl bg-waarschuwing-vlak px-4 py-3 text-base font-semibold text-waarschuwing-tekst">
+          <span aria-hidden>⚠</span>
+          <span>
+            {schoolNaamVanSchool
+              ? schoolNaamVanSchool + " gebruikt één huisstijl voor iedereen."
+              : "Je school gebruikt één huisstijl voor iedereen."}{" "}
+            Je downloads komen in de schoolhuisstijl, ook als je hieronder iets
+            anders kiest. Wat je hier instelt blijft bewaard en geldt weer zodra
+            de school het losser zet.
+          </span>
+        </p>
+      )}
 
       <section className="mt-8">
         <h2 className="font-display text-2xl text-marine">Kies een stijl</h2>

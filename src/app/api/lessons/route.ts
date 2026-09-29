@@ -2,13 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
 import { genereerLesMetAi } from "@/lib/ai/generate-lesson";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import {
-  FREE_QUOTA_PER_MONTH,
-  getCurrentUsage,
-  isPaidSubscriber,
-  quotaLimitBoodschap,
-  saveWithQuota,
-} from "@/lib/quota";
+import { quotaBoodschap, saveWithQuota } from "@/lib/quota";
+import { haalVerbruik } from "@/lib/school";
 import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
 /**
@@ -105,19 +100,18 @@ export async function POST(request: NextRequest) {
   //      één databasetransactie. Alleen die is bestand tegen twee
   //      gelijktijdige aanvragen door dezelfde laatste vrije plek, en er kan
   //      geen les van het quotum af zonder dat de les er ook echt staat.
-  // Betaalde abonnees lopen door geen limiet: stap 1 wordt overgeslagen en
-  // stap 2 slaat alleen op zonder te tellen.
-  const paid = await isPaidSubscriber(supabase, user.id);
-
+  //
+  // De voorcheck leest facula.mijn_verbruik(), dat zelf bepaalt welk regime
+  // geldt (schoollicentie, abonnement, gratis). Zo staat die keuze op één plek:
+  // in de database, dezelfde plek waar de bindende beslissing valt. Een
+  // eigen navolging hier zou bij de eerste wijziging uit elkaar lopen.
   try {
-    if (!paid) {
-      const verbruik = await getCurrentUsage(supabase, user.id);
-      if (verbruik.lessons >= FREE_QUOTA_PER_MONTH) {
-        return NextResponse.json(
-          { error: quotaLimitBoodschap("lessons") },
-          { status: 402 }
-        );
-      }
+    const verbruik = await haalVerbruik(supabase);
+    if (verbruik.limiet !== null && verbruik.lessons >= verbruik.limiet) {
+      return NextResponse.json(
+        { error: quotaBoodschap("lessons", verbruik.regime, verbruik.limiet) },
+        { status: 402 }
+      );
     }
 
     const { les, pogingen } = await genereerLesMetAi(input);
@@ -138,8 +132,10 @@ export async function POST(request: NextRequest) {
 
     const opslag = await saveWithQuota(supabase, "lessons", input, output);
     if (opslag.quotaExceeded) {
+      // De melding komt uit het regime dat de database net zelf vaststelde,
+      // niet uit een tweede gok hier.
       return NextResponse.json(
-        { error: quotaLimitBoodschap("lessons") },
+        { error: quotaBoodschap("lessons", opslag.regime, null) },
         { status: 402 }
       );
     }

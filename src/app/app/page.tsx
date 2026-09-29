@@ -7,11 +7,26 @@ import { UsageMeter } from "@/components/ui/UsageMeter";
 import { ButtonLink } from "@/components/ui/Button";
 import { LesIcon, ToetsIcon, RapportIcon } from "@/components/ui/icons";
 import { RecenteLijst, type RecentItem } from "@/components/app/RecenteLijst";
-import { getCurrentUsage, isPaidSubscriber, FREE_QUOTA_PER_MONTH } from "@/lib/quota";
+import {
+  haalLidmaatschap,
+  haalVerbruik,
+  ROL_LABEL,
+  ROL_UITLEG,
+  verbruikUitleg,
+  type VerbruikRegime,
+} from "@/lib/school";
 import type { GeneratedLesson, GeneratedTest, ReportInput } from "@/lib/types";
 
 /** Hoeveel items er onder "Je laatste werk" passen zonder een lijst te worden. */
 const MAX_RECENT = 6;
+
+/** Het regime in één woord op een badge. Geen jargon, geen Engels. */
+const REGIME_LABEL: Record<VerbruikRegime, string> = {
+  gratis: "Gratis",
+  abonnement: "Abonnement",
+  school_onbeperkt: "Schoollicentie",
+  school_pool: "Schoollicentie",
+};
 
 const RAPPORT_SOORT: Record<ReportInput["outputType"], string> = {
   rapporttekst: "rapporttekst",
@@ -46,10 +61,11 @@ export default async function AppDashboard() {
       .limit(MAX_RECENT),
   ]);
 
-  const paid = user ? await isPaidSubscriber(supabase, user.id) : false;
-  const usage = user
-    ? await getCurrentUsage(supabase, user.id)
-    : { lessons: 0, tests: 0, reports: 0 };
+  // Eén aanroep voor verbruik én regime: de database weet of er een
+  // schoollicentie, een abonnement of het gratis quotum geldt, en die keuze
+  // hoort niet ook hier te staan.
+  const verbruik = await haalVerbruik(supabase);
+  const lidmaatschap = user ? await haalLidmaatschap(supabase, user.id) : null;
 
   /*
    * Eén lijst met alle drie de soorten door elkaar, nieuwste eerst. Elk soort
@@ -134,6 +150,29 @@ export default async function AppDashboard() {
         />
       </div>
 
+      {lidmaatschap && (
+        <Section
+          className="mt-10"
+          titel={lidmaatschap.schoolNaam}
+          uitleg={
+            lidmaatschap.sectieNaam
+              ? "Je werkt hier als " +
+                ROL_LABEL[lidmaatschap.rol].toLowerCase() +
+                " in de sectie " +
+                lidmaatschap.sectieNaam +
+                "."
+              : "Je werkt hier als " +
+                ROL_LABEL[lidmaatschap.rol].toLowerCase() +
+                ". Je bent nog niet aan een sectie gekoppeld, vraag je beheerder daarom."
+          }
+          actie={
+            <ButtonLink href="/app/sectie" variant="secondary">
+              Naar de sectie
+            </ButtonLink>
+          }
+        />
+      )}
+
       <section id="werk" className="mt-14">
         <h2 className="font-display text-2xl text-marine">Je laatste werk</h2>
         <div className="mt-4">
@@ -155,38 +194,42 @@ export default async function AppDashboard() {
       <Section
         className="mt-14"
         titel="Gebruik deze maand"
-        actie={paid ? undefined : <UpgradeButton />}
+        uitleg={verbruikUitleg(verbruik)}
+        actie={verbruik.regime === "gratis" ? <UpgradeButton /> : undefined}
       >
         <div className="flex flex-wrap items-center gap-3">
-          {paid ? (
+          <StatusBadge
+            label={REGIME_LABEL[verbruik.regime]}
+            tone={verbruik.regime === "gratis" ? "neutral" : "success"}
+            uitleg={verbruikUitleg(verbruik)}
+          />
+          {lidmaatschap && (
             <StatusBadge
-              label="Abonnee"
-              tone="success"
-              uitleg="Onbeperkt gebruik als betalend abonnee"
-            />
-          ) : (
-            <StatusBadge
-              label="Gratis"
+              label={ROL_LABEL[lidmaatschap.rol]}
               tone="neutral"
-              uitleg={"Gratis: " + FREE_QUOTA_PER_MONTH + " per soort per maand"}
+              uitleg={ROL_UITLEG[lidmaatschap.rol]}
             />
           )}
         </div>
         <div className="mt-5 grid gap-6 sm:grid-cols-3">
           <UsageMeter
-            label="Lessen"
-            gebruikt={usage.lessons}
-            limiet={paid ? null : FREE_QUOTA_PER_MONTH}
+            label={verbruik.regime === "school_pool" ? "Lessen van de school" : "Lessen"}
+            gebruikt={verbruik.lessons}
+            limiet={verbruik.limiet}
           />
           <UsageMeter
-            label="Toetsen"
-            gebruikt={usage.tests}
-            limiet={paid ? null : FREE_QUOTA_PER_MONTH}
+            label={verbruik.regime === "school_pool" ? "Toetsen van de school" : "Toetsen"}
+            gebruikt={verbruik.tests}
+            limiet={verbruik.limiet}
           />
           <UsageMeter
-            label="Rapportteksten"
-            gebruikt={usage.reports}
-            limiet={paid ? null : FREE_QUOTA_PER_MONTH}
+            label={
+              verbruik.regime === "school_pool"
+                ? "Rapportteksten van de school"
+                : "Rapportteksten"
+            }
+            gebruikt={verbruik.reports}
+            limiet={verbruik.limiet}
           />
         </div>
       </Section>

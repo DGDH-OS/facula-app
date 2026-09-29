@@ -14,21 +14,48 @@ import { resolveHuisstijl, STANDAARD_HUISSTIJL, type Huisstijl } from "./themes"
  */
 
 export interface HuisstijlState {
+  /** De huisstijl die nu geldt: de eigen, of die van de school. */
   huisstijl: Huisstijl;
+  /** De eigen huisstijl van de docent, voor het instelscherm. */
+  eigen: Huisstijl;
+  /** Naam van de school, als de docent bij een school hoort. */
+  schoolNaam: string | null;
+  /** True als de school haar huisstijl afdwingt: eigen kleuren doen niet mee. */
+  schoolAfdwingen: boolean;
   /** Null zolang er nog niets geladen is, of als er geen logo is. */
   logo: Logo | null;
   laden: boolean;
 }
 
-/** Haalt de opgeslagen huisstijl op. Faalt zacht naar de standaardstijl. */
-export async function haalHuisstijlClient(): Promise<Huisstijl> {
+/** Wat GET /api/huisstijl teruggeeft. */
+export interface HuisstijlAntwoord {
+  huisstijl: Huisstijl;
+  eigen: Huisstijl;
+  schoolNaam: string | null;
+  schoolAfdwingen: boolean;
+}
+
+const VEILIG_ANTWOORD: HuisstijlAntwoord = {
+  huisstijl: STANDAARD_HUISSTIJL,
+  eigen: STANDAARD_HUISSTIJL,
+  schoolNaam: null,
+  schoolAfdwingen: false,
+};
+
+/** Haalt de huisstijl op. Faalt zacht naar de standaardstijl. */
+export async function haalHuisstijlClient(): Promise<HuisstijlAntwoord> {
   try {
     const response = await fetch("/api/huisstijl", { cache: "no-store" });
-    if (!response.ok) return STANDAARD_HUISSTIJL;
+    if (!response.ok) return VEILIG_ANTWOORD;
     const data = await response.json();
-    return (data?.huisstijl as Huisstijl) ?? STANDAARD_HUISSTIJL;
+    return {
+      huisstijl: (data?.huisstijl as Huisstijl) ?? STANDAARD_HUISSTIJL,
+      eigen: (data?.eigen as Huisstijl) ?? (data?.huisstijl as Huisstijl) ?? STANDAARD_HUISSTIJL,
+      schoolNaam: (data?.schoolNaam as string | null) ?? null,
+      schoolAfdwingen: data?.schoolAfdwingen === true,
+    };
   } catch {
-    return STANDAARD_HUISSTIJL;
+    return VEILIG_ANTWOORD;
   }
 }
 
@@ -54,6 +81,9 @@ export async function haalLogoClient(): Promise<Logo | null> {
 export function useHuisstijl(): HuisstijlState & { herlaad: () => void } {
   const [state, setState] = useState<HuisstijlState>({
     huisstijl: STANDAARD_HUISSTIJL,
+    eigen: STANDAARD_HUISSTIJL,
+    schoolNaam: null,
+    schoolAfdwingen: false,
     logo: null,
     laden: true,
   });
@@ -65,12 +95,19 @@ export function useHuisstijl(): HuisstijlState & { herlaad: () => void } {
     let actueel = true;
 
     (async () => {
-      const huisstijl = await haalHuisstijlClient();
-      const logo = huisstijl.logoPath ? await haalLogoClient() : null;
+      const antwoord = await haalHuisstijlClient();
+      const logo = antwoord.huisstijl.logoPath ? await haalLogoClient() : null;
       // Een tweede aanroep kan de eerste al hebben ingehaald; dan hoort het
       // oude antwoord niet meer over het nieuwe heen te schrijven.
       if (!actueel) return;
-      setState({ huisstijl: resolveHuisstijlVeilig(huisstijl), logo, laden: false });
+      setState({
+        huisstijl: resolveHuisstijlVeilig(antwoord.huisstijl),
+        eigen: resolveHuisstijlVeilig(antwoord.eigen),
+        schoolNaam: antwoord.schoolNaam,
+        schoolAfdwingen: antwoord.schoolAfdwingen,
+        logo,
+        laden: false,
+      });
     })();
 
     return () => {

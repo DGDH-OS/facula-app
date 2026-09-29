@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ReportInput, RapportOutputType, RapportToon } from "@/lib/types";
 import { genereerRapportTekst } from "@/lib/report-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { quotaLimitBoodschap, saveWithQuota } from "@/lib/quota";
+import { quotaBoodschap, saveWithQuota } from "@/lib/quota";
 import { limitString, readBodyWithLimit } from "@/lib/validation";
 
 const OUTPUT_TYPES: RapportOutputType[] = ["rapporttekst", "oudergesprek", "oudermail"];
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     const opslag = await saveWithQuota(supabase, "reports", input, output);
     if (opslag.quotaExceeded) {
       return NextResponse.json(
-        { error: quotaLimitBoodschap("reports") },
+        { error: quotaBoodschap("reports", opslag.regime, null) },
         { status: 402 }
       );
     }

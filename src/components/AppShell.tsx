@@ -33,19 +33,43 @@ import { wisAlleConcepten } from "@/lib/useDraft";
  * `actiefOp` is het pad waarop dit item "page" is, en de match is exact.
  * "Mijn werk" heeft er geen: het is een anker op /app, en anders zouden
  * Start en Mijn werk allebei tegelijk aria-current="page" dragen.
+ *
+ * De balk houdt maximaal vijf bestemmingen. Daarom valt "Mijn werk" weg zodra
+ * er een school is: het is een anker naar een lijst die op het startscherm al
+ * in beeld staat, en "Sectie" is dan de bestemming die een docent echt nodig
+ * heeft. "School" komt er alleen bij voor een beheerder, want alleen die kan
+ * er iets doen.
  */
-const NAV_ITEMS: { href: string; label: string; actiefOp?: string }[] = [
-  { href: "/app", label: "Start", actiefOp: "/app" },
-  { href: "/app#werk", label: "Mijn werk" },
-  { href: "/app/huisstijl", label: "Huisstijl", actiefOp: "/app/huisstijl" },
-  { href: "/app/account", label: "Account", actiefOp: "/app/account" },
-];
+function navItems(heeftSchool: boolean, isBeheerder: boolean) {
+  const items: { href: string; label: string; actiefOp?: string }[] = [
+    { href: "/app", label: "Start", actiefOp: "/app" },
+  ];
+
+  if (heeftSchool) {
+    items.push({ href: "/app/sectie", label: "Sectie", actiefOp: "/app/sectie" });
+  } else {
+    items.push({ href: "/app#werk", label: "Mijn werk" });
+  }
+
+  items.push({ href: "/app/huisstijl", label: "Huisstijl", actiefOp: "/app/huisstijl" });
+
+  if (isBeheerder) {
+    items.push({ href: "/app/school", label: "School", actiefOp: "/app/school" });
+  }
+
+  items.push({ href: "/app/account", label: "Account", actiefOp: "/app/account" });
+  return items;
+}
 
 export function AppShell({
   email,
+  heeftSchool = false,
+  isBeheerder = false,
   children,
 }: {
   email: string;
+  heeftSchool?: boolean;
+  isBeheerder?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -74,7 +98,7 @@ export function AppShell({
             Facula
           </Link>
           <nav aria-label="Hoofdnavigatie" className="flex flex-wrap items-center gap-2">
-            {NAV_ITEMS.map(({ href, label, actiefOp }) => {
+            {navItems(heeftSchool, isBeheerder).map(({ href, label, actiefOp }) => {
               const actief = actiefOp !== undefined && pathname === actiefOp;
               return (
                 <Link

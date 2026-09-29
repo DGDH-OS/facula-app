@@ -7,6 +7,27 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
 
+/**
+ * Waar de docent na het inloggen heen gaat.
+ *
+ * Standaard het startscherm. Kwam hij via een uitnodigingslink, dan staat dat
+ * pad in `?volgende=` en gaat hij daar weer naartoe: anders moet hij de link uit
+ * zijn mail opnieuw opzoeken.
+ *
+ * Alleen een pad binnen deze app wordt overgenomen: het moet met één schuine
+ * streep beginnen en er mag geen tweede op volgen. Dat sluit `//kwaadwillend.nl`
+ * uit, wat een browser als een andere site leest en waarmee een inlogpagina een
+ * doorstuurluik naar buiten wordt. Een absolute URL met schema valt af op
+ * dezelfde regel.
+ */
+function volgendePad(): string {
+  if (typeof window === "undefined") return "/app";
+  const gevraagd = new URLSearchParams(window.location.search).get("volgende");
+  if (!gevraagd) return "/app";
+  if (!gevraagd.startsWith("/") || gevraagd.startsWith("//")) return "/app";
+  return gevraagd;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -35,7 +56,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/app");
+    router.push(volgendePad());
     router.refresh();
   }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { quotaLimitBoodschap, saveWithQuota } from "@/lib/quota";
+import { quotaBoodschap, saveWithQuota } from "@/lib/quota";
 import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
 const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     const opslag = await saveWithQuota(supabase, "tests", input, output);
     if (opslag.quotaExceeded) {
       return NextResponse.json(
-        { error: quotaLimitBoodschap("tests") },
+        { error: quotaBoodschap("tests", opslag.regime, null) },
         { status: 402 }
       );
     }
