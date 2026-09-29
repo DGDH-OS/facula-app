@@ -342,11 +342,11 @@ export function puntenVoor(criterium: Criterium, niveau: Niveau) {
 
 export function valideerInitialen(waarde: string) {
   const tekst = waarde.trim();
-  return Boolean(
-    tekst &&
-      /^(?=.*[A-Za-zÀ-ÖØ-öø-ÿ])[A-Za-zÀ-ÖØ-öø-ÿ. -]{1,6}$/.test(tekst) &&
-      !/\b[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\s+[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]+\b/.test(tekst),
-  );
+  if (!tekst || tekst.length > 8) return false;
+  // Single letters each followed by a dot (L.J., L. J., L.J.v.D.) or up to 3 capitals (LJ, LJK).
+  const metPunten = /^(?:[A-Za-zÀ-ÖØ-öø-ÿ]\.[ -]?){1,4}$/.test(tekst);
+  const hoofdletters = /^[A-ZÀ-ÖØ-Ý]{1,3}$/.test(tekst);
+  return metPunten || hoofdletters;
 }
 
 export function berekenCijfer(

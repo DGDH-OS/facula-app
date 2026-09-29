@@ -29,6 +29,8 @@ assert.ok(valideerRubric({ ...rubric, cesuur: 100 }).length > 0);
 assert.equal(valideerInitialen("L.J."), true);
 assert.equal(valideerInitialen("te-lang"), false);
 assert.equal(valideerInitialen("Jan Jansen"), false);
+for (const ok of ["L.J.", "L. J.", "L.J.v.D.", "LJ", "LJK", "A."]) assert.equal(valideerInitialen(ok), true, ok);
+for (const fout of ["Jan", "abcdef", "jan", "Lisa", "L.Jansen", "Ab", "ABCD"]) assert.equal(valideerInitialen(fout), false, fout);
 const leerlingen: Leerling[] = [
   { id: "1", initialen: "L.J.", keuzes: { [c.id]: 1 as Niveau }, notitie: "" },
   { id: "2", initialen: "M.K.", keuzes: { [c.id]: 1 as Niveau }, notitie: "" },
