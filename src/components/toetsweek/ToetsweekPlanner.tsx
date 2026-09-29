@@ -107,8 +107,18 @@ export function ToetsweekPlanner() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
-      <style>{`@media print { .app-balk { display: none; } }`}</style>
+    <div
+      className={`toetsweek-root mx-auto max-w-5xl space-y-8${privacy.blokkeer ? " privacy-blokkeer" : ""}`}
+    >
+      <style>{`@media print {
+        .app-balk { display: none; }
+        .toetsweek-print-blokkade { display: none; }
+        .toetsweek-root.privacy-blokkeer > * { display: none !important; }
+        .toetsweek-root.privacy-blokkeer .toetsweek-print-blokkade { display: block !important; }
+      }`}</style>
+      <p className="toetsweek-print-blokkade hidden text-lg">
+        Printen is geblokkeerd. Verwijder eerst namen of contactgegevens uit de toetsnaam of notitie.
+      </p>
       <header className="print:hidden">
         <p className="text-base font-semibold text-marine">Facula · Toetsweek</p>
         <h1 className="mt-2 font-display text-4xl text-marine">Toetsweekplanner</h1>

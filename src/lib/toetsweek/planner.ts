@@ -1,5 +1,6 @@
 import {
   GEWICHT_PER_SOORT,
+  STANDAARD_INSTELLINGEN,
   type ToetsItem,
   type ToetsweekInstellingen,
 } from "./types";
@@ -154,17 +155,25 @@ export type ItemFout =
   | "datum-ongeldig"
   | "cijferdeadline-ongeldig"
   | "cijferdeadline-voor-datum"
-  | "leerlingen-ongeldig";
+  | "leerlingen-ongeldig"
+  | "klas-leeg"
+  | "vak-leeg"
+  | "nakijkminuten-ongeldig";
 
 const ITEM_FOUTMELDINGEN: Record<ItemFout, string> = {
   "datum-ongeldig": "De datum is ongeldig.",
   "cijferdeadline-ongeldig": "De cijferdeadline is ongeldig.",
   "cijferdeadline-voor-datum": "De cijferdeadline ligt voor de toetsdatum.",
   "leerlingen-ongeldig": "Vul een aantal leerlingen groter dan 0 in.",
+  "klas-leeg": "Vul een klas in.",
+  "vak-leeg": "Vul een vak in.",
+  "nakijkminuten-ongeldig": "Vul een aantal nakijkminuten groter dan 0 in.",
 };
 
 export function valideerItem(item: ToetsItem): ItemFout[] {
   const fouten: ItemFout[] = [];
+  if (!item.klas.trim()) fouten.push("klas-leeg");
+  if (!item.vak.trim()) fouten.push("vak-leeg");
   if (!isGeldigeDatum(item.datum)) fouten.push("datum-ongeldig");
   if (item.cijferdeadline && !isGeldigeDatum(item.cijferdeadline)) {
     fouten.push("cijferdeadline-ongeldig");
@@ -177,6 +186,9 @@ export function valideerItem(item: ToetsItem): ItemFout[] {
   }
   if (!Number.isFinite(item.aantalLeerlingen) || item.aantalLeerlingen <= 0) {
     fouten.push("leerlingen-ongeldig");
+  }
+  if (!Number.isFinite(item.nakijkminuten) || item.nakijkminuten <= 0) {
+    fouten.push("nakijkminuten-ongeldig");
   }
   return fouten;
 }
@@ -204,6 +216,25 @@ export type KlasWeekAnalyse = {
   status: KlasWeekStatus;
 };
 
+function positiefOf(waarde: number, standaard: number): number {
+  return Number.isFinite(waarde) && waarde > 0 ? waarde : standaard;
+}
+
+/** Vervangt lege, nul of negatieve instellingen door de standaardwaarde. */
+export function veiligeInstellingen(instellingen: ToetsweekInstellingen): ToetsweekInstellingen {
+  const drukGrens = positiefOf(instellingen.drukGrens, STANDAARD_INSTELLINGEN.drukGrens);
+  const teDrukGrens = positiefOf(instellingen.teDrukGrens, STANDAARD_INSTELLINGEN.teDrukGrens);
+  return {
+    ...instellingen,
+    nakijkminutenPerDag: positiefOf(
+      instellingen.nakijkminutenPerDag,
+      STANDAARD_INSTELLINGEN.nakijkminutenPerDag,
+    ),
+    drukGrens,
+    teDrukGrens: Math.max(drukGrens, teDrukGrens),
+  };
+}
+
 function bepaalStatus(
   gewogenBelasting: number,
   instellingen: ToetsweekInstellingen,
@@ -216,8 +247,9 @@ function bepaalStatus(
 /** Groepeert geldige items per klas per ISO-week en bepaalt de piekstatus. */
 export function analyseerPerKlasPerWeek(
   items: ToetsItem[],
-  instellingen: ToetsweekInstellingen,
+  invoerInstellingen: ToetsweekInstellingen,
 ): KlasWeekAnalyse[] {
+  const instellingen = veiligeInstellingen(invoerInstellingen);
   const groepen = new Map<string, KlasWeekAnalyse>();
   for (const item of items) {
     if (valideerItem(item).length > 0) continue;
@@ -366,8 +398,9 @@ export type NakijkplanningResultaat = {
  */
 export function berekenNakijkplanning(
   items: ToetsItem[],
-  instellingen: ToetsweekInstellingen,
+  invoerInstellingen: ToetsweekInstellingen,
 ): NakijkplanningResultaat {
+  const instellingen = veiligeInstellingen(invoerInstellingen);
   // Lege cijferdeadline: reken met de standaard (10 werkdagen na de toets), zoals de UI belooft.
   const metDeadline = items
     .filter((item) => valideerItem(item).length === 0 && item.nakijkminuten > 0)

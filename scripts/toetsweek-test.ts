@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   analyseerPerKlasPerWeek,
   berekenNakijkplanning,
+  veiligeInstellingen,
   dagnaam,
   filterGeldigeItems,
   genereerSignalen,
@@ -170,6 +171,17 @@ assert.ok(!skipData.has("2026-10-08"), "extra vrije dag mag geen nakijktijd krij
 assert.ok(!skipData.has("2026-10-10"), "zaterdag mag geen nakijktijd krijgen");
 assert.ok(!skipData.has("2026-10-11"), "zondag mag geen nakijktijd krijgen");
 assert.equal(skipPlanning.tekorten.length, 0);
+
+
+const onvolledig = item({ klas: "", vak: "", datum: "2026-10-05", nakijkminuten: 0 });
+assert.deepEqual(
+  valideerItem(onvolledig).sort(),
+  ["klas-leeg", "nakijkminuten-ongeldig", "vak-leeg"],
+);
+const veilige = veiligeInstellingen({ ...instellingen, nakijkminutenPerDag: 0, drukGrens: 0, teDrukGrens: -1 });
+assert.equal(veilige.nakijkminutenPerDag, 90);
+assert.equal(veilige.drukGrens, 2);
+assert.equal(veilige.teDrukGrens, 3);
 
 const edfInstellingen: ToetsweekInstellingen = {
   ...instellingen,

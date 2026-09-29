@@ -46,7 +46,7 @@ function ToetsRij({
   return (
     <article className="space-y-4 rounded-xl border-2 border-lijn bg-ivoor p-5">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Klas" verplicht>
+        <Field label="Klas" verplicht fout={foutBij("klas-leeg")}>
           {(ids) => (
             <input
               {...ids}
@@ -56,7 +56,7 @@ function ToetsRij({
             />
           )}
         </Field>
-        <Field label="Vak" verplicht>
+        <Field label="Vak" verplicht fout={foutBij("vak-leeg")}>
           {(ids) => (
             <input
               {...ids}
@@ -124,7 +124,7 @@ function ToetsRij({
             />
           )}
         </Field>
-        <Field label="Nakijkminuten per leerling">
+        <Field label="Nakijkminuten per leerling" fout={foutBij("nakijkminuten-ongeldig")}>
           {(ids) => (
             <input
               {...ids}
