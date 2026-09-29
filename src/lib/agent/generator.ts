@@ -28,6 +28,14 @@ function eigenWaarde(
   return velden[id];
 }
 
+function isPlainRecord(waarde: unknown): waarde is Record<string, unknown> {
+  return (
+    typeof waarde === "object" &&
+    waarde !== null &&
+    !Array.isArray(waarde)
+  );
+}
+
 export function valideerVelden(
   workflowId: WorkflowId,
   velden: Record<string, unknown>,
@@ -35,6 +43,15 @@ export function valideerVelden(
   | AssistentVragen
   | AssistentWeigering
   | { soort: "ok"; schoon: Record<string, string> } {
+  if (!isPlainRecord(velden)) {
+    return {
+      soort: "geweigerd",
+      code: "ongeldig-veld",
+      melding:
+        "Je kunt hier geen namen, e-mailadressen of leerlingteksten " +
+        "invullen. Kies alleen de vaste opties.",
+    };
+  }
   const workflow = workflowById(workflowId);
   if (!workflow) {
     return {
@@ -165,6 +182,15 @@ export function maakResultaat(
   workflowId: WorkflowId,
   velden: Record<string, string>,
 ): AssistentKlaar | AssistentWeigering {
+  if (!isPlainRecord(velden)) {
+    return {
+      soort: "geweigerd",
+      code: "ongeldig-veld",
+      melding:
+        "Je kunt hier geen namen, e-mailadressen of leerlingteksten " +
+        "invullen. Kies alleen de vaste opties.",
+    };
+  }
   const workflow = workflowById(workflowId);
   if (!workflow) {
     return {

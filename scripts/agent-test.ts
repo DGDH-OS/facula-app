@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import {
   voerAssistentUit,
   voerBevestigdeActieUit,
+  weigerIndienNodig,
   WORKFLOWS,
   workflowById,
 } from "../src/lib/agent";
-import type { WorkflowId } from "../src/lib/agent/types";
+import { maakResultaat, valideerVelden } from "../src/lib/agent/generator";
+import type { AssistentKlaar, WorkflowId } from "../src/lib/agent/types";
 
 function alsVelden(waarde: unknown): Record<string, string> {
   return waarde as Record<string, string>;
@@ -275,7 +277,13 @@ const verbodenApi = new RegExp(
     "document\\.execCommand|URL\\.createObjectURL|" +
     "localStorage|sessionStorage|indexedDB",
 );
+const vrijeInvoer = /<input|<textarea|contentEditable|contenteditable/i;
+const bijwerkPad = new RegExp(
+  "\\bfetch\\s*\\(|navigator\\.clipboard|clipboard|" +
+    "window\\.print|download|localStorage|sessionStorage",
+);
 const bronnen = [
+  "src/app/app/assistent/page.tsx",
   "src/components/app/AssistentScherm.tsx",
   "src/lib/agent/index.ts",
   "src/lib/agent/registry.ts",
@@ -287,6 +295,95 @@ for (const pad of bronnen) {
   const tekst = readFileSync(pad, "utf8");
   assert.equal(verbodenApi.test(tekst), false, pad);
   assert.equal(tekst.includes("Kopieer checklist"), false, pad);
+  assert.equal(vrijeInvoer.test(tekst), false, pad);
+  assert.equal(bijwerkPad.test(tekst), false, pad);
 }
+
+const assistentUi = readFileSync(
+  "src/components/app/AssistentScherm.tsx",
+  "utf8",
+);
+assert.equal(assistentUi.includes("CoachFloating"), false);
+assert.equal(assistentUi.includes("Vraag de coach"), false);
+
+const appShell = readFileSync("src/components/AppShell.tsx", "utf8");
+assert.ok(appShell.includes("<CoachFloating"));
+assert.ok(appShell.includes("/app/assistent"));
+
+const coachBron = readFileSync(
+  "src/components/coach/CoachPanel.tsx",
+  "utf8",
+);
+assert.ok(coachBron.includes('pathname === "/app/coach"'));
+assert.ok(coachBron.includes('pathname.startsWith("/app/assistent")'));
+assert.ok(coachBron.includes("Vraag de coach"));
+assert.ok(coachBron.includes("<input"));
+assert.equal(coachBron.includes('startsWith("/app/lessons")'), false);
+assert.equal(coachBron.includes('startsWith("/app/coach")'), false);
+
+function weigertGeenActie(uit: { soort: string }) {
+  assert.equal(uit.soort, "geweigerd");
+  assert.equal("href" in uit, false);
+}
+
+const nullActie = voerBevestigdeActieUit(
+  null as unknown as AssistentKlaar,
+  true,
+);
+weigertGeenActie(nullActie);
+
+const kapotVoorstel = voerBevestigdeActieUit(
+  { soort: "klaar" } as unknown as AssistentKlaar,
+  true,
+);
+weigertGeenActie(kapotVoorstel);
+
+const geenChecklist = voerBevestigdeActieUit(
+  {
+    soort: "klaar",
+    workflowId: "les",
+    requiresConfirmation: true,
+  } as unknown as AssistentKlaar,
+  true,
+);
+weigertGeenActie(geenChecklist);
+
+const valseBevestiging = [
+  1,
+  "true",
+  {},
+  [],
+  "1",
+] as unknown as boolean[];
+for (const vals of valseBevestiging) {
+  weigertGeenActie(voerBevestigdeActieUit(les, vals));
+}
+
+const nullValidatie = valideerVelden(
+  "les" as WorkflowId,
+  null as unknown as Record<string, string>,
+);
+assert.equal(nullValidatie.soort === "ok", false);
+
+const arrayValidatie = valideerVelden(
+  "les" as WorkflowId,
+  ["vak"] as unknown as Record<string, string>,
+);
+assert.equal(arrayValidatie.soort === "ok", false);
+
+const nullWeiger = weigerIndienNodig(null as unknown as string, []);
+assert.equal(nullWeiger?.soort, "geweigerd");
+
+const geenLijst = weigerIndienNodig({ vak: "Geschiedenis" }, null);
+assert.equal(geenLijst?.soort, "geweigerd");
+
+const geenArray = weigerIndienNodig({ vak: "Geschiedenis" }, "vak");
+assert.equal(geenArray?.soort, "geweigerd");
+
+const kapotResultaat = maakResultaat(
+  "les",
+  null as unknown as Record<string, string>,
+);
+assert.equal(kapotResultaat.soort, "geweigerd");
 
 console.log("agent-test: alle checks geslaagd");

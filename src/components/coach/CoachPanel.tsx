@@ -346,6 +346,12 @@ export function CoachFloating() {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   if (pathname === "/app/coach") return null;
+  if (
+    typeof pathname === "string" &&
+    pathname.startsWith("/app/assistent")
+  ) {
+    return null;
+  }
   function close() {
     setOpen(false);
     requestAnimationFrame(() => trigger.current?.focus());

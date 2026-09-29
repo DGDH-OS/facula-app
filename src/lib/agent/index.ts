@@ -70,28 +70,42 @@ export function voerAssistentUit(
   return maakResultaat(workflow.id, validatie.schoon);
 }
 
+function geenBevestiging(melding?: string): AssistentWeigering {
+  return {
+    soort: "geweigerd",
+    code: "geen-bevestiging",
+    melding:
+      melding ??
+      "Er is nog niets gebeurd. Bevestig eerst met Gebruik voorstel.",
+  };
+}
+
+function isBevestigdKlaar(waarde: unknown): waarde is AssistentKlaar {
+  if (!isPlainVelden(waarde)) return false;
+  if (waarde.soort !== "klaar") return false;
+  if (waarde.requiresConfirmation !== true) return false;
+  if (!Array.isArray(waarde.checklist)) return false;
+  if (!waarde.checklist.every((regel) => typeof regel === "string")) {
+    return false;
+  }
+  if (typeof waarde.workflowId !== "string") return false;
+  return true;
+}
+
 /**
  * Enige adapter die een lokale, omkeerbare actie mag geven.
  * Zonder expliciete bevestiging: weigering, nooit navigatie.
+ * Publieke grens: null of kapot voorstel weigert, gooit niet.
  */
 export function voerBevestigdeActieUit(
   voorstel: AssistentKlaar,
   bevestigd: boolean,
 ): AssistentActie | AssistentWeigering {
-  if (!bevestigd || voorstel.soort !== "klaar") {
-    return {
-      soort: "geweigerd",
-      code: "geen-bevestiging",
-      melding:
-        "Er is nog niets gebeurd. Bevestig eerst met Gebruik voorstel.",
-    };
-  }
-  if (voorstel.requiresConfirmation !== true) {
-    return {
-      soort: "geweigerd",
-      code: "geen-bevestiging",
-      melding: "Dit voorstel is niet bevestigbaar. Kies opnieuw een module.",
-    };
+  if (bevestigd !== true) return geenBevestiging();
+  if (!isBevestigdKlaar(voorstel)) {
+    return geenBevestiging(
+      "Dit voorstel is niet bevestigbaar. Kies opnieuw een module.",
+    );
   }
   const workflow = workflowById(voorstel.workflowId);
   if (!workflow) return onbekend();
