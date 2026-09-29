@@ -37,6 +37,7 @@ function veldMeta(
 export function AssistentScherm() {
   const [stap, setStap] = useState<Stap>("kies");
   const [workflowId, setWorkflowId] = useState<WorkflowId | null>(null);
+  const [veldIndex, setVeldIndex] = useState(0);
   const [velden, setVelden] = useState<Record<string, string>>({});
   const [voorstel, setVoorstel] = useState<AssistentKlaar | null>(null);
   const [actie, setActie] = useState<AssistentActie | null>(null);
@@ -44,10 +45,16 @@ export function AssistentScherm() {
   const [status, setStatus] = useState("");
 
   const workflow = workflowById(workflowId);
+  const huidigVeld = workflow?.velden[veldIndex];
+  const laatsteVeld =
+    !!workflow &&
+    (workflow.velden.length === 0 ||
+      veldIndex >= workflow.velden.length - 1);
 
   function opnieuw() {
     setStap("kies");
     setWorkflowId(null);
+    setVeldIndex(0);
     setVelden({});
     setVoorstel(null);
     setActie(null);
@@ -57,12 +64,37 @@ export function AssistentScherm() {
 
   function kiesModule(id: WorkflowId) {
     setWorkflowId(id);
+    setVeldIndex(0);
     setVelden({});
     setVoorstel(null);
     setActie(null);
     setFout("");
     setStap("formulier");
-    setStatus("Module gekozen. Kies de vaste opties. Nog niets gebeurd.");
+    setStatus("Module geopend. Kies de vaste opties. Nog niets gebeurd.");
+  }
+
+  function kiesVeldwaarde(id: string, waarde: string) {
+    setVelden((huidig) => ({ ...huidig, [id]: waarde }));
+    setFout("");
+    if (!workflow) return;
+    if (veldIndex < workflow.velden.length - 1) {
+      setVeldIndex(veldIndex + 1);
+      setStatus("Volgende keuze. Er is nog niets gebeurd.");
+    }
+  }
+
+  function terugInFormulier() {
+    if (veldIndex > 0) {
+      setVeldIndex(veldIndex - 1);
+      setFout("");
+      setStatus("Vorige keuze. Er is nog niets gebeurd.");
+      return;
+    }
+    setStap("kies");
+    setWorkflowId(null);
+    setVeldIndex(0);
+    setVelden({});
+    setStatus("Terug naar de modules. Er is nog niets gebeurd.");
   }
 
   function bekijkVoorstel(e: FormEvent) {
@@ -111,50 +143,41 @@ export function AssistentScherm() {
         {status}
       </p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {WORKFLOWS.map((w) => {
-          const actief = workflowId === w.id;
-          return (
+      {stap === "kies" && (
+        <div key="kies" className="stap-fade mt-8 grid gap-4 sm:grid-cols-2">
+          {WORKFLOWS.map((w) => (
             <button
               key={w.id}
               type="button"
-              aria-pressed={actief}
               onClick={() => kiesModule(w.id)}
               className={
-                "min-h-14 rounded-2xl border-2 px-4 py-3 text-left " +
-                "transition-colors duration-200 " +
+                "min-h-14 rounded-2xl border-2 border-lijn bg-ivoor " +
+                "px-4 py-3 text-left transition-transform duration-200 " +
+                "hover:border-marine hover:-translate-y-0.5 " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
-                "focus-visible:ring-marine " +
-                (actief
-                  ? "border-marine bg-ivoor-deep"
-                  : "border-lijn bg-ivoor hover:border-marine")
+                "focus-visible:ring-marine"
               }
             >
               <span className="block font-display text-lg text-marine">
                 {w.titel}
-                {actief && (
-                  <span className="ml-2 font-sans text-base" aria-hidden>
-                    ✓
-                  </span>
-                )}
               </span>
               <span className="mt-1 block text-base text-tekst-zacht">
                 {w.korteUitleg}
               </span>
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
       {stap === "formulier" && workflow && (
-        <div className="mt-8">
+        <div key="formulier" className="stap-fade mt-8">
           <FormCard onSubmit={bekijkVoorstel}>
             <h2 className="font-display text-xl text-marine">
               {workflow.titel}
             </h2>
             <p className="text-base text-tekst-zacht">
               {workflow.velden.length
-                ? "Kies de vaste opties. Daarna bekijk je het voorstel."
+                ? `Keuze ${veldIndex + 1} van ${workflow.velden.length}.`
                 : "Geen extra keuzes. Bekijk het voorstel; er gebeurt nog niets."}
             </p>
             {workflow.privacyWaarschuwing && (
@@ -163,19 +186,17 @@ export function AssistentScherm() {
               </p>
             )}
 
-            {workflow.velden.map((veld) => (
+            {huidigVeld && (
               <ChoiceCards
-                key={veld.id}
-                legend={veld.label}
-                hulptekst={veld.hulp}
-                keuzes={[...veld.keuzes]}
-                waarde={velden[veld.id] ?? ""}
-                onChange={(waarde) =>
-                  setVelden((huidig) => ({ ...huidig, [veld.id]: waarde }))
-                }
-                kolommen={veld.id === "leerjaar" ? 3 : 2}
+                key={huidigVeld.id}
+                legend={huidigVeld.label}
+                hulptekst={huidigVeld.hulp}
+                keuzes={[...huidigVeld.keuzes]}
+                waarde={velden[huidigVeld.id] ?? ""}
+                onChange={(waarde) => kiesVeldwaarde(huidigVeld.id, waarde)}
+                kolommen={huidigVeld.id === "leerjaar" ? 3 : 2}
               />
-            ))}
+            )}
 
             {fout && (
               <p className="text-base text-fout" role="alert">
@@ -184,9 +205,15 @@ export function AssistentScherm() {
             )}
 
             <div className="flex flex-wrap gap-3">
-              <Button type="submit">Bekijk voorstel</Button>
-              <Button type="button" variant="ghost" onClick={opnieuw}>
-                Opnieuw
+              {laatsteVeld && (
+                <Button type="submit">Bekijk voorstel</Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={terugInFormulier}
+              >
+                Terug
               </Button>
             </div>
           </FormCard>
@@ -194,7 +221,7 @@ export function AssistentScherm() {
       )}
 
       {stap === "voorstel" && voorstel && (
-        <div className="mt-8">
+        <div key="voorstel" className="stap-fade mt-8">
           <Section
             titel="Voorstel"
             uitleg="Controleer dit voorstel. Er is nog niets gebeurd."
@@ -252,7 +279,7 @@ export function AssistentScherm() {
       )}
 
       {stap === "gebruikt" && actie && (
-        <div className="mt-8">
+        <div key="gebruikt" className="stap-fade mt-8">
           <Section
             titel="Voorstel in gebruik"
             uitleg="Lokale, omkeerbare stap. Niets is verstuurd of opgeslagen."

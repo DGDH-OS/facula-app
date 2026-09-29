@@ -353,6 +353,9 @@ const assistentUi = readFileSync(
 );
 assert.equal(assistentUi.includes("CoachFloating"), false);
 assert.equal(assistentUi.includes("Vraag de coach"), false);
+assert.ok(assistentUi.includes('stap === "kies"'));
+assert.ok(assistentUi.includes("kiesModule"));
+assert.ok(assistentUi.includes("stap-fade"));
 
 const appShell = readFileSync("src/components/AppShell.tsx", "utf8");
 assert.ok(appShell.includes("<CoachFloating"));
