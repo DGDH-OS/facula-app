@@ -141,6 +141,24 @@ const data: Array<[string, string[], string[], string, CoachActie[]?]> = [
     "Kies vandaag één noodzakelijk resultaat. Bundel vergelijkbare taken, gebruik vaste formats en plan een stoptijd. Zet vragen die kunnen wachten op een lijst. Maak de volgende stap klein.",
   ],
   [
+    "toetsweek-piekbelasting",
+    ["te veel toetsen in één week", "piekbelasting toetsweek"],
+    ["toetsweek", "piek", "belasting", "te druk"],
+    "Zet elke toets en deadline per klas in een overzicht per week. Twee toetsen in"
+      + " dezelfde week is al druk, drie is te druk. Spreid waar het kan, en meld het"
+      + " op tijd aan collega's die dezelfde klas hebben.",
+    acties("/app/toetsweek", "Open Toetsweekplanner"),
+  ],
+  [
+    "nakijkplanning",
+    ["nakijktijd plannen", "nakijkplanning maken"],
+    ["nakijkplanning", "nakijktijd", "cijferdeadline"],
+    "Plan je nakijktijd terug vanaf de cijferdeadline: leerlingen keer minuten per"
+      + " leerling, verdeeld over de werkdagen die je nog hebt. Zo zie je op tijd of"
+      + " een deadline haalbaar is of dat je hem beter verzet.",
+    acties("/app/toetsweek", "Open Toetsweekplanner"),
+  ],
+  [
     "rapport-structuur",
     ["rapport schrijven", "rapporttekst"],
     ["rapport", "schrijven", "sterkte", "aandacht"],

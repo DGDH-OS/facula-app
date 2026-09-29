@@ -12,6 +12,7 @@
     "test:coach": "tsx scripts/coach-test.ts",
     "test:nakijken": "tsx scripts/nakijk-test.ts"
     ,"test:ouders": "tsx scripts/ouders-test.ts"
+    ,"test:toetsweek": "tsx scripts/toetsweek-test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
