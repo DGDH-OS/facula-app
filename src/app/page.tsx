@@ -7,7 +7,7 @@ const VAKKEN = [
   {
     naam: "Maatschappijleer",
     beschrijving:
-      "Van referentiekader tot framing — actuele casussen met echte cijfers.",
+      "Van referentiekader tot framing, met casussen en echte cijfers.",
   },
   {
     naam: "Geschiedenis",
@@ -15,7 +15,7 @@ const VAKKEN = [
   },
   {
     naam: "Economie",
-    beschrijving: "Vraag, aanbod en conjunctuur — met actuele marktdata.",
+    beschrijving: "Vraag, aanbod en conjunctuur, met actuele marktdata.",
   },
   {
     naam: "Aardrijkskunde",
@@ -28,7 +28,7 @@ const STAPPEN = [
     nummer: "01",
     titel: "Leerdoel invoeren",
     tekst:
-      "Vul vak, niveau, leerjaar, leerdoel en lesduur in — precies zoals je het al in je hoofd hebt.",
+      "Typ je leerdoel in je eigen woorden. Vak, niveau en lesduur staan al goed, aanpassen mag.",
   },
   {
     nummer: "02",
@@ -46,24 +46,34 @@ const STAPPEN = [
 
 const FAQS = [
   {
-    vraag: "Slaat Facula leerlinggegevens op?",
+    vraag: "Hebben leerlingen een account nodig?",
     antwoord:
-      "Nee. Facula werkt in v1 volledig zonder leerlingdata — jij voert alleen leerdoel, vak, niveau en cijfers in die je zelf kiest. Dat houdt de AVG-impact minimaal en vergelijkbaar met elke andere professionele schrijftool.",
+      "Nee. Leerlingen loggen nergens in en hebben geen account. Jij voert het leerdoel in, Facula maakt het materiaal, en wat de klas ziet is een PowerPoint of een blad papier.",
+  },
+  {
+    vraag: "Waar staan onze gegevens?",
+    antwoord:
+      "Database en hosting staan in de EU, en het taalmodel draait op een EU-regio. Er wordt niet getraind op wat jullie invoeren. Voor een school is er een model-verwerkersovereenkomst met subverwerkers en bewaartermijnen.",
+  },
+  {
+    vraag: "Is te zien dat het met AI is gemaakt?",
+    antwoord:
+      "Ja, en dat is bewust. Elke les, toets en tekst draagt op het scherm en in het bestand de vermelding dat hij met AI is gemaakt en door de docent nagekeken hoort te worden. Dat is wat de Europese AI-verordening van een gebruiker verwacht.",
   },
   {
     vraag: "Naar welke formaten kan ik exporteren?",
     antwoord:
-      "Lessen exporteer je naar PowerPoint of Word, toetsen naar Word of PDF inclusief antwoordsleutel. Je kunt alles ook eerst op het scherm bewerken voordat je exporteert.",
+      "Lessen naar PowerPoint, toetsen en rapportteksten naar Word, inclusief antwoordsleutel bij een toets. Je kunt alles eerst op het scherm bekijken en per onderdeel aanpassen.",
   },
   {
     vraag: "Voor welke vakken werkt Facula?",
     antwoord:
-      "We starten met maatschappijleer, geschiedenis, economie en aardrijkskunde voor havo en vwo. Nieuwe vakken en niveaus volgen op basis van vraag van docenten.",
+      "We starten met maatschappijleer, geschiedenis, economie en aardrijkskunde voor vmbo-t, havo en vwo. Nieuwe vakken volgen op basis van vraag van docenten en secties.",
   },
   {
     vraag: "Kan ik het eerst gratis proberen?",
     antwoord:
-      "Ja. Je kunt zonder betaalgegevens een account aanmaken en direct een eerste les en toets genereren om te zien of het aansluit bij jouw manier van lesgeven.",
+      "Ja. Je maakt een account aan zonder betaalgegevens en kunt direct een les en een toets maken. Een school begint met een pilot van zes weken voor één sectie.",
   },
 ];
 
@@ -76,23 +86,23 @@ export default function Home() {
         <section className="bg-ivoor px-6 py-24">
           <div className="mx-auto max-w-4xl text-center">
             <p className="font-display text-base uppercase tracking-[0.3em] text-tekst-zacht">
-              Facula
+              Voor docenten en scholen
             </p>
             <h1 className="mt-6 font-display text-4xl text-marine sm:text-5xl md:text-6xl">
-              Lesmateriaal dat past bij jouw kerndoelen,
+              Van leerdoel naar een complete les,
               <br className="hidden sm:block" /> in minuten.
             </h1>
             <p className="mx-auto mt-6 max-w-[62ch] text-lg text-tekst">
-              Facula is de les- en toetssuite voor Nederlandse docenten. Voer je
-              leerdoel in, en krijg een complete, herkenbare les en bijpassende
-              toets. Geen chatbot, maar een vakinstrument.
+              Typ wat je leerlingen moeten kunnen. Facula maakt de les, de toets
+              op dezelfde leerdoelen en de rapporttekst, in de huisstijl van je
+              school. Data in de EU, en geen leerlingaccounts nodig.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <ButtonLink href="/signup" variant="primary">
                 Probeer gratis
               </ButtonLink>
-              <ButtonLink href="#voorbeeld" variant="secondary">
-                Bekijk een voorbeeld
+              <ButtonLink href="/scholen#aanvragen" variant="secondary">
+                Schoollicentie aanvragen
               </ButtonLink>
             </div>
           </div>
@@ -253,6 +263,49 @@ export default function Home() {
             <div className="mt-8 text-center">
               <ButtonLink href="/signup" variant="omgekeerd">
                 Maak je eigen les
+              </ButtonLink>
+            </div>
+          </div>
+        </section>
+
+        {/* Voor scholen: één blok met de doorverwijzing, het hele verhaal
+            staat op /scholen. Een teamleider en een docent lezen andere
+            dingen, en die op één pagina persen levert een pagina op waar
+            niemand zich in herkent. */}
+        <section className="border-t-2 border-lijn bg-ivoor-deep px-6 py-24">
+          <div className="mx-auto max-w-6xl">
+            <div className="max-w-[62ch]">
+              <h2 className="font-display text-3xl text-marine">
+                Werkt je hele sectie ermee?
+              </h2>
+              <p className="mt-3 text-base text-tekst">
+                Met een schoollicentie krijgt de school docentplekken, één
+                factuur per jaar, één huisstijl voor iedereen en een gedeelde
+                sectiebibliotheek. Plus de stukken die jullie ICT- of
+                privacyfunctionaris nodig heeft.
+              </p>
+            </div>
+            <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                "Docentplekken met staffel",
+                "Beheerpaneel voor secties en gebruik",
+                "Eén schoolhuisstijl",
+                "Pilot van zes weken",
+              ].map((punt) => (
+                <li
+                  key={punt}
+                  className="rounded-2xl border-2 border-lijn bg-ivoor p-6 text-base font-semibold text-marine"
+                >
+                  {punt}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+              <ButtonLink href="/scholen" variant="primary">
+                Lees hoe het voor scholen werkt
+              </ButtonLink>
+              <ButtonLink href="/scholen#aanvragen" variant="secondary">
+                Schoollicentie aanvragen
               </ButtonLink>
             </div>
           </div>

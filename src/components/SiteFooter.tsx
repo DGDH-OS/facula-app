@@ -8,8 +8,8 @@ export default function SiteFooter() {
           <div>
             <div className="font-display text-xl text-marine">Facula</div>
             <p className="mt-3 max-w-xs text-base text-tekst-zacht">
-              De les- en toetssuite die Nederlandse kerndoelen vertaalt naar
-              kant-en-klaar, herkenbaar lesmateriaal.
+              Lessen, toetsen en rapportteksten uit je eigen leerdoel. Voor
+              losse docenten en voor scholen.
             </p>
           </div>
           <div>
@@ -25,10 +25,10 @@ export default function SiteFooter() {
               </li>
               <li>
                 <Link
-                  href="/#vakken"
+                  href="/scholen"
                   className="inline-flex min-h-14 items-center underline underline-offset-4"
                 >
-                  Vakken
+                  Voor scholen
                 </Link>
               </li>
               <li>
@@ -65,9 +65,9 @@ export default function SiteFooter() {
           <div>
             <h2 className="text-base font-semibold text-marine">Vertrouwen</h2>
             <ul className="mt-2 space-y-2 text-base text-tekst-zacht">
-              <li>AVG-vriendelijk, geen leerlingdata nodig</li>
-              <li>Export naar PowerPoint, Word en PDF</li>
-              <li>Gebouwd voor Nederlandse kerndoelen</li>
+              <li>Geen leerlingaccounts nodig</li>
+              <li>Database en hosting in de EU</li>
+              <li>Export naar PowerPoint en Word</li>
               <li>
                 <Link
                   href="/privacy"
@@ -89,7 +89,10 @@ export default function SiteFooter() {
         </div>
         <div className="mt-12 flex flex-col gap-2 border-t-2 border-lijn pt-6 text-base text-tekst-zacht md:flex-row md:items-center md:justify-between">
           <span>© {new Date().getFullYear()} Facula. Een venture van DGDH OS.</span>
-          <span>Demo-omgeving, geen echte betalingen of opslag.</span>
+          {/* Stond hier eerder als "demo-omgeving zonder opslag". Dat is niet
+              meer waar (je werk wordt bewaard) en op een pagina waar een school
+              inkoopt is een onjuiste regel over opslag het laatste wat helpt. */}
+          <span>Betalen is nog niet ingeschakeld, je werk wordt wel bewaard.</span>
         </div>
       </div>
     </footer>

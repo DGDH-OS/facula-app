@@ -11,6 +11,8 @@ export default function SiteHeader() {
         >
           Facula
         </Link>
+        {/* Vier bestemmingen, en "Voor scholen" is de nieuwe: een teamleider
+            die hier komt moet niet eerst het docentenverhaal doorlezen. */}
         <nav aria-label="Hoofdmenu" className="hidden items-center gap-6 md:flex">
           <Link
             href="/#hoe-het-werkt"
@@ -19,10 +21,10 @@ export default function SiteHeader() {
             Hoe het werkt
           </Link>
           <Link
-            href="/#vakken"
+            href="/scholen"
             className="inline-flex min-h-14 items-center text-base text-tekst"
           >
-            Vakken
+            Voor scholen
           </Link>
           <Link
             href="/pricing"
