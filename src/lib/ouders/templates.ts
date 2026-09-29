@@ -59,7 +59,12 @@ function normaliseer(tekst: string): string {
 
 function zinMet(label: string, tekst: string): string {
   const inhoud = normaliseer(tekst);
-  return inhoud ? `${label}: ${inhoud}` : "";
+  if (!inhoud) return "";
+  // Dutch: lowercase after a colon, but keep initials/acronyms such as "L.J." or "LJ".
+  const klein = /^[A-ZÀ-Ý][a-zà-ÿ]/.test(inhoud)
+    ? inhoud.charAt(0).toLowerCase() + inhoud.slice(1)
+    : inhoud;
+  return `${label}: ${klein}`;
 }
 
 const bank: Record<Aanleiding, Sjabloon> = {
