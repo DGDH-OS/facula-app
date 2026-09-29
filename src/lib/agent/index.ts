@@ -80,16 +80,58 @@ function geenBevestiging(melding?: string): AssistentWeigering {
   };
 }
 
+const KLAAR_SLEUTELS = new Set([
+  "soort",
+  "workflowId",
+  "titel",
+  "samenvatting",
+  "checklist",
+  "waarschuwingen",
+  "menselijkeControle",
+  "requiresConfirmation",
+  "ingevuldeVelden",
+]);
+
+function isNonEmptyString(waarde: unknown): waarde is string {
+  return typeof waarde === "string" && waarde.trim().length > 0;
+}
+
+function isStringLijst(waarde: unknown): waarde is string[] {
+  return Array.isArray(waarde) && waarde.every((r) => typeof r === "string");
+}
+
+function isVeldRecord(waarde: unknown): waarde is Record<string, string> {
+  if (!isPlainVelden(waarde)) return false;
+  return Object.values(waarde).every((v) => typeof v === "string");
+}
+
 function isBevestigdKlaar(waarde: unknown): waarde is AssistentKlaar {
   if (!isPlainVelden(waarde)) return false;
+  for (const sleutel of Object.keys(waarde)) {
+    if (!KLAAR_SLEUTELS.has(sleutel)) return false;
+  }
   if (waarde.soort !== "klaar") return false;
   if (waarde.requiresConfirmation !== true) return false;
-  if (!Array.isArray(waarde.checklist)) return false;
-  if (!waarde.checklist.every((regel) => typeof regel === "string")) {
+  if (waarde.menselijkeControle !== true) return false;
+  if (!isNonEmptyString(waarde.titel)) return false;
+  if (!isNonEmptyString(waarde.samenvatting)) return false;
+  if (!isStringLijst(waarde.checklist)) return false;
+  if (!waarde.checklist.length) return false;
+  if (!waarde.checklist.every((regel) => isNonEmptyString(regel))) {
     return false;
   }
-  if (typeof waarde.workflowId !== "string") return false;
-  return true;
+  if (!isStringLijst(waarde.waarschuwingen)) return false;
+  const workflow = workflowById(waarde.workflowId);
+  if (!workflow) return false;
+  if (waarde.titel !== workflow.titel) return false;
+  if (!isVeldRecord(waarde.ingevuldeVelden)) return false;
+  const extra = weigerIndienNodig(
+    waarde.ingevuldeVelden,
+    workflow.velden.map((v) => v.id),
+  );
+  if (extra) return false;
+  const validatie = valideerVelden(workflow.id, waarde.ingevuldeVelden);
+  return validatie.soort === "ok";
 }
 
 /**

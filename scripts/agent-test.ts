@@ -348,6 +348,56 @@ const geenChecklist = voerBevestigdeActieUit(
 );
 weigertGeenActie(geenChecklist);
 
+const partieelKlaar = voerBevestigdeActieUit(
+  {
+    soort: "klaar",
+    workflowId: "les",
+    requiresConfirmation: true,
+    checklist: ["Open de lesgenerator."],
+  } as unknown as AssistentKlaar,
+  true,
+);
+weigertGeenActie(partieelKlaar);
+
+const zonderTitel = voerBevestigdeActieUit(
+  {
+    soort: "klaar",
+    workflowId: "les",
+    titel: "",
+    samenvatting: "Les voorbereiden.",
+    checklist: ["Open de lesgenerator."],
+    waarschuwingen: ["Dit is een voorstel."],
+    menselijkeControle: true,
+    requiresConfirmation: true,
+    ingevuldeVelden: {
+      vak: "Geschiedenis",
+      niveau: "havo",
+      leerjaar: "4",
+      leerdoel: "eu",
+    },
+  } as unknown as AssistentKlaar,
+  true,
+);
+weigertGeenActie(zonderTitel);
+
+const metHref = voerBevestigdeActieUit(
+  {
+    ...les,
+    href: "/app/lessons/new",
+  } as unknown as AssistentKlaar,
+  true,
+);
+weigertGeenActie(metHref);
+
+const valseVelden = voerBevestigdeActieUit(
+  {
+    ...les,
+    ingevuldeVelden: { vak: "ongeldig" },
+  } as unknown as AssistentKlaar,
+  true,
+);
+weigertGeenActie(valseVelden);
+
 const valseBevestiging = [
   1,
   "true",
@@ -385,5 +435,51 @@ const kapotResultaat = maakResultaat(
   null as unknown as Record<string, string>,
 );
 assert.equal(kapotResultaat.soort, "geweigerd");
+
+const ongeldigDirect = maakResultaat("les", { vak: "ongeldig" });
+assert.equal(ongeldigDirect.soort === "klaar", false);
+
+const mistDirect = maakResultaat("les", {});
+assert.equal(mistDirect.soort === "klaar", false);
+
+const extraDirect = maakResultaat("les", {
+  vak: "Geschiedenis",
+  niveau: "havo",
+  leerjaar: "4",
+  leerdoel: "eu",
+  naam: "Jan",
+});
+assert.equal(extraDirect.soort === "klaar", false);
+
+const geenStringDirect = maakResultaat(
+  "les",
+  { vak: 1 } as unknown as Record<string, string>,
+);
+assert.equal(geenStringDirect.soort === "klaar", false);
+
+const geldigDirect = maakResultaat("les", {
+  vak: "Geschiedenis",
+  niveau: "havo",
+  leerjaar: "4",
+  leerdoel: "eu",
+});
+assert.equal(geldigDirect.soort, "klaar");
+if (geldigDirect.soort === "klaar") {
+  const geldigeActie = voerBevestigdeActieUit(geldigDirect, true);
+  assert.equal(geldigeActie.soort, "actie");
+}
+
+function plat(bron: string): string {
+  return bron.replace(/\s+/g, " ");
+}
+
+const privacyBron = plat(readFileSync("src/app/privacy/page.tsx", "utf8"));
+assert.equal(privacyBron.includes("geen externe AI-diensten"), false);
+assert.ok(privacyBron.includes("Google Vertex AI"));
+assert.equal(privacyBron.includes("eigen servers draait"), false);
+
+const aiBron = plat(readFileSync("src/app/ai/page.tsx", "utf8"));
+assert.ok(aiBron.includes("Google Vertex AI"));
+assert.ok(aiBron.includes("EU-regio"));
 
 console.log("agent-test: alle checks geslaagd");

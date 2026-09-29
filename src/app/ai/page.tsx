@@ -76,6 +76,19 @@ export default function AiPage() {
                 controle mogen ze niet de klas of de ouder in.
               </p>
             </section>
+
+            <section>
+              <h2 className="font-display text-xl text-marine">
+                6. Gemarkeerde AI-functies
+              </h2>
+              <p className="mt-2 text-base leading-relaxed text-tekst">
+                De Assistent belt geen externe AI-dienst en stuurt geen
+                invoer naar buiten. Andere Facula-functies die als AI zijn
+                gemarkeerd, zoals les- en toetsgeneratie, kunnen Google
+                Vertex AI in een EU-regio gebruiken. Dat blijft een
+                voorstel: jij leest na.
+              </p>
+            </section>
           </div>
         </div>
       </main>

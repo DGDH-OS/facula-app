@@ -127,12 +127,24 @@ export default function PrivacyPage() {
                   • <strong>Stripe</strong>: zodra betalen live gaat, voor
                   het afhandelen van abonnementsbetalingen.
                 </li>
+                <li>
+                  • <strong>Google Vertex AI</strong>: voor gemarkeerde
+                  AI-functies zoals les- en toetsgeneratie, in een
+                  EU-regio. De Assistent gebruikt dit niet.
+                </li>
               </ul>
               <p className="mt-2 text-base leading-relaxed text-tekst">
-                Facula gebruikt geen externe AI-diensten. Lessen, toetsen en
-                rapportteksten worden gegenereerd door software die op onze
-                eigen servers draait, dus je invoer wordt niet naar een
-                extern AI-bedrijf gestuurd.
+                De Assistent belt zelf geen externe AI-dienst en stuurt
+                geen invoer naar buiten. Andere Facula-functies die als
+                AI zijn gemarkeerd, kunnen Google Vertex AI in een
+                EU-regio gebruiken. Meer uitleg:{" "}
+                <Link
+                  href="/ai"
+                  className="font-semibold text-marine underline underline-offset-4"
+                >
+                  AI in Facula
+                </Link>
+                .
               </p>
             </section>
 

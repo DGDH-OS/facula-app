@@ -1,6 +1,7 @@
+import { weigerIndienNodig } from "./policy";
 import { workflowById } from "./registry";
 import type {
-  AssistentKlaar,
+  AssistentUitkomst,
   AssistentVragen,
   AssistentWeigering,
   WorkflowDefinitie,
@@ -181,7 +182,7 @@ function checklistVoor(
 export function maakResultaat(
   workflowId: WorkflowId,
   velden: Record<string, string>,
-): AssistentKlaar | AssistentWeigering {
+): AssistentUitkomst {
   if (!isPlainRecord(velden)) {
     return {
       soort: "geweigerd",
@@ -199,6 +200,14 @@ export function maakResultaat(
       melding: "Deze module ken ik niet. Kies een kaart op dit scherm.",
     };
   }
+  const extra = weigerIndienNodig(
+    velden,
+    workflow.velden.map((v) => v.id),
+  );
+  if (extra) return extra;
+  const validatie = valideerVelden(workflow.id, velden);
+  if (validatie.soort !== "ok") return validatie;
+  const schoon = validatie.schoon;
   const waarschuwingen = [
     "Dit is een voorstel. Er is nog niets gebeurd.",
     ...(workflow.privacyWaarschuwing ? [workflow.privacyWaarschuwing] : []),
@@ -207,11 +216,11 @@ export function maakResultaat(
     soort: "klaar",
     workflowId,
     titel: workflow.titel,
-    samenvatting: samenvattingVan(workflow, velden),
-    checklist: checklistVoor(workflow, velden),
+    samenvatting: samenvattingVan(workflow, schoon),
+    checklist: checklistVoor(workflow, schoon),
     waarschuwingen,
     menselijkeControle: true,
     requiresConfirmation: true,
-    ingevuldeVelden: { ...velden },
+    ingevuldeVelden: { ...schoon },
   };
 }
