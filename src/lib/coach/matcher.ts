@@ -39,8 +39,6 @@ function bevatVolledigeNaam(tekst: string): boolean {
   for (const match of tekst.matchAll(naam)) {
     const paar = match[0].toLowerCase().split(/\s+/);
     if (paar.some((woord) => gewoneWoorden.has(woord))) continue;
-    const voor = tekst.slice(0, match.index ?? 0).trimEnd();
-    if (!voor || /[.!?]\s*$/.test(voor)) continue;
     return true;
   }
   return false;
