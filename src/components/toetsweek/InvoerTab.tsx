@@ -140,7 +140,7 @@ function ToetsRij({
         </Field>
         <Field
           label="Cijferdeadline"
-          hulptekst="Leeg is 10 werkdagen na de toetsdatum."
+          hulptekst="Laat je dit leeg, dan rekenen we met 10 werkdagen na de toets."
           fout={
             foutBij("cijferdeadline-ongeldig") ?? foutBij("cijferdeadline-voor-datum")
           }
@@ -260,7 +260,7 @@ function InstellingenFieldset({
         </fieldset>
         <Field
           label="Grens 'druk' per klas per week"
-          hulptekst="Gewogen belasting vanaf waar een week als druk geldt."
+          hulptekst="Vanaf deze belasting noemen we een week druk."
         >
           {(ids) => (
             <input
@@ -278,7 +278,7 @@ function InstellingenFieldset({
         </Field>
         <Field
           label="Grens 'te druk' per klas per week"
-          hulptekst="Gewogen belasting vanaf waar een week als te druk geldt."
+          hulptekst="Vanaf deze belasting noemen we een week te druk."
         >
           {(ids) => (
             <input

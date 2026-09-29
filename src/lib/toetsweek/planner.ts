@@ -249,10 +249,6 @@ export function analyseerPerKlasPerWeek(
 
 export type ToetsweekSignaal = { datum: string; tekst: string };
 
-function beschrijfItem(item: ToetsItem): string {
-  return item.naam.trim() ? item.naam.trim() : `${item.vak} ${item.soort}`;
-}
-
 const TELWOORDEN = ["nul", "één", "twee", "drie", "vier", "vijf", "zes", "zeven", "acht"];
 
 function telwoord(aantal: number): string {
@@ -413,9 +409,9 @@ export function berekenNakijkplanning(
     }
     if (resterend > 0) {
       const beschikbareDagen = telWerkdagenTussen(start, eindeVenster, instellingen);
-      const beschrijving = beschrijfItem(item);
+      const beschrijving = item.naam.trim() ? item.naam.trim() : `de ${item.soort} ${item.vak}`;
       const basis =
-        `${beschrijving} (${item.klas}) heeft ${resterend} minuten nakijktijd`
+        `Voor ${beschrijving} (${item.klas}) kom je ${resterend} minuten nakijktijd`
         + ` tekort vóór de cijferdeadline van ${dagnaam(item.cijferdeadline)}.`;
       const suggestie =
         beschikbareDagen > 0
