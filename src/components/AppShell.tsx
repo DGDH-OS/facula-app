@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { wisAlleConcepten } from "@/lib/useDraft";
+import { CoachFloating } from "@/components/coach/CoachPanel";
 
 /**
  * Client-side navigatie/uitloggen-shell. De AUTH-GUARD zelf zit in
@@ -52,6 +53,7 @@ function navItems(heeftSchool: boolean, isBeheerder: boolean) {
   }
 
   items.push({ href: "/app/huisstijl", label: "Huisstijl", actiefOp: "/app/huisstijl" });
+  items.push({ href: "/app/coach", label: "Coach", actiefOp: "/app/coach" });
 
   if (isBeheerder) {
     items.push({ href: "/app/school", label: "School", actiefOp: "/app/school" });
@@ -131,6 +133,7 @@ export function AppShell({
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">{children}</main>
+      <CoachFloating />
     </div>
   );
 }
