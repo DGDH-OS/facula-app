@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import { extraheerBegrippen } from "./lesson-generator";
 import { parseBoekBegrippen, type BoekBegrip } from "./boek-begrippen";
+import { parseVoorbeeldToets } from "./voorbeeldtoets";
 import { controleerAfstemming } from "./constructive-alignment";
 
 /**
@@ -99,6 +100,25 @@ function bouwBronVragen(start: number, pool: BoekBegrip[]): ToetsVraag[] {
       antwoordsleutel: sleutelBron([item]),
     });
   }
+  const metDef = echte.filter((b) => b.definitie);
+  if (metDef.length >= 2) {
+    const doel = metDef[0];
+    const afleiders = metDef.slice(1, 4);
+    const opties: MeerkeuzeOptie[] = shuffle([
+      { tekst: doel.definitie, correct: true },
+      ...afleiders.map((b) => ({ tekst: b.definitie, correct: false })),
+    ]).map((o, i) => ({ label: String.fromCharCode(65 + i), tekst: o.tekst, correct: o.correct }));
+    const label = opties.find((o) => o.correct)!.label;
+    vragen.push({
+      nummer: nr++,
+      type: "meerkeuze",
+      bron: 1,
+      vraag: `Gebruik bron 1. Welke omschrijving past bij het begrip "${doel.begrip}" zoals dat in de bron voorkomt?`,
+      punten: 1,
+      opties,
+      antwoordsleutel: `${label}: ${doel.definitie}`,
+    });
+  }
   if (echte.length >= 2) {
     const [a, b] = echte;
     vragen.push({
@@ -139,9 +159,14 @@ export function genereerToets(input: TestInput): GeneratedTest {
   const pool = items.length > 0 ? items : [{ begrip: "kernbegrip", definitie: "" }];
   const metDefinitie = pool.filter((b) => b.definitie);
 
-  const aantal = Math.max(3, input.aantalVragen);
+  const eigen = parseVoorbeeldToets(input.eigenVragen);
+  const aantal = eigen.length > 0 ? 0 : Math.max(3, input.aantalVragen);
   const vragen: ToetsVraag[] = [];
   let nummer = 1;
+  for (const v of eigen) {
+    vragen.push({ ...v, nummer });
+    nummer++;
+  }
 
   for (let i = 0; i < aantal; i++) {
     const item = pool[i % pool.length];
@@ -170,7 +195,7 @@ export function genereerToets(input: TestInput): GeneratedTest {
   }
 
   // Slotvraag: koppel begrippen aan maatschappelijk probleem (open, hoger denkniveau)
-  vragen.push({
+  if (eigen.length === 0) vragen.push({
     nummer,
     type: "open",
     vraag: `Kies twee van de behandelde begrippen (${pool
@@ -199,6 +224,6 @@ export function genereerToets(input: TestInput): GeneratedTest {
     bronnen: bronnen.length > 0 ? bronnen : undefined,
     vragen,
     totaalPunten,
-    tijdsduur: Math.round(aantal * 3 + 10),
+    tijdsduur: Math.round(vragen.length * 3 + 10),
   };
 }

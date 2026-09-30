@@ -1,6 +1,5 @@
 import type {
   Vak,
-  Niveau,
   LessonInput,
   GeneratedLesson,
   LessonPart,
@@ -11,7 +10,12 @@ import {
   trimTitel,
   MAX_WOORDEN_BOEKDEFINITIE,
 } from "./slide-content-rules";
-import { parseBoekBegrippen, zoekDefinitie, type BoekBegrip } from "./boek-begrippen";
+import {
+  parseBoekBegrippen,
+  zoekDefinitie,
+  lesMateriaalVoorLes,
+  type BoekBegrip,
+} from "./boek-begrippen";
 
 /* ------------------------------------------------------------------ */
 /* Begrippen-extractie                                                 */
@@ -131,58 +135,24 @@ const GENERIEKE_VAKTERMEN: Record<Vak, string[]> = {
 /* Fragmenten/labels, geen volzinnen — docent vult mondeling aan.       */
 /* ------------------------------------------------------------------ */
 
-export function bouwCasus(vak: Vak, begrippen: string[], niveau: Niveau): string[] {
-  const eerste = begrippen[0] ?? "kernbegrip";
-  const tweede = begrippen[1] ?? begrippen[0] ?? "ander begrip";
+const ZONDER_MATERIAAL = "Voeg dit onderdeel toe uit je lesboek";
 
-  const casusMap: Record<Vak, string[]> = {
-    Maatschappijleer: [
-      "68% jongeren: nieuws via social media",
-      "Emotionele titel: 4,2x meer weergaven",
-      "55% deelt nieuws zonder bron te checken",
-      `Vraag: rol van ${eerste} en ${tweede}?`,
-    ],
-    Geschiedenis: [
-      "Europese bevolking: 290 → 460 miljoen (1870-1914)",
-      "Koloniaal bezit Afrika: 10% → 90%",
-      "Bronnen: kranten, redevoeringen, kaarten",
-      `Vraag: hoe helpen ${eerste} en ${tweede}?`,
-    ],
-    Economie: [
-      "Inflatie 4,1% vs. cao-stijging 6,2% (2023)",
-      "Prijs +8% → gevraagde hoeveelheid -3%",
-      "ECB-rente: 0% → 4,5%",
-      `Vraag: wat verklaren ${eerste} en ${tweede}?`,
-    ],
-    Aardrijkskunde: [
-      "Wereldbevolking steden: 2,9 → 4,4 miljard",
-      "Nieuwe wijk: 3.500 woningen, infra -15%",
-      "Enquête: 42% voor, 38% tegen, 20% neutraal",
-      `Vraag: rol van ${eerste} en ${tweede}?`,
-    ],
-  };
+function eigenMateriaal(regels: string[]): string[] {
+  return regels.length > 0 ? regels : [ZONDER_MATERIAAL];
+}
 
-  const niveauLabel: Record<Niveau, string> = {
-    vwo: "Extra: correlatie ≠ oorzaak-gevolg",
-    havo: "Eerst kort samenvatten in eigen woorden",
-    "vmbo-t": "Ondersteun met staafdiagram",
-  };
-
-  return afdwingenSlideRegels([...casusMap[vak].slice(0, 3), niveauLabel[niveau]]);
+/** Casus: woordelijk van de docent. Geen verzonnen cijfers of situaties. */
+export function bouwCasus(regels: string[]): string[] {
+  return eigenMateriaal(regels);
 }
 
 /* ------------------------------------------------------------------ */
 /* Uitgewerkt voorbeeld                                                 */
 /* ------------------------------------------------------------------ */
 
-export function bouwUitgewerktVoorbeeld(vak: Vak, begrippen: string[]): string[] {
-  const term = begrippen[0] ?? "kernbegrip";
-  return afdwingenSlideRegels([
-    "Kies voorbeeld: nieuwsbericht, bron of plan",
-    "Stap 1: benoem de feiten/cijfers",
-    `Stap 2: herken ${term} hierin`,
-    "Stap 3: leg link naar vraagstuk",
-  ]);
+/** Uitgewerkt voorbeeld: woordelijk van de docent. */
+export function bouwUitgewerktVoorbeeld(regels: string[]): string[] {
+  return eigenMateriaal(regels);
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,16 +253,10 @@ export function bouwLeerdoelKernbegrippen(
 /* Opdracht, bespreken, huiswerk                                        */
 /* ------------------------------------------------------------------ */
 
-export function bouwOpdracht(begrippen: string[]): string[] {
-  const lijst = begrippen.slice(0, 2);
-  return afdwingenSlideRegels([
-    `Kies twee begrippen: ${lijst.join(", ")}`,
-    "Zoek eigen actueel voorbeeld",
-    "Beschrijf kort: wat, begrip, gevolg",
-    "Tijd: 12-15 minuten",
-  ]);
+/** Opdracht: woordelijk van de docent. */
+export function bouwOpdracht(regels: string[]): string[] {
+  return eigenMateriaal(regels);
 }
-
 export function bouwBespreken(): string[] {
   return afdwingenSlideRegels([
     "2-3 duo's delen voorbeeld (max 1 min)",
@@ -356,12 +320,14 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
       {
         titel: trimTitel("3. Casus met concrete cijfers"),
         duur: 12,
-        inhoud: bouwCasus(input.vak, groep, input.niveau),
+        inhoud: bouwCasus(lesMateriaalVoorLes(input.casusTekst, idx)),
+        letterlijk: true,
       },
       {
         titel: trimTitel("4. Uitgewerkt voorbeeld (klassikaal, docent modelt)"),
         duur: 8,
-        inhoud: bouwUitgewerktVoorbeeld(input.vak, groep),
+        inhoud: bouwUitgewerktVoorbeeld(lesMateriaalVoorLes(input.voorbeeldTekst, idx)),
+        letterlijk: true,
       },
       {
         titel: trimTitel("5. Begeleide inoefening & check-for-understanding"),
@@ -371,7 +337,8 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
       {
         titel: trimTitel("6. Opdracht in tweetallen"),
         duur: 15,
-        inhoud: bouwOpdracht(groep),
+        inhoud: bouwOpdracht(lesMateriaalVoorLes(input.opdrachtTekst, idx)),
+        letterlijk: true,
       },
       {
         titel: trimTitel("7. Bespreken (plenair)"),

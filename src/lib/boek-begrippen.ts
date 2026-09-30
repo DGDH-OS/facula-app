@@ -36,3 +36,21 @@ export function zoekDefinitie(boek: BoekBegrip[], begrip: string): string {
   const sleutel = begrip.toLowerCase().trim();
   return boek.find((b) => b.begrip.toLowerCase() === sleutel)?.definitie ?? "";
 }
+
+export const MAX_LES_MATERIAAL = 6000;
+
+/**
+ * Eigen lesmateriaal van de docent (casus, uitgewerkt voorbeeld, opdracht).
+ * Meerdere lessen: scheid de delen met een regel "---". Het deel voor les N
+ * komt woordelijk op de slide; ontbreekt het, dan blijft de sectie leeg met
+ * een verwijzing naar het lesboek. Facula verzint hier geen casus of cijfers.
+ */
+export function lesMateriaalVoorLes(tekst: string | undefined | null, lesIndex: number): string[] {
+  if (!tekst || !tekst.trim()) return [];
+  const delen = tekst.split(/^\s*-{3,}\s*$/m);
+  const deel = delen.length === 1 ? delen[0] : (delen[lesIndex] ?? "");
+  return deel
+    .split(/\r?\n/)
+    .map((r) => r.trim())
+    .filter(Boolean);
+}

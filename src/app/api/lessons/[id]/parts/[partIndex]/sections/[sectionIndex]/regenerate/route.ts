@@ -1,4 +1,4 @@
-import { parseBoekBegrippen } from "@/lib/boek-begrippen";
+import { parseBoekBegrippen, lesMateriaalVoorLes } from "@/lib/boek-begrippen";
 import { NextRequest, NextResponse } from "next/server";
 import type { GeneratedLesson } from "@/lib/types";
 import {
@@ -93,16 +93,16 @@ export async function POST(
       );
       break;
     case 2:
-      nieuweInhoud = bouwCasus(input.vak, groep, input.niveau);
+      nieuweInhoud = bouwCasus(lesMateriaalVoorLes(input.casusTekst, partIndex));
       break;
     case 3:
-      nieuweInhoud = bouwUitgewerktVoorbeeld(input.vak, groep);
+      nieuweInhoud = bouwUitgewerktVoorbeeld(lesMateriaalVoorLes(input.voorbeeldTekst, partIndex));
       break;
     case 4:
       nieuweInhoud = bouwBegeleideInoefening(input.vak, groep);
       break;
     case 5:
-      nieuweInhoud = bouwOpdracht(groep);
+      nieuweInhoud = bouwOpdracht(lesMateriaalVoorLes(input.opdrachtTekst, partIndex));
       break;
     case 6:
       nieuweInhoud = bouwBespreken();

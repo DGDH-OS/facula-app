@@ -242,7 +242,9 @@ export function bouwLesPresentatie(
 
       // bullets, nogmaals door de content-regels gehaald zodat deze route
       // consistent kort blijft, ongeacht wat de generator aanleverde.
-      const inhoudBeperkt = afdwingenSlideRegels(sectie.inhoud);
+      const inhoudBeperkt = sectie.letterlijk
+        ? sectie.inhoud
+        : afdwingenSlideRegels(sectie.inhoud);
       if (inhoudBeperkt.length > 0) {
         slide.addText(
           inhoudBeperkt.map((regel) => ({

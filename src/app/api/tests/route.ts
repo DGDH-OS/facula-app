@@ -1,4 +1,5 @@
 import { MAX_BOEK_BEGRIPPEN } from "@/lib/boek-begrippen";
+import { MAX_EIGEN_VRAGEN } from "@/lib/voorbeeldtoets";
 import { NextRequest, NextResponse } from "next/server";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
@@ -84,6 +85,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const eigenVragen =
+    body.eigenVragen === undefined ? "" : limitString(body.eigenVragen, MAX_EIGEN_VRAGEN);
+  if (eigenVragen === null) {
+    return NextResponse.json({ error: "De voorbeeldvragen zijn te lang." }, { status: 400 });
+  }
+
   const aantalVragen =
     body.aantalVragen === undefined ? 8 : clampInt(body.aantalVragen, 1, 40);
   if (aantalVragen === null) {
@@ -103,6 +110,7 @@ export async function POST(request: NextRequest) {
     boekBegrippen,
     bronTekst,
     bronVermelding,
+    eigenVragen,
   };
 
   try {

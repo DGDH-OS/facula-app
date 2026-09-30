@@ -15,12 +15,18 @@ export interface LessonInput {
   aantalLessen: number;
   /** Begrippen + definities woordelijk uit het lesboek ("begrip: definitie" per regel). */
   boekBegrippen?: string;
+  /** Casus, voorbeeld en opdracht uit het lesboek/eigen materiaal van de docent. */
+  casusTekst?: string;
+  voorbeeldTekst?: string;
+  opdrachtTekst?: string;
 }
 
 export interface LessonSection {
   titel: string;
   inhoud: string[];
   duur?: number; // minuten, optioneel
+  /** Woordelijk van de docent: nooit inkorten of herschrijven bij export. */
+  letterlijk?: boolean;
   /**
    * Toelichting voor de docent, niet voor de slide. Optioneel omdat de
    * sjabloongenerator die niet levert en oudere opgeslagen lessen hem niet
@@ -117,6 +123,8 @@ export interface TestInput {
   bronTekst?: string;
   /** Bronvermelding van dat artikel, bv. "NOS, 12 maart 2026" of een link. */
   bronVermelding?: string;
+  /** Vragen uit een voorbeeldtoets van de docent, woordelijk. */
+  eigenVragen?: string;
 }
 
 export interface ToetsBron {

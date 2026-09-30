@@ -17,6 +17,25 @@ const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
 /** Zelfde grenzen als de serverside validatie in /api/tests (src/lib/validation.ts). */
 const MAX_LEERDOEL = 2000;
 const MAX_KERNBEGRIPPEN = 2000;
+
+/** Leest een .txt of .docx lokaal in de browser; er gaat niets naar een server. */
+async function leesToetsBestand(bestand: File): Promise<string> {
+  if (bestand.name.toLowerCase().endsWith(".txt")) return (await bestand.text()).slice(0, 20000);
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(await bestand.arrayBuffer());
+  const xml = await zip.file("word/document.xml")?.async("string");
+  if (!xml) return "";
+  const tekst = xml
+    .replace(/<\/w:p>/g, "\n")
+    .replace(/<w:tab\/>/g, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+  return tekst.slice(0, 20000);
+}
 const MIN_VRAGEN = 1;
 const MAX_VRAGEN = 40;
 const VASTE_AANTALLEN = [5, 10, 15, 20];
@@ -32,6 +51,7 @@ const DEFAULT_INPUT: TestInput = {
   boekBegrippen: "",
   bronTekst: "",
   bronVermelding: "",
+  eigenVragen: "",
   aantalVragen: 10,
 };
 
@@ -54,6 +74,7 @@ function herstelToetsInput(
     boekBegrippen: conceptTekst(ruw.boekBegrippen, 6000) ?? defaults.boekBegrippen,
     bronTekst: conceptTekst(ruw.bronTekst, 12000) ?? defaults.bronTekst,
     bronVermelding: conceptTekst(ruw.bronVermelding, 300) ?? defaults.bronVermelding,
+    eigenVragen: conceptTekst(ruw.eigenVragen, 20000) ?? defaults.eigenVragen,
     aantalVragen: conceptGetal(ruw.aantalVragen, MIN_VRAGEN, MAX_VRAGEN) ?? defaults.aantalVragen,
   };
 }
@@ -215,6 +236,7 @@ export default function NewTestPage() {
           boekBegrippen: (input.boekBegrippen ?? "").trim(),
           bronTekst: (input.bronTekst ?? "").trim(),
           bronVermelding: (input.bronVermelding ?? "").trim(),
+          eigenVragen: (input.eigenVragen ?? "").trim(),
         }),
       });
       if (!response.ok) {
@@ -354,6 +376,36 @@ export default function NewTestPage() {
                   onChange={(e) => setInput({ ...input, bronVermelding: e.target.value })}
                   className={VELD_KLASSEN}
                 />
+              )}
+            </Field>
+
+            <Field
+              label="Vragen uit je voorbeeldtoets (optioneel)"
+              hulptekst="Plak of laad je voorbeeldtoets. Elke vraag begint met (1p) of (2p). De vragen worden letterlijk overgenomen."
+            >
+              {(ids) => (
+                <>
+                  <input
+                    type="file"
+                    accept=".docx,.txt"
+                    aria-label="Laad een voorbeeldtoets (.docx of .txt)"
+                    className="mb-3 block text-base"
+                    onChange={async (e) => {
+                      const bestand = e.target.files?.[0];
+                      if (!bestand) return;
+                      const tekst = await leesToetsBestand(bestand);
+                      setInput({ ...input, eigenVragen: tekst });
+                    }}
+                  />
+                  <textarea
+                    {...ids}
+                    rows={8}
+                    maxLength={20000}
+                    value={input.eigenVragen ?? ""}
+                    onChange={(e) => setInput({ ...input, eigenVragen: e.target.value })}
+                    className={`${VELD_KLASSEN} leading-relaxed`}
+                  />
+                </>
               )}
             </Field>
 

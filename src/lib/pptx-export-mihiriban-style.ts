@@ -248,10 +248,13 @@ export async function bouwMihiribanPptxBuffer(
     // De nieuwe begeleide-inoefening-sectie (EDI-fase 4, check-for-
     // understanding) heeft evenmin een eigen sjabloonslide — samengevoegd met
     // de "voorbeeld uitgewerkt"-slide, direct ervoor in de EDI-volgorde.
-    const voorbeeldMetInoefening = combineerRegels(
-      voorbeeldSectie?.inhoud ?? [],
-      inoefeningSectie?.inhoud ?? []
-    );
+    // Voorbeeld is woordelijk van de docent: nooit inkorten. Alleen de ene
+    // "Check"-regel uit de inoefening komt eronder.
+    const checkRegel = (inoefeningSectie?.inhoud ?? []).find((r) => r.startsWith("Check"));
+    const voorbeeldMetInoefening = [
+      ...(voorbeeldSectie?.inhoud ?? []),
+      ...(checkRegel ? [checkRegel] : []),
+    ];
 
     const ondertitelKort =
       les.kernbegrippen.slice(0, 3).join(", ") || les.titel;
@@ -295,21 +298,21 @@ export async function bouwMihiribanPptxBuffer(
     // Slide — casus
     pres.addSlide("tpl", 5, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText(`Casus: ${les.input.vak.toLowerCase()}`));
-      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(casusSectie?.inhoud ?? [])));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiTextDefinities(casusSectie?.inhoud ?? [])));
       metLogo(slide);
     });
 
     // Slide — voorbeeld uitgewerkt (incl. begeleide inoefening/check)
     pres.addSlide("tpl", 6, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Voorbeeld & check"));
-      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(voorbeeldMetInoefening)));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiTextDefinities(voorbeeldMetInoefening)));
       metLogo(slide);
     });
 
     // Slide — opdracht in tweetallen
     pres.addSlide("tpl", 7, (slide) => {
       slide.modifyElement(TITEL_SHAPE, modify.setText("Opdracht in tweetallen"));
-      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiText(opdrachtSectie?.inhoud ?? [])));
+      slide.modifyElement(INHOUD_SHAPE, modify.setMultiText(alsMultiTextDefinities(opdrachtSectie?.inhoud ?? [])));
       metLogo(slide);
     });
 

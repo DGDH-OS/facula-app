@@ -32,6 +32,9 @@ const DEFAULT_INPUT: LessonInput = {
   lesduur: 50,
   aantalLessen: 1,
   boekBegrippen: "",
+  casusTekst: "",
+  voorbeeldTekst: "",
+  opdrachtTekst: "",
 };
 
 /**
@@ -52,6 +55,9 @@ function herstelLesInput(
     lesduur: conceptGetal(ruw.lesduur, MIN_LESDUUR, MAX_LESDUUR) ?? defaults.lesduur,
     aantalLessen: conceptGetal(ruw.aantalLessen, 1, MAX_LESSEN) ?? defaults.aantalLessen,
     boekBegrippen: conceptTekst(ruw.boekBegrippen, 6000) ?? defaults.boekBegrippen,
+    casusTekst: conceptTekst(ruw.casusTekst, 6000) ?? defaults.casusTekst,
+    voorbeeldTekst: conceptTekst(ruw.voorbeeldTekst, 6000) ?? defaults.voorbeeldTekst,
+    opdrachtTekst: conceptTekst(ruw.opdrachtTekst, 6000) ?? defaults.opdrachtTekst,
   };
 }
 
@@ -361,6 +367,54 @@ export default function NewLessonPage() {
                   value={input.boekBegrippen ?? ""}
                   onChange={(e) => setInput({ ...input, boekBegrippen: e.target.value })}
                   placeholder={"Framing: (definitie uit je boek)\nPolarisatie: (definitie uit je boek)"}
+                  className={`${VELD_KLASSEN} leading-relaxed`}
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Casus uit je lesboek (optioneel)"
+              hulptekst="Wordt letterlijk overgenomen. Meerdere lessen: scheid met een regel ---."
+            >
+              {(ids) => (
+                <textarea
+                  {...ids}
+                  rows={5}
+                  maxLength={6000}
+                  value={input.casusTekst ?? ""}
+                  onChange={(e) => setInput({ ...input, casusTekst: e.target.value })}
+                  className={`${VELD_KLASSEN} leading-relaxed`}
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Uitgewerkt voorbeeld (optioneel)"
+              hulptekst="Wordt letterlijk overgenomen. Meerdere lessen: scheid met een regel ---."
+            >
+              {(ids) => (
+                <textarea
+                  {...ids}
+                  rows={5}
+                  maxLength={6000}
+                  value={input.voorbeeldTekst ?? ""}
+                  onChange={(e) => setInput({ ...input, voorbeeldTekst: e.target.value })}
+                  className={`${VELD_KLASSEN} leading-relaxed`}
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Opdracht (optioneel)"
+              hulptekst="Wordt letterlijk overgenomen. Meerdere lessen: scheid met een regel ---."
+            >
+              {(ids) => (
+                <textarea
+                  {...ids}
+                  rows={5}
+                  maxLength={6000}
+                  value={input.opdrachtTekst ?? ""}
+                  onChange={(e) => setInput({ ...input, opdrachtTekst: e.target.value })}
                   className={`${VELD_KLASSEN} leading-relaxed`}
                 />
               )}

@@ -1,4 +1,4 @@
-import { MAX_BOEK_BEGRIPPEN } from "@/lib/boek-begrippen";
+import { MAX_BOEK_BEGRIPPEN, MAX_LES_MATERIAAL } from "@/lib/boek-begrippen";
 import { NextRequest, NextResponse } from "next/server";
 import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
 import { genereerLesMetAi } from "@/lib/ai/generate-lesson";
@@ -92,6 +92,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const materiaal: Record<"casusTekst" | "voorbeeldTekst" | "opdrachtTekst", string> = {
+    casusTekst: "",
+    voorbeeldTekst: "",
+    opdrachtTekst: "",
+  };
+  for (const sleutel of Object.keys(materiaal) as (keyof typeof materiaal)[]) {
+    const waarde =
+      body[sleutel] === undefined ? "" : limitString(body[sleutel], MAX_LES_MATERIAAL);
+    if (waarde === null) {
+      return NextResponse.json({ error: "Lesmateriaal is te lang." }, { status: 400 });
+    }
+    materiaal[sleutel] = waarde;
+  }
+
   const input: LessonInput = {
     vak: isVak(body.vak) ? body.vak : "Maatschappijleer",
     niveau: isNiveau(body.niveau) ? body.niveau : "havo",
@@ -100,6 +114,7 @@ export async function POST(request: NextRequest) {
     lesduur,
     aantalLessen,
     boekBegrippen,
+    ...materiaal,
   };
 
   // Het quotum kost de docent pas iets als er ook echt een les is opgeslagen.
