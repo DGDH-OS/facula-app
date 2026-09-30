@@ -5,6 +5,12 @@ const VAKKEN = [
   { waarde: "Geschiedenis", label: "Geschiedenis" },
   { waarde: "Economie", label: "Economie" },
   { waarde: "Aardrijkskunde", label: "Aardrijkskunde" },
+  { waarde: "Biologie", label: "Biologie" },
+  { waarde: "Natuurkunde", label: "Natuurkunde" },
+  { waarde: "Scheikunde", label: "Scheikunde" },
+  { waarde: "Nederlands", label: "Nederlands" },
+  { waarde: "Engels", label: "Engels" },
+  { waarde: "Wiskunde", label: "Wiskunde" },
 ] as const;
 
 const NIVEAUS = [

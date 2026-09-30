@@ -1,5 +1,6 @@
 import { MAX_BOEK_BEGRIPPEN, MAX_LES_MATERIAAL } from "@/lib/boek-begrippen";
 import { NextRequest, NextResponse } from "next/server";
+import { VAKKEN } from "@/lib/types";
 import type { LessonInput, Vak, Niveau, GeneratedLesson } from "@/lib/types";
 import { genereerLesMetAi } from "@/lib/ai/generate-lesson";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -16,11 +17,10 @@ import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
  */
 export const maxDuration = 180;
 
-const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
 
 function isVak(v: unknown): v is Vak {
-  return typeof v === "string" && (VAKKEN as string[]).includes(v);
+  return typeof v === "string" && (VAKKEN as readonly string[]).includes(v);
 }
 
 function isNiveau(v: unknown): v is Niveau {

@@ -1,17 +1,17 @@
 import { MAX_BOEK_BEGRIPPEN } from "@/lib/boek-begrippen";
 import { MAX_EIGEN_VRAGEN } from "@/lib/voorbeeldtoets";
 import { NextRequest, NextResponse } from "next/server";
+import { VAKKEN } from "@/lib/types";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { quotaBoodschap, saveWithQuota } from "@/lib/quota";
 import { clampInt, limitString, readBodyWithLimit } from "@/lib/validation";
 
-const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
 
 function isVak(v: unknown): v is Vak {
-  return typeof v === "string" && (VAKKEN as string[]).includes(v);
+  return typeof v === "string" && (VAKKEN as readonly string[]).includes(v);
 }
 
 function isNiveau(v: unknown): v is Niveau {

@@ -201,10 +201,10 @@ export function genereerToets(input: TestInput): GeneratedTest {
     vraag: `Kies twee van de behandelde begrippen (${pool
       .slice(0, 4)
       .map((b) => b.begrip)
-      .join(", ")}) en leg uit hoe deze samen een maatschappelijk probleem kunnen verklaren of versterken.`,
+      .join(", ")}) en leg uit hoe deze met elkaar samenhangen.`,
     punten: 4,
     antwoordsleutel:
-      "Volledig antwoord (4 pt): beide begrippen correct uitgelegd + een logisch onderbouwd verband met een concreet maatschappelijk probleem. Gedeeltelijk (2-3 pt): begrippen correct maar verband zwak onderbouwd. 0-1 pt: begrippen onjuist of geen verband gelegd.",
+      "Volledig antwoord (4 pt): beide begrippen correct uitgelegd + een logisch onderbouwd verband tussen de twee. Gedeeltelijk (2-3 pt): begrippen correct maar verband zwak onderbouwd. 0-1 pt: begrippen onjuist of geen verband gelegd.",
   } as ToetsVraag);
 
   // Constructive-alignment-check: elke vraag t.o.v. het leerdoel (zelfde

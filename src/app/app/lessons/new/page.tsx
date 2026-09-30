@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { VAKKEN } from "@/lib/types";
 import type { LessonInput, Vak, Niveau } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
@@ -12,7 +13,6 @@ import { FormCard } from "@/components/ui/FormCard";
 import { ProgressNotice } from "@/components/ui/ProgressNotice";
 import { Stepper } from "@/components/ui/Stepper";
 
-const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
 
 /** Zelfde grenzen als de serverside validatie in /api/lessons. */

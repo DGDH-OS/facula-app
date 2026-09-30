@@ -128,6 +128,13 @@ const GENERIEKE_VAKTERMEN: Record<Vak, string[]> = {
     "verstedelijking",
     "draagvlak",
   ],
+  // Nieuwe vakken: geen ingebouwde vaktermen. De begrippen komen uit het lesboek.
+  Biologie: [],
+  Natuurkunde: [],
+  Scheikunde: [],
+  Nederlands: [],
+  Engels: [],
+  Wiskunde: [],
 };
 
 /* ------------------------------------------------------------------ */
@@ -185,7 +192,19 @@ export function bouwTerugblik(vak: Vak, begrippen: string[], isEersteLes: boolea
       "Wat was de oorzaak van die verandering?",
       `Herinner je nog iets over ${eerste}?`,
     ],
-  };
+    ...Object.fromEntries(
+      (["Biologie", "Natuurkunde", "Scheikunde", "Nederlands", "Engels", "Wiskunde"] as const).map(
+        (v) => [
+          v,
+          [
+            "Waar ging de vorige les over?",
+            "Welke begrippen ken je al?",
+            `Herinner je nog iets over ${eerste}?`,
+          ],
+        ]
+      )
+    ),
+  } as Record<Vak, string[]>;
 
   const openingsRegel = isEersteLes
     ? "Korte activeringsvraag klassikaal (2 min)"

@@ -40,7 +40,7 @@ export function BronnenZoeker({
       setLijst(data.bronnen);
       if (data.bronnen.length === 0)
         setMelding(
-          "Geen artikel gevonden dat je begrippen echt behandelt. Abstracte begrippen staan zelden in het nieuws van vandaag. Zoek hieronder op een actueel onderwerp, bijvoorbeeld energiearmoede of asielopvang."
+          "Geen artikel van vandaag gevonden dat je begrippen echt behandelt. Dat komt vaak voor bij vakbegrippen. Zoek hieronder op een actueel onderwerp, of plak een bron uit je lesboek."
         );
     } catch (e) {
       setMelding(e instanceof Error ? e.message : "Zoeken lukt niet.");

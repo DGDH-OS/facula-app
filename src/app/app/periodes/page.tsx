@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
+import { VAKKEN } from "@/lib/types";
 import type { Niveau, Vak } from "@/lib/types";
 
-const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
 
 interface PeriodeRij {

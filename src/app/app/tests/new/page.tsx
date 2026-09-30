@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { VAKKEN, VAKKEN_MET_NIEUWSBRON } from "@/lib/types";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
@@ -14,7 +15,6 @@ import { FormCard } from "@/components/ui/FormCard";
 import { ProgressNotice } from "@/components/ui/ProgressNotice";
 import { Stepper } from "@/components/ui/Stepper";
 
-const VAKKEN: Vak[] = ["Maatschappijleer", "Geschiedenis", "Economie", "Aardrijkskunde"];
 const NIVEAUS: Niveau[] = ["vmbo-t", "havo", "vwo"];
 
 /** Zelfde grenzen als de serverside validatie in /api/tests (src/lib/validation.ts). */
@@ -398,17 +398,19 @@ export default function NewTestPage() {
               )}
             </Field>
 
-            <BronnenZoeker
-              begrippen={zoekBegrippen}
-              automatisch={vanPeriode}
-              onKies={(tekst, vermelding) =>
-                setInput({ ...input, bronTekst: tekst, bronVermelding: vermelding })
-              }
-            />
+            {VAKKEN_MET_NIEUWSBRON.includes(input.vak) && (
+              <BronnenZoeker
+                begrippen={zoekBegrippen}
+                automatisch={vanPeriode}
+                onKies={(tekst, vermelding) =>
+                  setInput({ ...input, bronTekst: tekst, bronVermelding: vermelding })
+                }
+              />
+            )}
 
             <Field
-              label="Bron: nieuwsartikel (optioneel)"
-              hulptekst="Plak een echt nieuwsartikel over een maatschappelijk probleem. Facula maakt daar vragen bij over je begrippen en verzint zelf geen bronnen."
+              label="Bron (optioneel)"
+              hulptekst="Plak een bron uit je lesboek of een echt artikel. Facula maakt daar vragen bij over je begrippen en verzint zelf geen bronnen."
             >
               {(ids) => (
                 <textarea

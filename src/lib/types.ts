@@ -1,8 +1,25 @@
-export type Vak =
-  | "Maatschappijleer"
-  | "Geschiedenis"
-  | "Economie"
-  | "Aardrijkskunde";
+export const VAKKEN = [
+  "Maatschappijleer",
+  "Geschiedenis",
+  "Economie",
+  "Aardrijkskunde",
+  "Biologie",
+  "Natuurkunde",
+  "Scheikunde",
+  "Nederlands",
+  "Engels",
+  "Wiskunde",
+] as const;
+
+export type Vak = (typeof VAKKEN)[number];
+
+/** Vakken waarbij een actueel nieuwsartikel als toetsbron past. */
+export const VAKKEN_MET_NIEUWSBRON: readonly Vak[] = [
+  "Maatschappijleer",
+  "Geschiedenis",
+  "Economie",
+  "Aardrijkskunde",
+];
 
 export type Niveau = "vmbo-t" | "havo" | "vwo";
 
