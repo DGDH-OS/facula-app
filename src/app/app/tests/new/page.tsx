@@ -362,6 +362,44 @@ export default function NewTestPage() {
               )}
             </Field>
 
+            <Field label="Vak">
+              {(ids) => (
+                <select
+                  {...ids}
+                  ref={vakRef}
+                  value={input.vak}
+                  onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
+                  className={VELD_KLASSEN}
+                >
+                  {VAKKEN.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+
+            <Field label="Niveau">
+              {(ids) => (
+                <select
+                  {...ids}
+                  ref={niveauRef}
+                  value={input.niveau}
+                  onChange={(e) =>
+                    setInput({ ...input, niveau: e.target.value as Niveau })
+                  }
+                  className={VELD_KLASSEN}
+                >
+                  {NIVEAUS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+
             <Field
               label="Kernbegrippen"
               hulptekst="Mag je leeg laten. Vul je ze in, dan komen ze zeker in de toets terug. Scheid ze met een komma."
@@ -467,44 +505,6 @@ export default function NewTestPage() {
                     className={`${VELD_KLASSEN} leading-relaxed`}
                   />
                 </>
-              )}
-            </Field>
-
-            <Field label="Vak">
-              {(ids) => (
-                <select
-                  {...ids}
-                  ref={vakRef}
-                  value={input.vak}
-                  onChange={(e) => setInput({ ...input, vak: e.target.value as Vak })}
-                  className={VELD_KLASSEN}
-                >
-                  {VAKKEN.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </Field>
-
-            <Field label="Niveau">
-              {(ids) => (
-                <select
-                  {...ids}
-                  ref={niveauRef}
-                  value={input.niveau}
-                  onChange={(e) =>
-                    setInput({ ...input, niveau: e.target.value as Niveau })
-                  }
-                  className={VELD_KLASSEN}
-                >
-                  {NIVEAUS.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
               )}
             </Field>
 
