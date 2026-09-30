@@ -127,6 +127,14 @@ export function ToetsWeergave({
           />
         )}
 
+        {toets.bronnen?.map((b) => (
+          <div key={b.nummer} className="rounded-2xl border-2 border-lijn bg-ivoor p-8">
+            <h3 className="font-display text-2xl text-marine">Bron {b.nummer}</h3>
+            <p className="mt-4 whitespace-pre-line text-base text-tekst">{b.tekst}</p>
+            <p className="mt-4 text-base italic text-tekst-zacht">{b.vermelding}</p>
+          </div>
+        ))}
+
         <div className="rounded-2xl border-2 border-lijn bg-ivoor p-8">
           <h3 className="font-display text-2xl text-marine">De vragen</h3>
           <ol className="mt-6 space-y-8">

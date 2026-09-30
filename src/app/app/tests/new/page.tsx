@@ -30,6 +30,8 @@ const DEFAULT_INPUT: TestInput = {
   leerdoel: "",
   kernbegrippen: "",
   boekBegrippen: "",
+  bronTekst: "",
+  bronVermelding: "",
   aantalVragen: 10,
 };
 
@@ -50,6 +52,8 @@ function herstelToetsInput(
     leerdoel: conceptTekst(ruw.leerdoel, MAX_LEERDOEL) ?? defaults.leerdoel,
     kernbegrippen: conceptTekst(ruw.kernbegrippen, MAX_KERNBEGRIPPEN) ?? defaults.kernbegrippen,
     boekBegrippen: conceptTekst(ruw.boekBegrippen, 6000) ?? defaults.boekBegrippen,
+    bronTekst: conceptTekst(ruw.bronTekst, 12000) ?? defaults.bronTekst,
+    bronVermelding: conceptTekst(ruw.bronVermelding, 300) ?? defaults.bronVermelding,
     aantalVragen: conceptGetal(ruw.aantalVragen, MIN_VRAGEN, MAX_VRAGEN) ?? defaults.aantalVragen,
   };
 }
@@ -209,6 +213,8 @@ export default function NewTestPage() {
           leerdoel: input.leerdoel.trim(),
           kernbegrippen: input.kernbegrippen.trim(),
           boekBegrippen: (input.boekBegrippen ?? "").trim(),
+          bronTekst: (input.bronTekst ?? "").trim(),
+          bronVermelding: (input.bronVermelding ?? "").trim(),
         }),
       });
       if (!response.ok) {
@@ -315,6 +321,38 @@ export default function NewTestPage() {
                   onChange={(e) => setInput({ ...input, boekBegrippen: e.target.value })}
                   placeholder={"Framing: (definitie uit je boek)\nPolarisatie: (definitie uit je boek)"}
                   className={`${VELD_KLASSEN} leading-relaxed`}
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Bron: nieuwsartikel (optioneel)"
+              hulptekst="Plak een echt nieuwsartikel over een maatschappelijk probleem. Facula maakt daar vragen bij over je begrippen en verzint zelf geen bronnen."
+            >
+              {(ids) => (
+                <textarea
+                  {...ids}
+                  rows={8}
+                  maxLength={12000}
+                  value={input.bronTekst ?? ""}
+                  onChange={(e) => setInput({ ...input, bronTekst: e.target.value })}
+                  className={`${VELD_KLASSEN} leading-relaxed`}
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Bronvermelding"
+              hulptekst="Verplicht bij een bron. Bijvoorbeeld: Naar: nos.nl, 12 maart 2026."
+            >
+              {(ids) => (
+                <input
+                  {...ids}
+                  type="text"
+                  maxLength={300}
+                  value={input.bronVermelding ?? ""}
+                  onChange={(e) => setInput({ ...input, bronVermelding: e.target.value })}
+                  className={VELD_KLASSEN}
                 />
               )}
             </Field>

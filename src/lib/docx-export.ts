@@ -118,6 +118,45 @@ export function bouwToetsDocument(
   vraagParagrafen.push(metaRegel(toets, stijl));
   vraagParagrafen.push(naamKlasRegel(stijl));
 
+  for (const b of toets.bronnen ?? []) {
+    vraagParagrafen.push(
+      new Paragraph({
+        spacing: { before: 240, after: 80 },
+        children: [
+          new TextRun({
+            text: `Bron ${b.nummer}`,
+            bold: true,
+            color: stijl.accent,
+            size: 24,
+            font: stijl.font,
+          }),
+        ],
+      })
+    );
+    for (const alinea of b.tekst.split(/\r?\n/).filter((r) => r.trim())) {
+      vraagParagrafen.push(
+        new Paragraph({
+          spacing: { after: 80 },
+          children: [new TextRun({ text: alinea, size: 20, color: stijl.tekst, font: stijl.font })],
+        })
+      );
+    }
+    vraagParagrafen.push(
+      new Paragraph({
+        spacing: { after: 200 },
+        children: [
+          new TextRun({
+            text: b.vermelding,
+            italics: true,
+            size: 18,
+            color: stijl.zacht,
+            font: stijl.font,
+          }),
+        ],
+      })
+    );
+  }
+
   for (const v of toets.vragen) {
     vraagParagrafen.push(
       new Paragraph({

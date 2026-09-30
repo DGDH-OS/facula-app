@@ -4,6 +4,7 @@ import type {
   GeneratedTest,
   ToetsVraag,
   MeerkeuzeOptie,
+  ToetsBron,
 } from "./types";
 import { extraheerBegrippen } from "./lesson-generator";
 import { parseBoekBegrippen, type BoekBegrip } from "./boek-begrippen";
@@ -74,6 +75,44 @@ function bouwInvulvraag(nummer: number, item: BoekBegrip): ToetsVraag {
   };
 }
 
+function sleutelBron(items: BoekBegrip[]): string {
+  const defs = items
+    .filter((b) => b.definitie)
+    .map((b) => `${b.begrip}: "${b.definitie}"`)
+    .join("; ");
+  return `${
+    defs ? `Lesboek: ${defs}. ` : ""
+  }Beoordeel aan de hand van de bron en het lesboek. 1p: begrip(pen) juist uitgelegd. 1p: duidelijke koppeling met een fragment uit de bron.`;
+}
+
+function bouwBronVragen(start: number, pool: BoekBegrip[]): ToetsVraag[] {
+  const echte = pool.filter((b) => b.begrip !== "kernbegrip");
+  const vragen: ToetsVraag[] = [];
+  let nr = start;
+  for (const item of echte.slice(0, 3)) {
+    vragen.push({
+      nummer: nr++,
+      type: "open",
+      bron: 1,
+      vraag: `Gebruik bron 1. Leg aan de hand van de bron uit hoe het begrip "${item.begrip}" hierin naar voren komt.`,
+      punten: 2,
+      antwoordsleutel: sleutelBron([item]),
+    });
+  }
+  if (echte.length >= 2) {
+    const [a, b] = echte;
+    vragen.push({
+      nummer: nr++,
+      type: "open",
+      bron: 1,
+      vraag: `Gebruik bron 1. Leg de relatie uit tussen de begrippen "${a.begrip}" en "${b.begrip}" aan de hand van de bron.`,
+      punten: 2,
+      antwoordsleutel: sleutelBron([a, b]),
+    });
+  }
+  return vragen;
+}
+
 function titelVoorTest(input: TestInput): string {
   return `Toets ${input.vak}, ${input.niveau.toUpperCase()} ${input.leerjaar}`;
 }
@@ -117,6 +156,19 @@ export function genereerToets(input: TestInput): GeneratedTest {
     nummer++;
   }
 
+  // Bronvragen: alleen met een bron die de docent zelf aanleverde (een echt
+  // nieuwsartikel). De vragen gaan over de kernbegrippen uit het lesboek en
+  // verwijzen naar de bron; de bron zelf wordt nooit door Facula gemaakt.
+  const bronTekst = (input.bronTekst ?? "").trim();
+  const bronVermelding = (input.bronVermelding ?? "").trim();
+  const bronnen: ToetsBron[] = [];
+  if (bronTekst && bronVermelding) {
+    bronnen.push({ nummer: 1, tekst: bronTekst, vermelding: bronVermelding });
+    const bronVragen = bouwBronVragen(nummer, pool);
+    vragen.push(...bronVragen);
+    nummer += bronVragen.length;
+  }
+
   // Slotvraag: koppel begrippen aan maatschappelijk probleem (open, hoger denkniveau)
   vragen.push({
     nummer,
@@ -144,6 +196,7 @@ export function genereerToets(input: TestInput): GeneratedTest {
     createdAt: new Date().toISOString(),
     input,
     titel: titelVoorTest(input),
+    bronnen: bronnen.length > 0 ? bronnen : undefined,
     vragen,
     totaalPunten,
     tijdsduur: Math.round(aantal * 3 + 10),

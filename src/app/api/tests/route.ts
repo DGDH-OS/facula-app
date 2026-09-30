@@ -71,6 +71,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const bronTekst = body.bronTekst === undefined ? "" : limitString(body.bronTekst, 12000);
+  const bronVermelding =
+    body.bronVermelding === undefined ? "" : limitString(body.bronVermelding, 300);
+  if (bronTekst === null || bronVermelding === null) {
+    return NextResponse.json({ error: "De bron is te lang." }, { status: 400 });
+  }
+  if (bronTekst && !bronVermelding) {
+    return NextResponse.json(
+      { error: "Vul de bronvermelding in (krant of site en datum)." },
+      { status: 400 }
+    );
+  }
+
   const aantalVragen =
     body.aantalVragen === undefined ? 8 : clampInt(body.aantalVragen, 1, 40);
   if (aantalVragen === null) {
@@ -88,6 +101,8 @@ export async function POST(request: NextRequest) {
     kernbegrippen,
     aantalVragen,
     boekBegrippen,
+    bronTekst,
+    bronVermelding,
   };
 
   try {
@@ -101,6 +116,7 @@ export async function POST(request: NextRequest) {
       id: toets.id,
       createdAt: toets.createdAt,
       titel: toets.titel,
+      bronnen: toets.bronnen,
       vragen: toets.vragen,
       totaalPunten: toets.totaalPunten,
       tijdsduur: toets.tijdsduur,

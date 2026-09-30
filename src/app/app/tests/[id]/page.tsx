@@ -45,6 +45,7 @@ export default async function TestDetailPage({
     createdAt: rij.created_at,
     input: rij.input,
     titel: rij.output.titel,
+    bronnen: rij.output.bronnen,
     vragen: rij.output.vragen,
     totaalPunten: rij.output.totaalPunten,
     tijdsduur: rij.output.tijdsduur,

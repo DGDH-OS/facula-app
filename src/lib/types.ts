@@ -98,6 +98,8 @@ export interface ToetsVraag {
   punten: number;
   opties?: MeerkeuzeOptie[];
   antwoordsleutel: string;
+  /** Nummer van de bron waar deze vraag over gaat (zie GeneratedTest.bronnen). */
+  bron?: number;
   /** Constructive-alignment-check t.o.v. het leerdoel (zie hierboven). */
   alignment?: AfstemmingResultaat;
 }
@@ -111,6 +113,16 @@ export interface TestInput {
   aantalVragen: number;
   /** Begrippen + definities woordelijk uit het lesboek ("begrip: definitie" per regel). */
   boekBegrippen?: string;
+  /** Echt nieuwsartikel van de docent, woordelijk geplakt. Facula zoekt of verzint geen bronnen. */
+  bronTekst?: string;
+  /** Bronvermelding van dat artikel, bv. "NOS, 12 maart 2026" of een link. */
+  bronVermelding?: string;
+}
+
+export interface ToetsBron {
+  nummer: number;
+  tekst: string;
+  vermelding: string;
 }
 
 export interface GeneratedTest {
@@ -118,6 +130,7 @@ export interface GeneratedTest {
   createdAt: string;
   input: TestInput;
   titel: string;
+  bronnen?: ToetsBron[];
   vragen: ToetsVraag[];
   totaalPunten: number;
   tijdsduur: number;
