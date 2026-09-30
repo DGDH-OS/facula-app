@@ -193,12 +193,36 @@ const FEEDS: { url: string; domein: string }[] = [
   { url: "https://www.rtl.nl/nieuws/rss.xml", domein: "rtl.nl" },
 ];
 
-interface FeedItem {
+export interface FeedItem {
   titel: string;
   url: string;
   datum: string;
   samenvatting: string;
   domein: string;
+}
+
+/** Voor de dagelijkse archieftaak: de actuele feed-items ongefilterd. */
+export async function haalActueleFeedItems(): Promise<FeedItem[]> {
+  return haalFeedItems();
+}
+
+/** Zoekwoorden voor een reeks begrippen (zelfde stamlogica als de live-zoeker). */
+export function zoekWoordenVoor(begrippen: string[]): string[] {
+  return [
+    ...new Set(
+      begrippen
+        .map((b) => b.trim())
+        .filter((b) => b.length >= 3)
+        .flatMap((t) => [
+          stam(t),
+          ...t
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w) => w.length >= 6)
+            .map(stam),
+        ])
+    ),
+  ];
 }
 
 let feedCache: { op: number; items: FeedItem[] } | null = null;
@@ -250,6 +274,34 @@ function stam(begrip: string): string {
  * (betaalmuur, video) vallen af, dus elk aanbod is direct bruikbaar. Volgorde:
  * de meeste begrippen eerst, dan de nieuwste. Geen AI: alleen zoeken en tellen.
  */
+async function zoekInArchief(woorden: string[]): Promise<FeedItem[]> {
+  if (woorden.length === 0) return [];
+  const { createServiceRoleClient } = await import("./supabase/server");
+  const filter = woorden
+    .slice(0, 10)
+    .map((w) => w.replace(/[%,()*]/g, ""))
+    .filter(Boolean)
+    .flatMap((w) => [`titel.ilike.*${w}*`, `samenvatting.ilike.*${w}*`])
+    .join(",");
+  if (!filter) return [];
+  const { data } = await createServiceRoleClient()
+    .schema("facula")
+    .from("bronnen_archief")
+    .select("url, titel, domein, datum, samenvatting")
+    .or(filter)
+    .order("datum", { ascending: false })
+    .limit(40);
+  return (data ?? [])
+    .filter((r) => domeinVan(r.url))
+    .map((r) => ({
+      titel: r.titel,
+      url: r.url,
+      datum: r.datum ?? "",
+      samenvatting: r.samenvatting,
+      domein: r.domein,
+    }));
+}
+
 export async function zoekBronnenBijBegrippen(
   begrippen: string[],
   max = 6
@@ -263,6 +315,9 @@ export async function zoekBronnenBijBegrippen(
   ];
 
   const items = await haalFeedItems();
+  const uitArchief = await zoekInArchief(woorden).catch(() => [] as FeedItem[]);
+  const gezienUrls = new Set(items.map((i) => i.url));
+  for (const a of uitArchief) if (!gezienUrls.has(a.url)) items.push(a);
   const voorselectie = items
     .map((i) => {
       const hooi = `${i.titel} ${i.samenvatting}`.toLowerCase();
