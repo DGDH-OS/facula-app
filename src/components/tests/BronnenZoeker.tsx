@@ -14,12 +14,15 @@ export function BronnenZoeker({
   onKies,
   begrippen = [],
   automatisch = false,
+  vak,
 }: {
   onKies: (tekst: string, vermelding: string) => void;
   /** Kernbegrippen uit de wizard; daarmee kan Facula zelf bronnen zoeken. */
   begrippen?: string[];
   /** Zoek meteen zodra er begrippen zijn (bijv. na kiezen van een periode). */
   automatisch?: boolean;
+  /** Huidig vak, voor een duidelijke melding als er niets past. */
+  vak?: string;
 }) {
   const [zoek, setZoek] = useState("");
   const [bezig, setBezig] = useState<string | null>(null);
@@ -40,7 +43,7 @@ export function BronnenZoeker({
       setLijst(data.bronnen);
       if (data.bronnen.length === 0)
         setMelding(
-          "Geen artikel van vandaag gevonden dat je begrippen echt behandelt. Dat komt vaak voor bij vakbegrippen. Zoek hieronder op een actueel onderwerp, of plak een bron uit je lesboek."
+          `Geen artikel van vandaag gevonden dat je begrippen echt behandelt. Dat komt vaak voor bij vakbegrippen. Staat je vak nu goed ingesteld${vak ? ` (nu: ${vak})` : ""}? Kies anders boven het juiste vak, of zoek hieronder op een actueel onderwerp.`
         );
     } catch (e) {
       setMelding(e instanceof Error ? e.message : "Zoeken lukt niet.");

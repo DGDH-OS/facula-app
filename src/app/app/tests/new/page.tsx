@@ -362,7 +362,10 @@ export default function NewTestPage() {
               )}
             </Field>
 
-            <Field label="Vak">
+            <Field
+              label="Vak"
+              hulptekst="Kies het vak van je toets. De bronzoeker verschijnt alleen bij maatschappijvakken."
+            >
               {(ids) => (
                 <select
                   {...ids}
@@ -436,8 +439,15 @@ export default function NewTestPage() {
               )}
             </Field>
 
+            {!VAKKEN_MET_NIEUWSBRON.includes(input.vak) && (
+              <p className="rounded-xl border-2 border-lijn bg-ivoor-deep p-4 text-base text-tekst-zacht">
+                Bij {input.vak} hoort meestal geen nieuwsbron. Plak hieronder een bron uit je
+                lesboek als je bronvragen wilt.
+              </p>
+            )}
             {VAKKEN_MET_NIEUWSBRON.includes(input.vak) && (
               <BronnenZoeker
+                vak={input.vak}
                 begrippen={zoekBegrippen}
                 automatisch={vanPeriode}
                 onKies={(tekst, vermelding) =>
