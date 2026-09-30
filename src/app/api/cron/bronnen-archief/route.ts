@@ -15,7 +15,9 @@ export async function GET(request: NextRequest) {
   const items = await haalActueleFeedItems();
   const db = createServiceRoleClient().schema("facula");
 
-  const rijen = items.slice(0, 600).map((i) => ({
+  // Eén rij per URL: dezelfde link in twee feeds mag niet dubbel in één upsert.
+  const uniek = [...new Map(items.map((i) => [i.url, i])).values()];
+  const rijen = uniek.slice(0, 600).map((i) => ({
     url: i.url.slice(0, 500),
     titel: i.titel.slice(0, 400),
     domein: i.domein,
@@ -23,7 +25,10 @@ export async function GET(request: NextRequest) {
     samenvatting: i.samenvatting.slice(0, 1200),
   }));
   const { error } = await db.from("bronnen_archief").upsert(rijen, { onConflict: "url" });
-  if (error) return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
+  if (error) {
+    console.error("bronnen-archief upsert:", error.message);
+    return NextResponse.json({ error: "Opslaan mislukt." }, { status: 500 });
+  }
 
   const grens = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
   await db.from("bronnen_archief").delete().lt("datum", grens);
