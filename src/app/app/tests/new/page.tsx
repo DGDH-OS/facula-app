@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
+import { BronnenZoeker } from "@/components/tests/BronnenZoeker";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
@@ -382,6 +383,12 @@ export default function NewTestPage() {
                 />
               )}
             </Field>
+
+            <BronnenZoeker
+              onKies={(tekst, vermelding) =>
+                setInput({ ...input, bronTekst: tekst, bronVermelding: vermelding })
+              }
+            />
 
             <Field
               label="Bron: nieuwsartikel (optioneel)"
