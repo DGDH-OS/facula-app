@@ -21,6 +21,7 @@ export const TOEGESTANE_SITES: Record<string, string> = {
   "cbs.nl": "CBS",
   "tweedekamer.nl": "Tweede Kamer",
   "nji.nl": "NJi",
+  "nl.wikipedia.org": "Wikipedia",
 };
 
 export interface BronResultaat {
@@ -104,7 +105,9 @@ export async function zoekBronnen(zoekterm: string, max = 8): Promise<BronResult
   } catch {
     // Google begrenst soms; dan zoeken we in de feeds van de kranten zelf.
   }
-  return zoekBronnenBijBegrippen([schoon], max);
+  const nieuws = await zoekBronnenBijBegrippen([schoon], max);
+  if (nieuws.length >= 3) return nieuws;
+  return [...nieuws, ...(await zoekWikipedia([schoon], max - nieuws.length))];
 }
 
 async function zoekViaGoogle(schoon: string, max: number): Promise<BronResultaat[]> {
@@ -147,6 +150,7 @@ async function zoekViaGoogle(schoon: string, max: number): Promise<BronResultaat
 /** Haalt de artikeltekst op uit het JSON-LD (articleBody) of de alinea's. */
 export async function haalArtikelTekst(url: string): Promise<{ tekst: string; titel: string }> {
   if (!domeinVan(url)) throw new Error("Deze site staat niet op de lijst.");
+  if (domeinVan(url) === "nl.wikipedia.org") return haalWikipediaTekst(url);
   const html = await haal(url);
   const titel = decodeEntiteiten(
     html.match(/<meta property="og:title" content="([^"]*)"/)?.[1] ??
@@ -186,6 +190,8 @@ const FEEDS: { url: string; domein: string }[] = [
   { url: "https://www.nu.nl/rss/Algemeen", domein: "nu.nl" },
   { url: "https://www.nu.nl/rss/Politiek", domein: "nu.nl" },
   { url: "https://www.nu.nl/rss/Economie", domein: "nu.nl" },
+  { url: "https://www.nu.nl/rss/Wetenschap", domein: "nu.nl" },
+  { url: "https://feeds.nos.nl/nosnieuwstech", domein: "nos.nl" },
   { url: "https://www.nrc.nl/rss/", domein: "nrc.nl" },
   { url: "https://www.trouw.nl/nieuws/rss.xml", domein: "trouw.nl" },
   { url: "https://www.ad.nl/binnenland/rss.xml", domein: "ad.nl" },
@@ -359,4 +365,119 @@ export async function zoekBronnenBijBegrippen(
     .filter((b): b is BronResultaat & { past: string[] } => b !== null)
     .sort((a, b) => b.past.length - a.past.length || b.datum.localeCompare(a.datum))
     .slice(0, max);
+}
+
+/* ------------------------------------------------------------------ */
+/* Wikipedia (nl): echte encyclopedietekst voor vakken zonder nieuwsbron  */
+/* Licentie CC BY-SA 4.0: bronvermelding met link is verplicht en wordt  */
+/* automatisch meegegeven.                                                */
+/* ------------------------------------------------------------------ */
+
+const WIKI_API = "https://nl.wikipedia.org/w/api.php";
+const WIKI_UA = { "User-Agent": "FaculaBronnen/1.0 (https://facula-app.vercel.app; info@dgdh-os.com)" };
+
+function wikiSchoon(tekst: string): string {
+  return tekst
+    .replace(/^=+\s*[^=\n]+\s*=+\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function knipOpAlinea(tekst: string, max: number): string {
+  if (tekst.length <= max) return tekst;
+  const stuk = tekst.slice(0, max);
+  const punt = Math.max(stuk.lastIndexOf("\n\n"), stuk.lastIndexOf(". "));
+  return (punt > max * 0.5 ? stuk.slice(0, punt + 1) : stuk).trim();
+}
+
+export async function haalWikipediaTekst(url: string): Promise<{ tekst: string; titel: string }> {
+  const titel = decodeURIComponent(new URL(url).pathname.replace(/^\/wiki\//, "")).replace(/_/g, " ");
+  const api = `${WIKI_API}?action=query&prop=extracts&explaintext=1&exsectionformat=wiki&redirects=1&titles=${encodeURIComponent(titel)}&format=json`;
+  const r = await fetch(api, { headers: WIKI_UA, signal: AbortSignal.timeout(12000), cache: "no-store" });
+  if (!r.ok) throw new Error("Wikipedia niet bereikbaar");
+  const d = (await r.json()) as { query?: { pages?: Record<string, { title: string; extract?: string }> } };
+  const pagina = Object.values(d.query?.pages ?? {})[0];
+  const extract = wikiSchoon(pagina?.extract ?? "");
+  if (extract.length < 200) throw new Error("Geen tekst");
+  return { tekst: knipOpAlinea(extract, 3500), titel: pagina?.title ?? titel };
+}
+
+export async function zoekWikipedia(begrippen: string[], max = 6): Promise<BronResultaat[]> {
+  const termen = [...new Set(begrippen.map((b) => b.trim()).filter((b) => b.length >= 3))].slice(0, 6);
+  if (termen.length === 0) return [];
+  const perTerm = await Promise.all(
+    termen.map(async (t) => {
+      try {
+        const api = `${WIKI_API}?action=query&generator=search&gsrsearch=${encodeURIComponent(t)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json`;
+        const r = await fetch(api, { headers: WIKI_UA, signal: AbortSignal.timeout(12000), cache: "no-store" });
+        if (!r.ok) return [];
+        const d = (await r.json()) as {
+          query?: { pages?: Record<string, { title: string; fullurl: string; extract?: string; index: number }> };
+        };
+        return Object.values(d.query?.pages ?? {}).sort((a, b) => a.index - b.index);
+      } catch {
+        return [];
+      }
+    })
+  );
+  const uniek = new Map<string, { titel: string; url: string; extract: string; rang: number }>();
+  perTerm.forEach((lijst) =>
+    lijst.forEach((p, i) => {
+      if (!p.fullurl?.startsWith("https://nl.wikipedia.org/") || (p.extract ?? "").length < 150) return;
+      const bestaand = uniek.get(p.fullurl);
+      const rang = i;
+      if (!bestaand || rang < bestaand.rang) uniek.set(p.fullurl, { titel: p.title, url: p.fullurl, extract: p.extract ?? "", rang });
+    })
+  );
+  const vandaag = new Date().toISOString();
+  return [...uniek.values()]
+    .map((p) => {
+      const laag = `${p.titel} ${p.extract}`.toLowerCase();
+      const past = termen.filter((t) => laag.includes(stam(t)));
+      return { ...p, past };
+    })
+    .filter((p) => p.past.length > 0)
+    .sort((a, b) => b.past.length - a.past.length || a.rang - b.rang)
+    .slice(0, max)
+    .map((p) => ({
+      titel: p.titel,
+      site: "Wikipedia",
+      domein: "nl.wikipedia.org",
+      datum: vandaag,
+      url: p.url,
+      past: p.past,
+    }));
+}
+
+/* ------------------------------------------------------------------ */
+/* APA 7 bronvermelding, automatisch uit de gevonden gegevens             */
+/* ------------------------------------------------------------------ */
+
+const MAANDEN_NL = [
+  "januari", "februari", "maart", "april", "mei", "juni",
+  "juli", "augustus", "september", "oktober", "november", "december",
+];
+
+function apaDatum(iso: string): string {
+  const d = new Date(iso);
+  if (!iso || isNaN(d.getTime())) return "z.d.";
+  return `${d.getFullYear()}, ${d.getDate()} ${MAANDEN_NL[d.getMonth()]}`;
+}
+
+function nu(): string {
+  const d = new Date();
+  return `${d.getDate()} ${MAANDEN_NL[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * APA 7 voor online nieuws: Organisatie. (jaar, dag maand). Titel. Site. URL
+ * Een krant is hier de auteur (groepsauteur), want de feeds noemen geen
+ * journalist. Wikipedia krijgt een opgehaald-op datum, omdat de pagina wijzigt.
+ */
+export function apaVermelding(b: { titel: string; site: string; domein: string; datum: string; url: string }): string {
+  const titel = b.titel.replace(/\s+/g, " ").trim().replace(/[.]+$/, "");
+  if (b.domein === "nl.wikipedia.org") {
+    return `Wikipedia. (z.d.). ${titel}. Geraadpleegd op ${nu()}, van ${b.url}`;
+  }
+  return `${b.site}. (${apaDatum(b.datum)}). ${titel}. ${b.site}. ${b.url}`;
 }

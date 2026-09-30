@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { domeinVan, haalArtikelTekst, TOEGESTANE_SITES } from "@/lib/bronnen";
+import { apaVermelding, domeinVan, haalArtikelTekst, TOEGESTANE_SITES } from "@/lib/bronnen";
 import { limitString, readBodyWithLimit } from "@/lib/validation";
 
 /** POST /api/bronnen/tekst { url, datum? }. Haalt de tekst van een gekozen artikel op. */
@@ -34,12 +34,17 @@ export async function POST(request: NextRequest) {
         { status: 422 }
       );
     }
-    const datumRuw = typeof body.datum === "string" ? new Date(body.datum) : null;
-    const datum =
-      datumRuw && !isNaN(datumRuw.getTime())
-        ? datumRuw.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
+    const datumIso =
+      typeof body.datum === "string" && !isNaN(new Date(body.datum).getTime())
+        ? new Date(body.datum).toISOString()
         : "";
-    const vermelding = `Naar: ${domein}${datum ? `, ${datum}` : ""} (${TOEGESTANE_SITES[domein]}) ${url}`;
+    const vermelding = apaVermelding({
+      titel,
+      site: TOEGESTANE_SITES[domein],
+      domein,
+      datum: datumIso,
+      url,
+    });
     return NextResponse.json({ tekst, titel, vermelding });
   } catch {
     return NextResponse.json(

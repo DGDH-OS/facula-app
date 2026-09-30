@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { zoekBronnen, zoekBronnenBijBegrippen } from "@/lib/bronnen";
+import { zoekBronnen, zoekBronnenBijBegrippen, zoekWikipedia } from "@/lib/bronnen";
+import { VAKKEN_MET_NIEUWSBRON, type Vak } from "@/lib/types";
 
 /** GET /api/bronnen/zoek?q=... Echte nieuwsartikelen, alleen voor ingelogde docenten. */
 export async function GET(request: NextRequest) {
@@ -15,9 +16,20 @@ export async function GET(request: NextRequest) {
     .map((b) => b.trim().slice(0, 60))
     .filter(Boolean)
     .slice(0, 4);
+  const vak = request.nextUrl.searchParams.get("vak") ?? "";
+  const nieuwsVak = VAKKEN_MET_NIEUWSBRON.includes(vak as Vak);
   if (begrippen.length > 0) {
     try {
-      return NextResponse.json({ bronnen: await zoekBronnenBijBegrippen(begrippen) });
+      // Nieuwsvakken: eerst nieuws. Andere vakken (of niets gevonden): Wikipedia + wetenschapsnieuws.
+      let bronnen = nieuwsVak ? await zoekBronnenBijBegrippen(begrippen) : [];
+      if (bronnen.length === 0) {
+        const [wiki, nieuws] = await Promise.all([
+          zoekWikipedia(begrippen, 4),
+          nieuwsVak ? Promise.resolve([]) : zoekBronnenBijBegrippen(begrippen, 3),
+        ]);
+        bronnen = [...wiki, ...nieuws];
+      }
+      return NextResponse.json({ bronnen });
     } catch {
       return NextResponse.json(
         { error: "Zoeken lukt nu niet. Plak het artikel zelf in het veld hieronder." },

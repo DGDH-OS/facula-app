@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { VAKKEN, VAKKEN_MET_NIEUWSBRON } from "@/lib/types";
+import { VAKKEN } from "@/lib/types";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
@@ -170,9 +170,6 @@ export default function NewTestPage() {
         .filter(Boolean),
     ]),
   ];
-  const [vanPeriode] = useState(
-    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("periode")
-  );
 
   const leerdoelRef = useRef<HTMLTextAreaElement>(null);
   const kernbegrippenRef = useRef<HTMLTextAreaElement>(null);
@@ -364,7 +361,7 @@ export default function NewTestPage() {
 
             <Field
               label="Vak"
-              hulptekst="Kies het vak van je toets. De bronzoeker verschijnt alleen bij maatschappijvakken."
+              hulptekst="Kies het vak van je toets. Facula zoekt daar zelf een passende bron bij."
             >
               {(ids) => (
                 <select
@@ -439,22 +436,15 @@ export default function NewTestPage() {
               )}
             </Field>
 
-            {!VAKKEN_MET_NIEUWSBRON.includes(input.vak) && (
-              <p className="rounded-xl border-2 border-lijn bg-ivoor-deep p-4 text-base text-tekst-zacht">
-                Bij {input.vak} hoort meestal geen nieuwsbron. Plak hieronder een bron uit je
-                lesboek als je bronvragen wilt.
-              </p>
-            )}
-            {VAKKEN_MET_NIEUWSBRON.includes(input.vak) && (
-              <BronnenZoeker
-                vak={input.vak}
-                begrippen={zoekBegrippen}
-                automatisch={vanPeriode}
-                onKies={(tekst, vermelding) =>
-                  setInput({ ...input, bronTekst: tekst, bronVermelding: vermelding })
-                }
-              />
-            )}
+            <BronnenZoeker
+              vak={input.vak}
+              begrippen={zoekBegrippen}
+              automatisch
+              bronIngevuld={(input.bronTekst ?? "").trim().length > 0}
+              onKies={(tekst, vermelding) =>
+                setInput({ ...input, bronTekst: tekst, bronVermelding: vermelding })
+              }
+            />
 
             <Field
               label="Bron (optioneel)"
@@ -474,7 +464,7 @@ export default function NewTestPage() {
 
             <Field
               label="Bronvermelding"
-              hulptekst="Verplicht bij een bron. Bijvoorbeeld: Naar: nos.nl, 12 maart 2026."
+              hulptekst="Verplicht bij een bron. Bij een gekozen bron staat hier automatisch de APA-vermelding."
             >
               {(ids) => (
                 <input
