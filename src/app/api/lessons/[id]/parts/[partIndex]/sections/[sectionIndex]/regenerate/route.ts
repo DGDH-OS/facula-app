@@ -1,3 +1,4 @@
+import { parseBoekBegrippen } from "@/lib/boek-begrippen";
 import { NextRequest, NextResponse } from "next/server";
 import type { GeneratedLesson } from "@/lib/types";
 import {
@@ -84,7 +85,12 @@ export async function POST(
       nieuweInhoud = bouwTerugblik(input.vak, groep, isEersteLes);
       break;
     case 1:
-      nieuweInhoud = bouwLeerdoelKernbegrippen(input.vak, groep, isEersteLes);
+      nieuweInhoud = bouwLeerdoelKernbegrippen(
+        input.vak,
+        groep,
+        isEersteLes,
+        parseBoekBegrippen(input.boekBegrippen)
+      );
       break;
     case 2:
       nieuweInhoud = bouwCasus(input.vak, groep, input.niveau);

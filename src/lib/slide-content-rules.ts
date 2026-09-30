@@ -30,6 +30,12 @@ export const MAX_DEFINITIE_WOORDEN = 12;
 export const MAX_WOORDEN_PER_DEFINITIE_BULLET = 20;
 
 /**
+ * Definities uit het lesboek gaan 1-op-1 op de slide en mogen nooit
+ * ingekort worden. Deze limiet is alleen een veiligheidsplafond.
+ */
+export const MAX_WOORDEN_BOEKDEFINITIE = 200;
+
+/**
  * Woordlimiet voor content die grammaticaal COMPLEET moet blijven ook al is
  * die langer dan een actie-bullet — met name het volledige leerdoel op de
  * Leerdoelen-slide. Dit is de categorie "definitie/uitspraak die leerlingen

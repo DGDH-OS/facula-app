@@ -1,3 +1,4 @@
+import { MAX_BOEK_BEGRIPPEN } from "@/lib/boek-begrippen";
 import { NextRequest, NextResponse } from "next/server";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { genereerToets } from "@/lib/test-generator";
@@ -61,6 +62,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const boekBegrippen =
+    body.boekBegrippen === undefined ? "" : limitString(body.boekBegrippen, MAX_BOEK_BEGRIPPEN);
+  if (boekBegrippen === null) {
+    return NextResponse.json(
+      { error: "Begrippen uit het boek zijn te lang." },
+      { status: 400 }
+    );
+  }
+
   const aantalVragen =
     body.aantalVragen === undefined ? 8 : clampInt(body.aantalVragen, 1, 40);
   if (aantalVragen === null) {
@@ -77,6 +87,7 @@ export async function POST(request: NextRequest) {
     leerdoel,
     kernbegrippen,
     aantalVragen,
+    boekBegrippen,
   };
 
   try {

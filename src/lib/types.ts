@@ -13,6 +13,8 @@ export interface LessonInput {
   leerdoel: string;
   lesduur: number; // minuten
   aantalLessen: number;
+  /** Begrippen + definities woordelijk uit het lesboek ("begrip: definitie" per regel). */
+  boekBegrippen?: string;
 }
 
 export interface LessonSection {
@@ -107,6 +109,8 @@ export interface TestInput {
   leerdoel: string;
   kernbegrippen: string;
   aantalVragen: number;
+  /** Begrippen + definities woordelijk uit het lesboek ("begrip: definitie" per regel). */
+  boekBegrippen?: string;
 }
 
 export interface GeneratedTest {

@@ -29,6 +29,7 @@ const DEFAULT_INPUT: TestInput = {
   leerjaar: 4,
   leerdoel: "",
   kernbegrippen: "",
+  boekBegrippen: "",
   aantalVragen: 10,
 };
 
@@ -48,6 +49,7 @@ function herstelToetsInput(
     leerjaar: conceptGetal(ruw.leerjaar, MIN_LEERJAAR, MAX_LEERJAAR) ?? defaults.leerjaar,
     leerdoel: conceptTekst(ruw.leerdoel, MAX_LEERDOEL) ?? defaults.leerdoel,
     kernbegrippen: conceptTekst(ruw.kernbegrippen, MAX_KERNBEGRIPPEN) ?? defaults.kernbegrippen,
+    boekBegrippen: conceptTekst(ruw.boekBegrippen, 6000) ?? defaults.boekBegrippen,
     aantalVragen: conceptGetal(ruw.aantalVragen, MIN_VRAGEN, MAX_VRAGEN) ?? defaults.aantalVragen,
   };
 }
@@ -206,6 +208,7 @@ export default function NewTestPage() {
           ...input,
           leerdoel: input.leerdoel.trim(),
           kernbegrippen: input.kernbegrippen.trim(),
+          boekBegrippen: (input.boekBegrippen ?? "").trim(),
         }),
       });
       if (!response.ok) {
@@ -294,6 +297,23 @@ export default function NewTestPage() {
                   value={input.kernbegrippen}
                   onChange={(e) => setInput({ ...input, kernbegrippen: e.target.value })}
                   placeholder="Bijv. framing, polarisatie, desinformatie"
+                  className={`${VELD_KLASSEN} leading-relaxed`}
+                />
+              )}
+            </Field>
+
+            <Field
+              label="Begrippen en definities uit je lesboek"
+              hulptekst="Eén per regel: begrip: definitie. Facula neemt ze letterlijk over en verzint zelf niets."
+            >
+              {(ids) => (
+                <textarea
+                  {...ids}
+                  rows={6}
+                  maxLength={6000}
+                  value={input.boekBegrippen ?? ""}
+                  onChange={(e) => setInput({ ...input, boekBegrippen: e.target.value })}
+                  placeholder={"Framing: (definitie uit je boek)\nPolarisatie: (definitie uit je boek)"}
                   className={`${VELD_KLASSEN} leading-relaxed`}
                 />
               )}

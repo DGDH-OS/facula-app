@@ -31,6 +31,7 @@ const DEFAULT_INPUT: LessonInput = {
   leerdoel: "",
   lesduur: 50,
   aantalLessen: 1,
+  boekBegrippen: "",
 };
 
 /**
@@ -50,6 +51,7 @@ function herstelLesInput(
     leerdoel: conceptTekst(ruw.leerdoel, MAX_LEERDOEL) ?? defaults.leerdoel,
     lesduur: conceptGetal(ruw.lesduur, MIN_LESDUUR, MAX_LESDUUR) ?? defaults.lesduur,
     aantalLessen: conceptGetal(ruw.aantalLessen, 1, MAX_LESSEN) ?? defaults.aantalLessen,
+    boekBegrippen: conceptTekst(ruw.boekBegrippen, 6000) ?? defaults.boekBegrippen,
   };
 }
 
@@ -344,6 +346,23 @@ export default function NewLessonPage() {
                     {input.leerdoel.length} van {MAX_LEERDOEL} tekens
                   </p>
                 </>
+              )}
+            </Field>
+
+            <Field
+              label="Begrippen en definities uit je lesboek"
+              hulptekst="Eén per regel: begrip: definitie. Facula neemt ze letterlijk over en verzint zelf niets."
+            >
+              {(ids) => (
+                <textarea
+                  {...ids}
+                  rows={6}
+                  maxLength={6000}
+                  value={input.boekBegrippen ?? ""}
+                  onChange={(e) => setInput({ ...input, boekBegrippen: e.target.value })}
+                  placeholder={"Framing: (definitie uit je boek)\nPolarisatie: (definitie uit je boek)"}
+                  className={`${VELD_KLASSEN} leading-relaxed`}
+                />
               )}
             </Field>
 

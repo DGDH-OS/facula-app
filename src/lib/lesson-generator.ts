@@ -8,10 +8,10 @@ import type {
 } from "./types";
 import {
   afdwingenSlideRegels,
-  afdwingenDefinitie,
   trimTitel,
-  MAX_WOORDEN_PER_DEFINITIE_BULLET,
+  MAX_WOORDEN_BOEKDEFINITIE,
 } from "./slide-content-rules";
+import { parseBoekBegrippen, zoekDefinitie, type BoekBegrip } from "./boek-begrippen";
 
 /* ------------------------------------------------------------------ */
 /* Begrippen-extractie                                                 */
@@ -94,15 +94,6 @@ export function extraheerBegrippen(leerdoel: string): string[] {
 /* DEFINITIONS_AS_SINGLE_SENTENCE) — geen lijst van volzinnen.            */
 /* ------------------------------------------------------------------ */
 
-const DEFINITIES: Record<string, string> = {
-  referentiekader: "eigen waarden en ervaringen kleuren je interpretatie",
-  "selectieve waarneming": "onbewust vooral zien wat je al verwacht",
-  desinformatie: "bewust onjuiste, misleidende informatie",
-  manipulatie: "oneerlijk beïnvloeden van mening of gedrag",
-  polarisatie: "standpunten groeien steeds verder uit elkaar",
-  framing: "boodschap ingekleed voor gewenste interpretatie",
-};
-
 const GENERIEKE_VAKTERMEN: Record<Vak, string[]> = {
   Maatschappijleer: [
     "referentiekader",
@@ -134,12 +125,6 @@ const GENERIEKE_VAKTERMEN: Record<Vak, string[]> = {
     "draagvlak",
   ],
 };
-
-function definieer(begrip: string, vak: Vak): string {
-  const key = begrip.toLowerCase().trim();
-  if (DEFINITIES[key]) return afdwingenDefinitie(DEFINITIES[key]);
-  return afdwingenDefinitie(`kernbegrip binnen ${vak.toLowerCase()}, leg uit met voorbeeld`);
-}
 
 /* ------------------------------------------------------------------ */
 /* Casus met concrete cijfers — per vak, generiek herbruikbaar          */
@@ -267,12 +252,19 @@ export function bouwBegeleideInoefening(vak: Vak, begrippen: string[]): string[]
 export function bouwLeerdoelKernbegrippen(
   vak: Vak,
   begrippen: string[],
-  isEersteLes: boolean
+  isEersteLes: boolean,
+  boek: BoekBegrip[] = []
 ): string[] {
+  // Definities komen woordelijk uit het lesboek van de docent. Geen
+  // definitie aangeleverd = alleen het begrip, Facula verzint er geen.
   return afdwingenSlideRegels(
     [
       isEersteLes ? "Leerdoel van deze les(senreeks)" : "Herhaling + nieuwe kernbegrippen",
-      ...begrippen.map((b) => `${b[0].toUpperCase()}${b.slice(1)}: ${definieer(b, vak)}`),
+      ...begrippen.map((b) => {
+        const kop = `${b[0].toUpperCase()}${b.slice(1)}`;
+        const def = zoekDefinitie(boek, b);
+        return def ? `${kop}: ${def}` : kop;
+      }),
     ],
     {
       maxBullets: begrippen.length + 1,
@@ -281,8 +273,8 @@ export function bouwLeerdoelKernbegrippen(
       // label + definitie samen hebben een eigen, hogere limiet nodig.
       // Anders knipt de generieke 7-woorden-regel de definitie af
       // vóórdat hij een complete gedachte vormt (bug 3).
-      maxWoordenPerBullet: MAX_WOORDEN_PER_DEFINITIE_BULLET,
-      maxTotaalWoorden: (begrippen.length + 1) * MAX_WOORDEN_PER_DEFINITIE_BULLET,
+      maxWoordenPerBullet: MAX_WOORDEN_BOEKDEFINITIE,
+      maxTotaalWoorden: (begrippen.length + 1) * MAX_WOORDEN_BOEKDEFINITIE,
     }
   );
 }
@@ -333,7 +325,9 @@ function titelVoorLes(input: LessonInput): string {
 }
 
 export function genereerLes(input: LessonInput): GeneratedLesson {
-  const begrippen = extraheerBegrippen(input.leerdoel);
+  const boek = parseBoekBegrippen(input.boekBegrippen);
+  const begrippen =
+    boek.length > 0 ? boek.map((b) => b.begrip) : extraheerBegrippen(input.leerdoel);
   const aantalLessen = Math.max(1, input.aantalLessen);
 
   // verdeel begrippen zo gelijk mogelijk over de lessen
@@ -357,7 +351,7 @@ export function genereerLes(input: LessonInput): GeneratedLesson {
       {
         titel: trimTitel("2. Leerdoel & kernbegrippen"),
         duur: 8,
-        inhoud: bouwLeerdoelKernbegrippen(input.vak, groep, idx === 0),
+        inhoud: bouwLeerdoelKernbegrippen(input.vak, groep, idx === 0, boek),
       },
       {
         titel: trimTitel("3. Casus met concrete cijfers"),

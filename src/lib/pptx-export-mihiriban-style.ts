@@ -7,7 +7,7 @@ import { passendeAfmeting, type LogoBestand } from "./huisstijl/logo";
 import {
   afdwingenSlideRegels,
   afdwingenVolledigeZin,
-  MAX_WOORDEN_PER_DEFINITIE_BULLET,
+  MAX_WOORDEN_BOEKDEFINITIE,
 } from "./slide-content-rules";
 
 /**
@@ -123,15 +123,16 @@ function alsMultiTextVolledigeZin(regels: string[]) {
 /**
  * Voor de "Label: definitie"-bullets in de kernbegrippen-sectie: deze zijn al
  * grammaticaal compleet opgebouwd door lesson-generator.ts (met
- * MAX_WOORDEN_PER_DEFINITIE_BULLET). Hier NIET nogmaals door de generieke
+ * MAX_WOORDEN_BOEKDEFINITIE). Hier NIET nogmaals door de generieke
  * 7-woorden-bullet-trim halen — dat zou de definitie alsnog midden-in
  * afknippen (bug 3). Wel de maxBullets-limiet en filtering op lege regels
  * behouden, maar met dezelfde ruimere per-bullet/totaal-limiet.
  */
 function alsMultiTextDefinities(regels: string[]) {
   const gefilterd = afdwingenSlideRegels(regels, {
-    maxWoordenPerBullet: MAX_WOORDEN_PER_DEFINITIE_BULLET,
-    maxTotaalWoorden: regels.length * MAX_WOORDEN_PER_DEFINITIE_BULLET,
+    maxBullets: regels.length,
+    maxWoordenPerBullet: MAX_WOORDEN_BOEKDEFINITIE,
+    maxTotaalWoorden: regels.length * MAX_WOORDEN_BOEKDEFINITIE,
   })
     .map((r) => r.trim())
     .filter(Boolean);
