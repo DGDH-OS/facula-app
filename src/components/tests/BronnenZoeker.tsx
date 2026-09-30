@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, VELD_KLASSEN } from "@/components/ui/Field";
 import type { BronResultaat } from "@/lib/bronnen";
@@ -12,13 +12,49 @@ import type { BronResultaat } from "@/lib/bronnen";
  */
 export function BronnenZoeker({
   onKies,
+  begrippen = [],
+  automatisch = false,
 }: {
   onKies: (tekst: string, vermelding: string) => void;
+  /** Kernbegrippen uit de wizard; daarmee kan Facula zelf bronnen zoeken. */
+  begrippen?: string[];
+  /** Zoek meteen zodra er begrippen zijn (bijv. na kiezen van een periode). */
+  automatisch?: boolean;
 }) {
   const [zoek, setZoek] = useState("");
   const [bezig, setBezig] = useState<string | null>(null);
   const [lijst, setLijst] = useState<BronResultaat[] | null>(null);
   const [melding, setMelding] = useState<string | null>(null);
+
+  const begrippenSleutel = begrippen.slice(0, 4).join("|");
+  const autoGedaan = useRef(false);
+
+  async function zoekOpBegrippen() {
+    setBezig("zoeken");
+    setMelding(null);
+    setLijst(null);
+    try {
+      const r = await fetch(`/api/bronnen/zoek?begrippen=${encodeURIComponent(begrippenSleutel)}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Zoeken lukt niet.");
+      setLijst(data.bronnen);
+      if (data.bronnen.length === 0)
+        setMelding(
+          "Geen artikel gevonden dat je begrippen echt behandelt. Abstracte begrippen staan zelden in het nieuws van vandaag. Zoek hieronder op een actueel onderwerp, bijvoorbeeld energiearmoede of asielopvang."
+        );
+    } catch (e) {
+      setMelding(e instanceof Error ? e.message : "Zoeken lukt niet.");
+    } finally {
+      setBezig(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!automatisch || autoGedaan.current || !begrippenSleutel) return;
+    autoGedaan.current = true;
+    void zoekOpBegrippen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [automatisch, begrippenSleutel]);
 
   async function zoekBronnen() {
     setBezig("zoeken");
@@ -59,6 +95,22 @@ export function BronnenZoeker({
 
   return (
     <div className="rounded-2xl border-2 border-lijn bg-ivoor-deep p-6">
+      {begrippen.length > 0 && (
+        <div className="mb-5">
+          <p className="text-base text-tekst">
+            Facula kan zelf bronnen zoeken bij je begrippen: {begrippen.slice(0, 4).join(", ")}.
+          </p>
+          <div className="mt-3">
+            <Button
+              variant="primary"
+              onClick={() => void zoekOpBegrippen()}
+              disabled={bezig !== null}
+            >
+              {bezig === "zoeken" ? "Bezig met zoeken..." : "Zoek automatisch bij mijn begrippen"}
+            </Button>
+          </div>
+        </div>
+      )}
       <Field
         label="Bron zoeken"
         hulptekst="Zoek een echt nieuwsartikel over een maatschappelijk probleem, bijvoorbeeld energiearmoede."
@@ -99,6 +151,11 @@ export function BronnenZoeker({
           {lijst.map((b) => (
             <li key={b.url} className="rounded-xl border-2 border-lijn bg-ivoor p-4">
               <p className="text-base font-medium text-tekst">{b.titel}</p>
+              {b.past && b.past.length > 0 && (
+                <p className="mt-1 text-base font-medium text-succes-tekst">
+                  Bevat: {b.past.join(", ")}
+                </p>
+              )}
               <p className="mt-1 text-base text-tekst-zacht">
                 {b.site}
                 {b.datum &&

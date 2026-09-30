@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { zoekBronnen } from "@/lib/bronnen";
+import { zoekBronnen, zoekBronnenBijBegrippen } from "@/lib/bronnen";
 
 /** GET /api/bronnen/zoek?q=... Echte nieuwsartikelen, alleen voor ingelogde docenten. */
 export async function GET(request: NextRequest) {
@@ -9,6 +9,22 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Niet ingelogd." }, { status: 401 });
+
+  const begrippen = (request.nextUrl.searchParams.get("begrippen") ?? "")
+    .split("|")
+    .map((b) => b.trim().slice(0, 60))
+    .filter(Boolean)
+    .slice(0, 4);
+  if (begrippen.length > 0) {
+    try {
+      return NextResponse.json({ bronnen: await zoekBronnenBijBegrippen(begrippen) });
+    } catch {
+      return NextResponse.json(
+        { error: "Zoeken lukt nu niet. Plak het artikel zelf in het veld hieronder." },
+        { status: 502 }
+      );
+    }
+  }
 
   const q = request.nextUrl.searchParams.get("q") ?? "";
   if (q.trim().length < 3) {

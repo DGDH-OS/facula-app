@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
+import { parseBoekBegrippen } from "@/lib/boek-begrippen";
 import { BronnenZoeker } from "@/components/tests/BronnenZoeker";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
@@ -159,6 +160,19 @@ export default function NewTestPage() {
         }));
       });
   }, [setInput, wisConcept]);
+
+  const zoekBegrippen = [
+    ...new Set([
+      ...parseBoekBegrippen(input.boekBegrippen).map((b) => b.begrip),
+      ...input.kernbegrippen
+        .split(/,|\n/)
+        .map((b) => b.trim())
+        .filter(Boolean),
+    ]),
+  ];
+  const [vanPeriode] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("periode")
+  );
 
   const leerdoelRef = useRef<HTMLTextAreaElement>(null);
   const kernbegrippenRef = useRef<HTMLTextAreaElement>(null);
@@ -385,6 +399,8 @@ export default function NewTestPage() {
             </Field>
 
             <BronnenZoeker
+              begrippen={zoekBegrippen}
+              automatisch={vanPeriode}
               onKies={(tekst, vermelding) =>
                 setInput({ ...input, bronTekst: tekst, bronVermelding: vermelding })
               }
