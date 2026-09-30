@@ -105,7 +105,8 @@ export default function NewLessonPage() {
   const [vanUrl] = useState(() =>
     typeof window === "undefined"
       ? false
-      : new URLSearchParams(window.location.search).has("van")
+      : new URLSearchParams(window.location.search).has("van") ||
+        new URLSearchParams(window.location.search).has("periode")
   );
 
   const {
@@ -115,6 +116,38 @@ export default function NewLessonPage() {
   } = useDraft<LessonInput>("lesson", DEFAULT_INPUT, herstelLesInput, naHerstel, {
     slaHerstelOver: vanUrl,
   });
+
+
+  /**
+   * Staat er `?periode=<id>` in de URL, dan komen leerdoelen, begrippen, vak en
+   * niveau uit die periode (RLS geeft alleen de eigen rijen terug). Er wordt
+   * hier nooit uit zichzelf gegenereerd.
+   */
+  const periodeGeladen = useRef(false);
+  useEffect(() => {
+    if (periodeGeladen.current) return;
+    const id = new URLSearchParams(window.location.search).get("periode");
+    if (!id) return;
+    periodeGeladen.current = true;
+    createClient()
+      .schema("facula")
+      .from("periodes")
+      .select("vak, niveau, leerjaar, leerdoelen, begrippen")
+      .eq("id", id)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        wisConcept();
+        setInput((huidig) => ({
+          ...huidig,
+          vak: conceptKeuze(data.vak, VAKKEN) ?? huidig.vak,
+          niveau: conceptKeuze(data.niveau, NIVEAUS) ?? huidig.niveau,
+          leerjaar: conceptGetal(data.leerjaar, 1, 6) ?? huidig.leerjaar,
+          leerdoel: conceptTekst(data.leerdoelen, 2000) ?? huidig.leerdoel,
+          boekBegrippen: conceptTekst(data.begrippen, 6000) ?? huidig.boekBegrippen,
+        }));
+      });
+  }, [setInput, wisConcept]);
 
   const leerdoelRef = useRef<HTMLTextAreaElement>(null);
   const lesduurRef = useRef<HTMLInputElement>(null);

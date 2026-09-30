@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TestInput, Vak, Niveau } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 import { conceptGetal, conceptKeuze, conceptTekst, useDraft } from "@/lib/useDraft";
 import { Button } from "@/components/ui/Button";
 import { ChoiceCards } from "@/components/ui/ChoiceCards";
@@ -121,7 +122,42 @@ export default function NewTestPage() {
     waarde: input,
     zetWaarde: setInput,
     wisConcept,
-  } = useDraft<TestInput>("tests", DEFAULT_INPUT, herstelToetsInput, naHerstel);
+  } = useDraft<TestInput>("tests", DEFAULT_INPUT, herstelToetsInput, naHerstel, {
+    slaHerstelOver:
+      typeof window !== "undefined" && new URLSearchParams(window.location.search).has("periode"),
+  });
+
+
+  /**
+   * Staat er `?periode=<id>` in de URL, dan komen leerdoelen, begrippen, vak en
+   * niveau uit die periode (RLS geeft alleen de eigen rijen terug). Er wordt
+   * hier nooit uit zichzelf gegenereerd.
+   */
+  const periodeGeladen = useRef(false);
+  useEffect(() => {
+    if (periodeGeladen.current) return;
+    const id = new URLSearchParams(window.location.search).get("periode");
+    if (!id) return;
+    periodeGeladen.current = true;
+    createClient()
+      .schema("facula")
+      .from("periodes")
+      .select("vak, niveau, leerjaar, leerdoelen, begrippen")
+      .eq("id", id)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        wisConcept();
+        setInput((huidig) => ({
+          ...huidig,
+          vak: conceptKeuze(data.vak, VAKKEN) ?? huidig.vak,
+          niveau: conceptKeuze(data.niveau, NIVEAUS) ?? huidig.niveau,
+          leerjaar: conceptGetal(data.leerjaar, 1, 6) ?? huidig.leerjaar,
+          leerdoel: conceptTekst(data.leerdoelen, 2000) ?? huidig.leerdoel,
+          boekBegrippen: conceptTekst(data.begrippen, 6000) ?? huidig.boekBegrippen,
+        }));
+      });
+  }, [setInput, wisConcept]);
 
   const leerdoelRef = useRef<HTMLTextAreaElement>(null);
   const kernbegrippenRef = useRef<HTMLTextAreaElement>(null);
