@@ -99,15 +99,16 @@ async function echteUrl(googleLink: string): Promise<string | null> {
 export async function zoekBronnen(zoekterm: string, max = 8): Promise<BronResultaat[]> {
   const schoon = zoekterm.trim().slice(0, 120);
   if (!schoon) return [];
+  let uitGoogle: BronResultaat[] = [];
   try {
-    const uitGoogle = await zoekViaGoogle(schoon, max);
-    if (uitGoogle.length > 0) return uitGoogle;
+    uitGoogle = await zoekViaGoogle(schoon, max);
   } catch {
-    // Google begrenst soms; dan zoeken we in de feeds van de kranten zelf.
+    // Google begrenst soms; dan zoeken we in de feeds en op Wikipedia.
   }
-  const nieuws = await zoekBronnenBijBegrippen([schoon], max);
-  if (nieuws.length >= 3) return nieuws;
-  return [...nieuws, ...(await zoekWikipedia([schoon], max - nieuws.length))];
+  if (uitGoogle.length >= 4) return uitGoogle;
+  const aanvulling = await zoekBronnenMinimaal([schoon], true, 4, max);
+  const gezien = new Set(uitGoogle.map((b) => b.url));
+  return [...uitGoogle, ...aanvulling.filter((b) => !gezien.has(b.url))].slice(0, max);
 }
 
 async function zoekViaGoogle(schoon: string, max: number): Promise<BronResultaat[]> {
@@ -402,13 +403,17 @@ export async function haalWikipediaTekst(url: string): Promise<{ tekst: string; 
   return { tekst: knipOpAlinea(extract, 3500), titel: pagina?.title ?? titel };
 }
 
-export async function zoekWikipedia(begrippen: string[], max = 6): Promise<BronResultaat[]> {
+export async function zoekWikipedia(
+  begrippen: string[],
+  max = 6,
+  perTermLimiet = 3
+): Promise<BronResultaat[]> {
   const termen = [...new Set(begrippen.map((b) => b.trim()).filter((b) => b.length >= 3))].slice(0, 6);
   if (termen.length === 0) return [];
   const perTerm = await Promise.all(
     termen.map(async (t) => {
       try {
-        const api = `${WIKI_API}?action=query&generator=search&gsrsearch=${encodeURIComponent(t)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json`;
+        const api = `${WIKI_API}?action=query&generator=search&gsrsearch=${encodeURIComponent(t)}&gsrlimit=${perTermLimiet}&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json`;
         const r = await fetch(api, { headers: WIKI_UA, signal: AbortSignal.timeout(12000), cache: "no-store" });
         if (!r.ok) return [];
         const d = (await r.json()) as {
@@ -480,4 +485,65 @@ export function apaVermelding(b: { titel: string; site: string; domein: string; 
     return `Wikipedia. (z.d.). ${titel}. Geraadpleegd op ${nu()}, van ${b.url}`;
   }
   return `${b.site}. (${apaDatum(b.datum)}). ${titel}. ${b.site}. ${b.url}`;
+}
+
+/**
+ * Levert ALTIJD minstens `minimum` bronnen als de wereld ze heeft. Volgorde:
+ * 1. nieuws dat de begrippen echt behandelt (alleen bij nieuwsvakken),
+ * 2. Wikipedia bij alle begrippen samen,
+ * 3. Wikipedia met ruimere zoekresultaten per begrip,
+ * 4. verwante Wikipedia-pagina's bij de beste treffers (uit de eigen links).
+ * Alles echt, geen verzonnen bron. Dubbele links vallen af.
+ */
+export async function zoekBronnenMinimaal(
+  begrippen: string[],
+  nieuwsVak: boolean,
+  minimum = 4,
+  max = 6
+): Promise<BronResultaat[]> {
+  const uit: BronResultaat[] = [];
+  const gezien = new Set<string>();
+  const voegToe = (lijst: BronResultaat[]) => {
+    for (const b of lijst) {
+      if (uit.length >= max) return;
+      if (!gezien.has(b.url)) {
+        gezien.add(b.url);
+        uit.push(b);
+      }
+    }
+  };
+
+  if (nieuwsVak) voegToe(await zoekBronnenBijBegrippen(begrippen, max).catch(() => []));
+  if (uit.length < minimum) voegToe(await zoekWikipedia(begrippen, max).catch(() => []));
+  if (uit.length < minimum) voegToe(await zoekWikipedia(begrippen, max, 8).catch(() => []));
+  if (uit.length < minimum && uit.some((b) => b.domein === "nl.wikipedia.org")) {
+    voegToe(await verwanteWikipedia(uit.filter((b) => b.domein === "nl.wikipedia.org")[0]).catch(() => []));
+  }
+  if (uit.length < minimum && !nieuwsVak) {
+    voegToe(await zoekBronnenBijBegrippen(begrippen, max).catch(() => []));
+  }
+  return uit;
+}
+
+/** Pagina's waar de beste Wikipedia-treffer naar linkt: inhoudelijk verwant, altijd echt. */
+async function verwanteWikipedia(basis: BronResultaat): Promise<BronResultaat[]> {
+  const titel = decodeURIComponent(new URL(basis.url).pathname.replace(/^\/wiki\//, "")).replace(/_/g, " ");
+  const api = `${WIKI_API}?action=query&generator=search&gsrsearch=${encodeURIComponent(`morelike:${titel}`)}&gsrlimit=6&prop=extracts|info&exintro=1&explaintext=1&inprop=url&format=json`;
+  const r = await fetch(api, { headers: WIKI_UA, signal: AbortSignal.timeout(12000), cache: "no-store" });
+  if (!r.ok) return [];
+  const d = (await r.json()) as {
+    query?: { pages?: Record<string, { title: string; fullurl: string; extract?: string; index: number }> };
+  };
+  const vandaag = new Date().toISOString();
+  return Object.values(d.query?.pages ?? {})
+    .sort((a, b) => a.index - b.index)
+    .filter((p) => p.fullurl?.startsWith("https://nl.wikipedia.org/") && (p.extract ?? "").length >= 150)
+    .map((p) => ({
+      titel: p.title,
+      site: "Wikipedia",
+      domein: "nl.wikipedia.org",
+      datum: vandaag,
+      url: p.fullurl,
+      past: [],
+    }));
 }
